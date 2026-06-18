@@ -78,6 +78,14 @@ public class TrackingService extends Service {
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // приложение смахнули из списка задач — гасим уведомление и службу
+        super.onTaskRemoved(rootIntent);
+        stopForeground(true);
+        stopSelf();
+    }
+
+    @Override
     public void onDestroy() {
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();

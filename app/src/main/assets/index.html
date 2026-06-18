@@ -561,6 +561,7 @@
     rt.tracking=true; rt.last=null; rt.speed=0;
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:2000,timeout:27000}); reqWake();
+    try{ if(window.Android&&window.Android.startTracking)window.Android.startTracking(); }catch(e){}
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
 
   function startSim(){
@@ -573,6 +574,7 @@
     rt.tracking=true; rt.speed=0; rt.last=null; alertState={}; rt.posM=currentMeters();
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     reqWake(); setTrackBtn(true);
+    try{ if(window.Android&&window.Android.startTracking)window.Android.startTracking(); }catch(e){}
     $("#gps").className="gps live"; $("#gpsTxt").textContent="ДЕМО";
     var t=Date.now();
     rt.simTimer=setInterval(function(){
@@ -590,6 +592,7 @@
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
     if(rt.simTimer){ clearInterval(rt.simTimer); rt.simTimer=null; }
     relWake(); rt.speed=0;
+    try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){}
     if(rt.autoCalib){ state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; }
     $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
     setTrackBtn(false); renderTrip(); renderList(); }

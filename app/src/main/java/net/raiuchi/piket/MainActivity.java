@@ -57,7 +57,6 @@ public class MainActivity extends Activity {
         web.loadUrl("file:///android_asset/index.html");
 
         requestNeededPermissions();
-        startTrackingService();
     }
 
     private void requestNeededPermissions() {
@@ -79,8 +78,7 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        // перезапускаем службу — теперь с выданными разрешениями
-        startTrackingService();
+        // разрешения получены — служба запустится сама при нажатии «Старт» в приложении
     }
 
     private void startTrackingService() {
@@ -92,10 +90,28 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void stopTrackingService() {
+        stopService(new Intent(this, TrackingService.class));
+    }
+
     class PiketBridge {
         @android.webkit.JavascriptInterface
         public void updatePosition(final String text) {
             TrackingService.updateNotificationText(MainActivity.this, text);
+        }
+
+        @android.webkit.JavascriptInterface
+        public void startTracking() {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { startTrackingService(); }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void stopTracking() {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { stopTrackingService(); }
+            });
         }
     }
 
@@ -111,6 +127,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        stopTrackingService();
         if (web != null) {
             ((android.view.ViewGroup) web.getParent()).removeView(web);
             web.destroy();
