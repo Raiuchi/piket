@@ -161,6 +161,14 @@
   .author{text-align:center;padding:22px 10px 8px;color:var(--dim2);font-size:12px;line-height:1.6}
   .author b{color:var(--steel);font-weight:700} .author .mk{letter-spacing:.2em;font-size:10px;color:var(--dim2)}
 
+  .update-banner{display:none;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(46,134,240,.18),rgba(46,134,240,.08));border:1px solid rgba(46,134,240,.4);border-radius:12px;padding:11px 13px;margin-bottom:14px}
+  .update-banner.on{display:flex}
+  .update-banner .ico{font-size:18px;flex:none}
+  .update-banner .txt{flex:1;font-size:13px;line-height:1.4}
+  .update-banner .txt b{color:#7FB8FF}
+  .update-banner .ub-dl{flex:none;background:var(--blue);color:#fff;font-size:12.5px;font-weight:700;padding:8px 12px;border-radius:8px}
+  .update-banner .ub-x{flex:none;color:var(--dim);font-size:18px;padding:4px 2px}
+
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:60;display:none;backdrop-filter:blur(2px)} .scrim.on{display:block}
   .sheet{position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--bg);border-top:1px solid var(--line);border-radius:22px 22px 0 0;max-width:540px;margin:0 auto;padding:8px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;max-height:92dvh;overflow-y:auto}
   .sheet.on{transform:none} .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 14px}
@@ -241,6 +249,12 @@
   </div>
 
   <section class="view on" id="v-trip">
+    <div class="update-banner" id="updateBanner">
+      <span class="ico">🚀</span>
+      <span class="txt">Доступна версия <b id="ubVer"></b> — обновите приложение</span>
+      <button class="ub-dl" id="ubDownload">Скачать</button>
+      <button class="ub-x" id="ubClose">✕</button>
+    </div>
     <div class="board">
       <div class="seg" id="dirSeg"><button data-d="tuda" class="on">Туда</button><button data-d="obratno">Обратно</button></div>
       <button class="peregon" id="peregonBtn">
@@ -310,6 +324,7 @@
       <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
     </div>
     <p class="small" style="margin:18px 4px 8px">Работает офлайн, данные на телефоне.<br>Помощник, а не замена АЛСН/КЛУБ и регламенту.</p>
+    <p class="small" id="appVerLine" style="margin:0 4px 8px;opacity:.6"></p>
   </section>
 </div>
 
@@ -747,6 +762,14 @@
 
   if("speechSynthesis"in window){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();}; }
   if(!LS_OK)toast("Открой файл в браузере — тогда данные сохранятся");
+
+  // ========= ПРОВЕРКА ОБНОВЛЕНИЙ =========
+  var updateUrl="https://github.com/romanoffvlad2-stack/piket/releases/latest";
+  window.showUpdateBanner=function(ver,url){ $("#ubVer").textContent="v"+ver; updateUrl=url||updateUrl; $("#updateBanner").classList.add("on"); };
+  $("#ubDownload").addEventListener("click",function(){ try{ if(window.Android&&window.Android.openUrl)window.Android.openUrl(updateUrl); else window.open(updateUrl,"_blank"); }catch(e){} });
+  $("#ubClose").addEventListener("click",function(){ $("#updateBanner").classList.remove("on"); });
+  try{ if(window.Android&&window.Android.getAppVersion){ $("#appVerLine").textContent="Версия приложения: "+window.Android.getAppVersion(); } }catch(e){}
+
   setSeg("#dirSeg",state.ctx.towards,"d"); syncSw(); renderTrip(); renderList();
 })();
 </script>
