@@ -161,6 +161,22 @@
   .author{text-align:center;padding:22px 10px 8px;color:var(--dim2);font-size:12px;line-height:1.6}
   .author b{color:var(--steel);font-weight:700} .author .mk{letter-spacing:.2em;font-size:10px;color:var(--dim2)}
 
+  .trainCard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:10px}
+  .trainHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+  .trainHead b{font-family:var(--mono);font-size:16px}
+  .trainHead .del{margin-left:auto;color:var(--dim2);font-size:12px;background:none;border:none}
+  .trainBody{border-top:1px solid var(--line);padding-top:8px}
+  .trow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;font-size:14px;gap:10px}
+  .trow .tname{color:var(--txt);flex:1;min-width:0}
+  .trow .ttime{font-family:var(--mono);color:var(--dim);font-size:12.5px;white-space:nowrap;flex:none}
+  .trainTotal{margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:13px;color:var(--dim)}
+  .trainTotal b{color:#7FB8FF}
+  .stopRow{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .stopRow .sName{flex:1;padding:11px 10px;background:var(--panel);border:1px solid var(--line);border-radius:9px;font-size:15px;color:var(--txt);min-width:0}
+  .stopRow .sTime{width:58px;padding:11px 6px;background:var(--panel);border:1px solid var(--line);border-radius:9px;font-size:14px;text-align:center;font-family:var(--mono);color:var(--txt);flex:none}
+  .stopRow .sUnit{font-size:11px;color:var(--dim);width:58px;text-align:center;flex:none}
+  .stopRow .sDel{color:var(--dim2);font-size:18px;padding:4px 6px;flex:none;background:none;border:none}
+
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:60;display:none;backdrop-filter:blur(2px)} .scrim.on{display:block}
   .sheet{position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--bg);border-top:1px solid var(--line);border-radius:22px 22px 0 0;max-width:540px;margin:0 auto;padding:8px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;max-height:92dvh;overflow-y:auto}
   .sheet.on{transform:none} .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 14px}
@@ -292,6 +308,12 @@
     <div id="listBox" style="margin-top:14px"></div>
   </section>
 
+  <section class="view pad" id="v-trains">
+    <div class="sec-h"><h2>Время хода</h2><span class="count" id="trainsCount">0</span></div>
+    <button class="add-fab" id="btnAddTrain">＋ Добавить поезд</button>
+    <div id="trainsBox" style="margin-top:14px"></div>
+  </section>
+
   <section class="view pad" id="v-set">
     <div class="sec-h"><h2>Настройки</h2></div>
     <div class="card">
@@ -316,6 +338,7 @@
 <nav class="nav">
   <button class="on" data-v="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 12 8 8m4 4 4-2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>Поездка</button>
   <button data-v="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>Список</button>
+  <button data-v="trains"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/></svg>Поезда</button>
   <button data-v="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8 2 2 0 1 1-2.8 2.8 1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5 2 2 0 0 1-4 0 1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3 2 2 0 1 1-2.8-2.8 1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1 2 2 0 0 1 0-4 1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8 2 2 0 1 1 2.8-2.8 1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5 2 2 0 0 1 4 0 1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3 2 2 0 1 1 2.8 2.8 1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1 2 2 0 0 1 0 4 1.6 1.6 0 0 0-1.5 1z"/></svg>Настройки</button>
 </nav>
 
@@ -362,6 +385,24 @@
 <div class="sheet" id="sheetPer"><div class="grab"></div><h3>Перегон</h3><div id="perList"></div></div>
 
 <div class="sheet" id="sheetReason"><div class="grab"></div><h3>Причина</h3><div id="reasonList"></div></div>
+
+<div class="sheet" id="sheetTrain">
+  <div class="grab"></div>
+  <h3 id="trainTitle">Новый поезд</h3>
+  <div class="f"><label>Номер поезда</label><input id="tNumber" inputmode="numeric" placeholder="777"></div>
+  <div class="f"><label>Перегон</label>
+    <button type="button" class="pickfield" id="tPeregonPick"><span id="tPeregonVal">Все участки</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+  </div>
+  <div class="f"><label>Направление</label>
+    <div class="seg2" id="tDir"><button data-d="tuda" class="on">Туда</button><button data-d="obratno">Обратно</button></div>
+  </div>
+  <div class="f"><label>Станции по порядку</label>
+    <div id="tStopsBox"></div>
+    <button type="button" class="toggle-range" id="btnAddStop">＋ добавить станцию</button>
+  </div>
+  <p class="small" style="text-align:left;margin:2px 0 14px">Первая станция — без времени (старт). У каждой следующей — время хода от предыдущей, в минутах.</p>
+  <div class="save-row"><button class="btn" id="trainCancel" style="background:transparent;border:1px solid var(--line)">Отмена</button><button class="btn primary" id="trainSave">Сохранить</button></div>
+</div>
 
 <div class="alert" id="alert">
   <div class="head" id="alHead">Внимание</div>
@@ -449,9 +490,10 @@
     restrictions: load("sap_res",[]),
     settings: Object.assign({lead:3000,voice:true,sound:true,vibe:true,wake:true,demo:false}, load("sap_set",{})),
     calib: load("sap_cal",null),
-    ctx: Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}))
+    ctx: Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{})),
+    trains: load("sap_trains",[])
   };
-  function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
+  function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); save("sap_trains",state.trains); }
 
   var rt={tracking:false,watchId:null,simTimer:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null};
   var MAXSPD=250;
@@ -666,7 +708,7 @@
         '<div class="iright">'+(status?'<span class="status '+sc+'">'+status+'</span>':'<span></span>')+'<button class="del" data-del="'+r.id+'">удалить</button></div></div>'; }).join(""); }
 
   function openSheet(id){ $("#scrim").classList.add("on"); $(id).classList.add("on"); }
-  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason"].forEach(function(s){$(s).classList.remove("on");}); }
+  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason","#sheetTrain"].forEach(function(s){$(s).classList.remove("on");}); }
   $("#scrim").addEventListener("click",closeSheets);
   function setSeg(sel,val,attr){ document.querySelectorAll(sel+" button").forEach(function(b){ b.classList.toggle("on",b.getAttribute("data-"+attr)===val); }); }
   function renderChips(rowSel,opts,val,onPick){ var row=$(rowSel);
@@ -679,6 +721,7 @@
     openSheet("#sheetPer"); }
   $("#perList").addEventListener("click",function(e){ var b=e.target.closest("[data-p]"); if(!b)return; var v=b.getAttribute("data-p");
     if(perTarget==="ctx"){ state.ctx.peregon=v; persist(); $("#sheetPer").classList.remove("on"); $("#scrim").classList.remove("on"); renderTrip(); }
+    else if(perTarget==="train"){ tPeregon=v; $("#tPeregonVal").textContent=v; $("#sheetPer").classList.remove("on"); }
     else { resPeregon=v; $("#rPeregonVal").textContent=v; $("#sheetPer").classList.remove("on"); } });
   $("#peregonBtn").addEventListener("click",function(){ openPer("ctx",state.ctx.peregon); });
   document.querySelectorAll("#dirSeg button").forEach(function(b){ b.addEventListener("click",function(){ state.ctx.towards=b.getAttribute("data-d"); setSeg("#dirSeg",state.ctx.towards,"d"); persist(); renderTrip(); }); });
@@ -712,6 +755,55 @@
     if(editId){ var i=state.restrictions.findIndex(function(x){return x.id===editId;}); if(i>=0)state.restrictions[i]=r; } else state.restrictions.push(r);
     persist(); closeSheets(); renderList(); renderTrip(); toast(editId?"Сохранено":"Ограничение добавлено"); });
 
+  // ========= ВРЕМЯ ХОДА (расписания поездов) =========
+  function fmtMin(m){ if(m==null)return"—"; m=Math.round(m); var h=Math.floor(m/60),mm=m%60;
+    return h>0?(h+"ч"+(mm?" "+mm+"м":"")):(m+"м"); }
+
+  var editTrainId=null,tPeregon="Все участки",tDir="tuda",tStops=[];
+  function renderStopRows(){ var box=$("#tStopsBox");
+    box.innerHTML=tStops.map(function(s,i){
+      return '<div class="stopRow"><input class="sName" data-i="'+i+'" placeholder="Станция" value="'+escapeHtml(s.name||"")+'">'+
+        (i>0?('<input class="sTime num" data-i="'+i+'" inputmode="numeric" placeholder="мин" value="'+(s.t!=null?s.t:"")+'">'):('<span class="sUnit">старт</span>'))+
+        (tStops.length>1?('<button type="button" class="sDel" data-i="'+i+'">✕</button>'):'')+'</div>';
+    }).join("");
+    box.querySelectorAll(".sName").forEach(function(inp){ inp.addEventListener("input",function(){ tStops[+inp.getAttribute("data-i")].name=inp.value; }); });
+    box.querySelectorAll(".sTime").forEach(function(inp){ inp.addEventListener("input",function(){ var v=inp.value; tStops[+inp.getAttribute("data-i")].t=v===""?null:Math.max(0,parseInt(v,10)||0); }); });
+    box.querySelectorAll(".sDel").forEach(function(btn){ btn.addEventListener("click",function(){ tStops.splice(+btn.getAttribute("data-i"),1); renderStopRows(); }); }); }
+  $("#btnAddStop").addEventListener("click",function(){ tStops.push({name:"",t:null}); renderStopRows(); });
+
+  function openTrain(t){ editTrainId=t?t.id:null; $("#trainTitle").textContent=t?"Изменить поезд":"Новый поезд";
+    $("#tNumber").value=t?t.number:"";
+    tPeregon=t?(t.peregon||"Все участки"):"Все участки"; $("#tPeregonVal").textContent=tPeregon;
+    tDir=t?(t.dir||"tuda"):"tuda"; setSeg("#tDir",tDir,"d");
+    tStops=t?JSON.parse(JSON.stringify(t.stops||[{name:"",t:null}])):[{name:"",t:null},{name:"",t:null}];
+    renderStopRows(); openSheet("#sheetTrain"); }
+  document.querySelectorAll("#tDir button").forEach(function(b){ b.addEventListener("click",function(){ tDir=b.getAttribute("data-d"); setSeg("#tDir",tDir,"d"); }); });
+  $("#tPeregonPick").addEventListener("click",function(){ openPer("train",tPeregon); });
+  $("#btnAddTrain").addEventListener("click",function(){ openTrain(null); });
+  $("#trainCancel").addEventListener("click",closeSheets);
+  $("#trainSave").addEventListener("click",function(){
+    var num=$("#tNumber").value.trim(); if(!num){ toast("Впиши номер поезда"); return; }
+    var valid=tStops.filter(function(s){ return s.name&&s.name.trim(); });
+    if(valid.length<2){ toast("Добавь хотя бы 2 станции"); return; }
+    var tr={ id:editTrainId||("tr"+Date.now()+Math.floor(Math.random()*1000)), number:num, peregon:tPeregon, dir:tDir, stops:valid };
+    if(editTrainId){ var i=state.trains.findIndex(function(x){return x.id===editTrainId;}); if(i>=0)state.trains[i]=tr; } else state.trains.push(tr);
+    persist(); closeSheets(); renderTrains(); toast(editTrainId?"Сохранено":"Поезд добавлен"); });
+
+  function renderTrains(){ var box=$("#trainsBox"),arr=state.trains||[]; $("#trainsCount").textContent=arr.length;
+    if(!arr.length){ box.innerHTML='<div class="empty"><div class="ico">🕐</div><b>Список пуст</b><p>Добавь поезд и впиши станции с временем хода между ними.</p></div>'; return; }
+    box.innerHTML=arr.map(function(tr){ var cum=0;
+      var rows=tr.stops.map(function(s,i){ if(i===0){ cum=0; return '<div class="trow"><span class="tname">'+escapeHtml(s.name)+'</span><span class="ttime">старт</span></div>'; }
+        cum+=(s.t||0); return '<div class="trow"><span class="tname">'+escapeHtml(s.name)+'</span><span class="ttime">+'+(s.t||0)+'м · '+fmtMin(cum)+'</span></div>'; }).join("");
+      return '<div class="trainCard" data-id="'+tr.id+'"><div class="trainHead"><b>№ '+escapeHtml(tr.number)+'</b><span class="chip c-dir">'+dirLabel(tr.dir)+'</span>'+
+        (tr.peregon&&tr.peregon!=="Все участки"?('<span class="chip c-per">'+escapeHtml(tr.peregon)+'</span>'):'')+
+        '<button class="del" data-deltrain="'+tr.id+'">удалить</button></div><div class="trainBody">'+rows+'</div>'+
+        '<div class="trainTotal">Итого время хода: <b>'+fmtMin(cum)+'</b></div></div>'; }).join(""); }
+  $("#trainsBox").addEventListener("click",function(e){ var del=e.target.closest("[data-deltrain]");
+    if(del){ var id=del.getAttribute("data-deltrain"); state.trains=state.trains.filter(function(x){return x.id!==id;}); persist(); renderTrains(); toast("Удалено"); return; }
+    var card=e.target.closest(".trainCard"); if(card){ var tr=state.trains.find(function(x){return x.id===card.getAttribute("data-id");}); if(tr)openTrain(tr); } });
+
+
+
   var calDir="up";
   function openCal(){ var m=currentMeters(); $("#cKm").value=state.calib?state.calib.km:(m!=null?kmFrom(m):""); $("#cPk").value=state.calib?state.calib.pk:1;
     calDir=state.calib?state.calib.dir:"up"; setSeg("#cDir",calDir,"d"); openSheet("#sheetCal"); }
@@ -742,12 +834,12 @@
     var it=e.target.closest(".item"); if(it){ var r=state.restrictions.find(function(x){return x.id===it.getAttribute("data-id");}); if(r)openRes(r); } });
 
   document.querySelectorAll(".nav button").forEach(function(b){ b.addEventListener("click",function(){ var v=b.getAttribute("data-v");
-    document.querySelectorAll(".nav button").forEach(function(x){x.classList.toggle("on",x===b);}); document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");}); $("#v-"+v).classList.add("on"); if(v==="list")renderList(); }); });
+    document.querySelectorAll(".nav button").forEach(function(x){x.classList.toggle("on",x===b);}); document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");}); $("#v-"+v).classList.add("on"); if(v==="list")renderList(); if(v==="trains")renderTrains(); }); });
   $("#btnTrack").addEventListener("click",function(){ rt.tracking?stopTrack():startTrack(); });
 
   if("speechSynthesis"in window){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=function(){speechSynthesis.getVoices();}; }
   if(!LS_OK)toast("Открой файл в браузере — тогда данные сохранятся");
-  setSeg("#dirSeg",state.ctx.towards,"d"); syncSw(); renderTrip(); renderList();
+  setSeg("#dirSeg",state.ctx.towards,"d"); syncSw(); renderTrip(); renderList(); renderTrains();
 })();
 </script>
 </body>
