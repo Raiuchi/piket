@@ -1,7 +1,7 @@
 # 🚄 ПИКЕТ
 
 > **Помощник машиниста** для контроля ограничений скорости по км/пикетам на Октябрьской железной дороге.
-> Сапсан · ЭС1П
+> Сапсан · 
 
 ![Build](https://github.com/romanoffvlad2-stack/piket/actions/workflows/build.yml/badge.svg)
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
