@@ -15,7 +15,8 @@
     --mono:ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  input,textarea{-webkit-user-select:text;user-select:text}
   html,body{margin:0;padding:0}
   body{background:var(--bg);color:var(--txt);font-family:var(--sans);min-height:100dvh;overflow-x:hidden;
        -webkit-font-smoothing:antialiased;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
@@ -513,9 +514,13 @@
     if(!ruv.length)ruv=vs.filter(function(v){return /^ru/i.test(v.lang||"");});
     var fem=ruv.find(function(v){return /female|женск|milena|katya|alyona|alena|irina|svetlana|tatyana|google/i.test(v.name||"");});
     return fem||ruv[0]||null; }
-  function say(t){ if(!state.settings.voice||!("speechSynthesis"in window))return; try{ speechSynthesis.cancel();
+  function say(t){ if(!state.settings.voice)return;
+    try{ if(window.Android&&window.Android.speak){ window.Android.speak(t); return; } }catch(e){}
+    if(!("speechSynthesis"in window))return; try{ speechSynthesis.cancel();
     var u=new SpeechSynthesisUtterance(t); u.lang="ru-RU"; u.rate=1.0; u.pitch=1.05; var v=pickVoice(); if(v)u.voice=v; speechSynthesis.speak(u);}catch(e){} }
-  function warmVoice(){ if(!state.settings.voice||!("speechSynthesis"in window))return; try{ speechSynthesis.cancel(); var w=new SpeechSynthesisUtterance("Контроль включён"); w.lang="ru-RU"; w.pitch=1.05; var v=pickVoice(); if(v)w.voice=v; speechSynthesis.speak(w);}catch(e){} }
+  function warmVoice(){ if(!state.settings.voice)return;
+    try{ if(window.Android&&window.Android.speak){ window.Android.speak("Контроль включён"); return; } }catch(e){}
+    if(!("speechSynthesis"in window))return; try{ speechSynthesis.cancel(); var w=new SpeechSynthesisUtterance("Контроль включён"); w.lang="ru-RU"; w.pitch=1.05; var v=pickVoice(); if(v)w.voice=v; speechSynthesis.speak(w);}catch(e){} }
   function sayPhrase(r){ var p=""; if(r.reason)p+=r.reason.toLowerCase(); if(r.spd!=null){ p+=(p?", ":"")+"ограничение скорости "+r.spd; } return p||"внимание"; }
   function distWords(m){ return m>=1000?("через "+(m/1000).toFixed(1).replace(".",",")+" километра"):("через "+(Math.round(m/100)*100)+" метров"); }
 

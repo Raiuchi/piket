@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.speech.tts.TextToSpeech;
 import android.view.View;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
@@ -23,10 +24,13 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Locale;
 
 public class MainActivity extends Activity {
 
     private WebView web;
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +38,8 @@ public class MainActivity extends Activity {
 
         // держим экран включённым во время поездки
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
+        initTts();
 
         web = new WebView(this);
 
@@ -160,6 +166,23 @@ public class MainActivity extends Activity {
         // разрешения получены — служба запустится сама при нажатии «Старт» в приложении
     }
 
+    /** Нативный Android TTS — Web Speech API внутри WebView не работает, это известное ограничение */
+    private void initTts() {
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS) {
+                    int res = tts.setLanguage(new Locale("ru", "RU"));
+                    ttsReady = (res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED);
+                }
+            }
+        });
+    }
+
+    private void speakNative(String text) {
+        if (tts == null || !ttsReady || text == null || text.isEmpty()) return;
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "piket_say");
+    }
+
     private void startTrackingService() {
         Intent i = new Intent(this, TrackingService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -206,6 +229,18 @@ public class MainActivity extends Activity {
         public String getAppVersion() {
             return currentVersionName();
         }
+
+        @android.webkit.JavascriptInterface
+        public void speak(final String text) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { speakNative(text); }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean isTtsReady() {
+            return ttsReady;
+        }
     }
 
     @Override
@@ -221,6 +256,11 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         stopTrackingService();
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+            tts = null;
+        }
         if (web != null) {
             ((android.view.ViewGroup) web.getParent()).removeView(web);
             web.destroy();
