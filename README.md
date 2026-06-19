@@ -3,7 +3,7 @@
 > **Пикет** для контроля ограничений скорости по км/пикетам на Октябрьской железной дороге.
 > Сапсан · 
 
-![Build](https://github.com/romanoffvlad2-stack/piket/actions/workflows/build.yml/badge.svg)
+![Build](https://github.com/Raiuchi/piket/actions/workflows/build.yml/badge.svg)
 ![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)
 ![Offline](https://img.shields.io/badge/режим-офлайн-blue)
 
@@ -54,7 +54,7 @@
 
 ## 📥 Скачать
 
-**[➡️ Последняя версия — страница Releases](https://github.com/romanoffvlad2-stack/piket/releases/latest)**
+**[➡️ Последняя версия — страница Releases](https://github.com/Raiuchi/piket/releases/latest)**
 
 Просто открой ссылку → скачай `ПИКЕТ.apk` → установи (разреши установку из неизвестных источников).
 Приложение само подскажет, когда выйдет новая версия.
@@ -88,7 +88,7 @@
 
 <div align="center">
 
-**Разработка** — [@Raiuchi](https://github.com/romanoffvlad2-stack)
+**Разработка** — [@Raiuchi](https://github.com/Raiuchi)
 
 🚄 *ПИКЕТ · Октябрьская железная дорога*
 

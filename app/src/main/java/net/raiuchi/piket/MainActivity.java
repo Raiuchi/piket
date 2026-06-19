@@ -73,7 +73,7 @@ public class MainActivity extends Activity {
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    URL url = new URL("https://api.github.com/repos/romanoffvlad2-stack/piket/releases/latest");
+                    URL url = new URL("https://api.github.com/repos/Raiuchi/piket/releases/latest");
                     HttpURLConnection con = (HttpURLConnection) url.openConnection();
                     con.setRequestProperty("Accept", "application/vnd.github+json");
                     con.setConnectTimeout(6000);
@@ -88,7 +88,7 @@ public class MainActivity extends Activity {
 
                     JSONObject json = new JSONObject(sb.toString());
                     String tag = json.optString("tag_name", "");
-                    String htmlUrl = json.optString("html_url", "https://github.com/romanoffvlad2-stack/piket/releases/latest");
+                    String htmlUrl = json.optString("html_url", "https://github.com/Raiuchi/piket/releases/latest");
                     String latest = tag.startsWith("v") ? tag.substring(1) : tag;
                     String current = currentVersionName();
 

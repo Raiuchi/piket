@@ -764,7 +764,7 @@
   if(!LS_OK)toast("Открой файл в браузере — тогда данные сохранятся");
 
   // ========= ПРОВЕРКА ОБНОВЛЕНИЙ =========
-  var updateUrl="https://github.com/romanoffvlad2-stack/piket/releases/latest";
+  var updateUrl="https://github.com/Raiuchi/piket/releases/latest";
   window.showUpdateBanner=function(ver,url){ $("#ubVer").textContent="v"+ver; updateUrl=url||updateUrl; $("#updateBanner").classList.add("on"); };
   $("#ubDownload").addEventListener("click",function(){ try{ if(window.Android&&window.Android.openUrl)window.Android.openUrl(updateUrl); else window.open(updateUrl,"_blank"); }catch(e){} });
   $("#ubClose").addEventListener("click",function(){ $("#updateBanner").classList.remove("on"); });
