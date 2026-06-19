@@ -1,0 +1,48 @@
+Copyright (c) 2026 Владислав Романов (@Raiuchi)
+
+Все права защищены.
+
+Данный исходный код, включая дизайн, логику приложения и встроенные
+данные маршрутов, является собственностью автора — @Raiuchi.
+
+Код опубликован в открытом доступе ИСКЛЮЧИТЕЛЬНО для целей:
+  • прозрачности сборки (любой может проверить, что APK собран
+    именно из этого кода, без скрытого функционала);
+  • автоматической проверки обновлений внутри приложения.
+
+ЗАПРЕЩАЕТСЯ без письменного разрешения автора:
+  • копировать, использовать, изменять или распространять данный код
+    (полностью или частично) в собственных проектах;
+  • публиковать модифицированные версии приложения под своим именем
+    или под другим названием;
+  • использовать встроенные данные маршрутов или иные материалы
+    в коммерческих или иных целях.
+
+Разрешается:
+  • просматривать код в образовательных целях;
+  • собирать и использовать приложение лично, без распространения.
+
+---
+
+Copyright (c) 2026 Vladislav Romanov (@Raiuchi)
+All rights reserved.
+
+This source code, including the application design, logic, and
+embedded route data, is the property of the author — @Raiuchi.
+
+The code is published openly SOLELY for the purposes of:
+  • build transparency (anyone can verify the APK is built exactly
+    from this code, with no hidden functionality);
+  • automatic in-app update checking.
+
+Without the author's written permission, it is PROHIBITED to:
+  • copy, use, modify, or distribute this code (in whole or in part)
+    in your own projects;
+  • publish modified versions of the application under your own name
+    or a different name;
+  • use the embedded route data or other materials for commercial
+    or other purposes.
+
+Permitted:
+  • viewing the code for educational purposes;
+  • building and using the application personally, without distribution.
