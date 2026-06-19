@@ -58,11 +58,16 @@
   .gaugeWrap{position:relative;width:260px;max-width:74vw;margin:6px auto 2px;aspect-ratio:1}
   .gaugeWrap svg{width:100%;height:100%}
   .g-bg{fill:none;stroke:#16202E;stroke-width:14;stroke-linecap:round}
+  .g-ticks{fill:none;stroke:#3A4D63;stroke-width:2.5}
   .g-fg{fill:none;stroke:url(#gGrad);stroke-width:14;stroke-linecap:round;transition:stroke-dasharray .35s ease}
   .g-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .g-center .sv{font-family:var(--mono);font-size:66px;font-weight:800;line-height:.9;text-shadow:0 0 26px rgba(46,134,240,.3)}
-  .g-center .su{font-size:12px;color:var(--dim);letter-spacing:.22em;margin-top:2px}
-  .g-center .src{font-size:10px;color:var(--dim2);margin-top:8px;letter-spacing:.08em}
+  .g-center .sv{font-family:var(--mono);font-size:60px;font-weight:800;line-height:.9;text-shadow:0 0 26px rgba(46,134,240,.3)}
+  .g-center .su{font-size:11px;color:var(--dim);letter-spacing:.22em;margin-top:1px}
+  .g-limit{display:flex;align-items:center;gap:5px;margin-top:7px;padding:3px 11px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+  .g-limit .lv{font-family:var(--mono);font-size:15px;font-weight:800;color:var(--dim2)}
+  .g-limit .lu{font-size:9px;color:var(--dim2);letter-spacing:.12em;text-transform:uppercase}
+  .g-limit.s-red .lv{color:var(--rsig)} .g-limit.s-amber .lv{color:var(--amber)} .g-limit.s-green .lv{color:var(--green)}
+  .g-center .src{font-size:10px;color:var(--dim2);margin-top:7px;letter-spacing:.08em}
   .g-center .src.dr{color:var(--amber)}
 
   .odo{display:flex;justify-content:center;margin:4px auto 2px;align-items:flex-end}
@@ -267,10 +272,13 @@
       <svg viewBox="0 0 200 200">
         <defs><linearGradient id="gGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E86F0"/><stop offset="1" stop-color="#7FB8FF"/></linearGradient></defs>
         <circle class="g-bg" cx="100" cy="100" r="86" pathLength="100" stroke-dasharray="75 100" transform="rotate(135 100 100)"/>
+        <circle class="g-ticks" cx="100" cy="100" r="95" pathLength="100" stroke-dasharray="0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 32.16" transform="rotate(135 100 100)"/>
         <circle class="g-fg" id="gaugeFg" cx="100" cy="100" r="86" pathLength="100" stroke-dasharray="0 100" transform="rotate(135 100 100)"/>
       </svg>
       <div class="g-center">
-        <div class="sv num" id="spdVal">0</div><div class="su">КМ/Ч</div><div class="src" id="spdSrc">GPS не активен</div>
+        <div class="sv num" id="spdVal">0</div><div class="su">КМ/Ч</div>
+        <div class="g-limit" id="gLimit" style="display:none"><span class="lv num" id="limVal">—</span><span class="lu">доп.</span></div>
+        <div class="src" id="spdSrc">GPS не активен</div>
       </div>
     </div>
 
@@ -629,17 +637,22 @@
     if(r.to)c+='<span class="chip">до '+fmtDate(r.to)+'</span>'; return c; }
   function locOf(r){ return r.km+" км "+r.pk+" пк"+(r.kmE!=null?(" → "+r.kmE+" км "+r.pkE+" пк"):""); }
 
+  function updateLimitBadge(r){ var el=$("#gLimit");
+    if(!r){ el.style.display="none"; return; }
+    el.className="g-limit "+speedClass(r.spd); el.style.display="flex"; $("#limVal").textContent=r.spd||"—"; }
+
   function renderTrip(){ var m=currentMeters(); if(m!=null)rt.posM=m;
     $("#oKm").textContent=m==null?"—":kmFrom(m); $("#oPk").textContent=m==null?"—":pkFrom(m);
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=state.ctx.peregon;
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
-    if(state.calib==null){ sig.className="signal"; stEl.textContent="нет калибровки"; distEl.textContent=""; appW.style.display="none";
+    if(state.calib==null){ sig.className="signal"; stEl.textContent="нет калибровки"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null);
       var cnt=state.restrictions.length;
       content.innerHTML='<div class="sig-empty"><b>'+(cnt?(cnt+' огранич. в списке'):'Откалибруйся по столбу')+'</b>'+(cnt?'Нажми «Калибровка» — пойдёт отсчёт до них.':'Нажми «Калибровка», впиши км столба.')+'</div>'; return; }
     var r=nextRestriction();
-    if(!r){ sig.className="signal clear"; stEl.textContent="путь свободен"; distEl.textContent=""; appW.style.display="none";
+    if(!r){ sig.className="signal clear"; stEl.textContent="путь свободен"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null);
       content.innerHTML='<div class="sig-empty"><b>Ограничений впереди нет</b>'+(state.restrictions.length?'По текущему участку чисто.':'Добавь ограничения во вкладке «Список».')+'</div>'; return; }
     var lead=r.lead||state.settings.lead,inzone=r._zone,ahead=r._ahead;
+    updateLimitBadge(r);
     if(inzone){ sig.className="signal danger"; stEl.textContent="в зоне ограничения"; }
     else if(ahead<=lead){ sig.className="signal warn"; stEl.textContent="подъезжаешь"; }
     else { sig.className="signal clear"; stEl.textContent="ограничение впереди"; }
