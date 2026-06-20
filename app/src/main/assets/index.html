@@ -175,6 +175,16 @@
   .update-banner .ub-dl{flex:none;background:var(--blue);color:#fff;font-size:12.5px;font-weight:700;padding:8px 12px;border-radius:8px}
   .update-banner .ub-x{flex:none;color:var(--dim);font-size:18px;padding:4px 2px}
 
+  .srGroup{margin-bottom:18px}
+  .srGroup h3{font-size:13px;color:#7FB8FF;letter-spacing:.06em;margin:0 2px 8px;text-transform:uppercase}
+  .srRow{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+  .srRow .srName{flex:1;font-size:13.5px;line-height:1.35;min-width:0}
+  .srRow .srSpd{flex:none;display:flex;gap:6px}
+  .srBadge{font-family:var(--mono);font-weight:800;font-size:14px;border-radius:7px;padding:5px 9px;min-width:34px;text-align:center}
+  .srBadge.glp{background:rgba(46,134,240,.16);color:#7FB8FF}
+  .srBadge.bokp{background:rgba(245,165,36,.16);color:var(--amber)}
+  .srNote{font-size:12px;color:var(--dim);line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 13px;margin-top:6px}
+
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:60;display:none;backdrop-filter:blur(2px)} .scrim.on{display:block}
   .sheet{position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--bg);border-top:1px solid var(--line);border-radius:22px 22px 0 0;max-width:540px;margin:0 auto;padding:8px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;max-height:92dvh;overflow-y:auto}
   .sheet.on{transform:none} .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 14px}
@@ -330,10 +340,22 @@
       <div class="row"><div><div class="t">Демо-режим</div><div class="d">Симуляция движения для проверки без GPS. Включи и нажми «Старт» — поедет к ближайшему ограничению.</div></div><div class="sw" id="swDemo"></div></div>
     </div>
     <div class="card" style="padding:14px">
+      <button class="lb" id="btnSpeedRef" style="width:100%;margin-bottom:8px">📋 Справочник скоростей «Ласточка»</button>
       <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
     </div>
     <p class="small" style="margin:18px 4px 8px">Работает офлайн, данные на телефоне.<br>Помощник, а не замена АЛСН/КЛУБ и регламенту.</p>
     <p class="small" id="appVerLine" style="margin:0 4px 8px;opacity:.6"></p>
+  </section>
+
+  <section class="view pad" id="v-speedref">
+    <div class="sec-h">
+      <button id="srBack" style="display:flex;align-items:center;gap:6px;color:#7FB8FF;font-size:14px;background:none;border:none;padding:6px 0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="m15 18-6-6 6-6"/></svg>Назад
+      </button>
+    </div>
+    <h2 style="margin:4px 2px 2px">Справочник скоростей</h2>
+    <p class="small" style="text-align:left;margin:0 2px 14px">ЭС «Ласточка» · СПб – Балт. – Луга 1 (Псков) – СПб – Балт.<br>Выписка из приказа ОКТ-10 от 17.02.2026. Перенесено вручную — сверь с бланком перед использованием.</p>
+    <div id="speedRefBox"></div>
   </section>
 </div>
 
@@ -820,6 +842,110 @@
   $("#ubDownload").addEventListener("click",function(){ try{ if(window.Android&&window.Android.openUrl)window.Android.openUrl(updateUrl); else window.open(updateUrl,"_blank"); }catch(e){} });
   $("#ubClose").addEventListener("click",function(){ $("#updateBanner").classList.remove("on"); });
   try{ if(window.Android&&window.Android.getAppVersion){ $("#appVerLine").textContent="Версия приложения: "+window.Android.getAppVersion(); } }catch(e){}
+
+  // ========= СПРАВОЧНИК СКОРОСТЕЙ «ЛАСТОЧКА» (приказ ОКТ-10 от 17.02.2026) =========
+  var SPEEDREF={
+    p1:[
+      {name:"СПб – Балт. со всех перронных путей до БРМЦ",bokp:25},
+      {name:"Парк А все пути",bokp:25},
+      {name:"СПб. – Балт. – Броневая",glp:100},
+      {name:"— 1 км 1пк – 7пк",glp:40},
+      {name:"— 1 км 8пк – 10пк",glp:90},
+      {name:"— 2 км 1пк – 2пк",glp:80},
+      {name:"Броневая (путь 1Б до 4км 10пк)",glp:100,bokp:40},
+      {name:"Броневая – Предпортовая, с 4км 3пк",glp:100},
+      {name:"Предпортовая, с 7км 9пк",glp:110,bokp:40},
+      {name:"Предпортовая – Шоссейная, с 10км 5пк",glp:110},
+      {name:"Шоссейная, 11км 8пк – 12км 1пк",glp:100,bokp:40},
+      {name:"— съезды 6/4, 9/11 с II на I п. (25 км/ч), с 12км 2пк",glp:120},
+      {name:"Шоссейная – Гатчина – Варш.",glp:120,bokp:40},
+      {name:"Александровская",glp:120,bokp:25},
+      {name:"Верево (съезды 1/3, 2/4 с I на II путь – 40 км/ч)",glp:120},
+      {name:"Гатчина – Варш., 44км 3пк – 48км 6пк",glp:80,bokp:40},
+      {name:"Гатчина – Варш. – Сиверская, с 49км 1пк",glp:140},
+      {name:"— переезд головой поезда, 49км 9пк",glp:120},
+      {name:"— переезд головой поезда, 66км 4пк",glp:120},
+      {name:"Сиверская",glp:120,bokp:40},
+      {name:"С-д 12/14 с 8 на 10п; 34/36 с 10 на 24п; 39/43 с 8 на II п.",bokp:25},
+      {name:"Сиверская – Строганово, с 69км 4пк",glp:120},
+      {name:"Строганово, 76км 10пк – 78км 4пк",glp:100,bokp:40},
+      {name:"Строганово – Мшинская",glp:140},
+      {name:"— 78км 5пк – 86км 10пк",glp:120},
+      {name:"— переезд головой поезда, 92км 3пк",glp:120},
+      {name:"— 93км 1пк – 97км 10пк",glp:120},
+      {name:"— 101км 1пк – 105км 1пк",glp:120},
+      {name:"Мшинская (пути 6,7 — 25 км/ч)",glp:120,bokp:40},
+      {name:"Мшинская – Луга-1",glp:120,bokp:40},
+      {name:"Толмачёво",glp:120,bokp:40},
+      {name:"Рзд. Генерала Омельченко, 131км 6пк – 132км 10пк",glp:100,bokp:40},
+      {name:"— 4 и 6 пути",bokp:15},
+      {name:"Луга – 1, с 135км 9пк",glp:70,bokp:25},
+      {name:"— с 137км 10пк",glp:40},
+      {name:"С-д 5/5а с I на IIс путь; 79/81 с IIс на «I П» путь",bokp:40},
+      {name:"Парк «Северный», пути 4,7,9",bokp:40},
+      {name:"Пассажирский парк ПП — путь, нет КС !!!",bokp:40}
+    ],
+    p2:[
+      {name:"II гл. путь (заголовок раздела)",glp:40},
+      {name:"Луга – 1, «I П» путь",bokp:40},
+      {name:"С-д 79/81 с «IП» на IIс путь; 5/5а с IIс на I путь, с 137км 1пк",glp:80,bokp:25},
+      {name:"Луга – 1, с 135км 7пк",glp:120},
+      {name:"Луга 1 – Толмачёва, с 132км 10пк – 131км 5пк",glp:100,bokp:40},
+      {name:"Рзд. Генерала Омельченко, 4 и 6 пути",bokp:15},
+      {name:"Толмачёво, с 125км 1пк – 121км 4пк",glp:100,bokp:40},
+      {name:"Толмачёво",glp:140},
+      {name:"Толмачёво – Строганово, 121км 3пк – 120км 1пк",glp:120},
+      {name:"— 113км 10пк – 107км 7пк",glp:120},
+      {name:"— 107км 3пк – 105км 7пк",glp:80,bokp:40},
+      {name:"Мшинская, 6 и 7 пути",bokp:25},
+      {name:"— 105км 2пк – 100км 1пк",glp:120},
+      {name:"— переезд головой поезда, 97км 8пк",glp:120},
+      {name:"— 95км 10пк – 1пк",glp:120},
+      {name:"— переезд головой поезда, 92км 3пк",glp:120},
+      {name:"— переезд головой поезда, 84км 8пк",glp:120},
+      {name:"— 78км 4пк – 77км 1пк",glp:100,bokp:40},
+      {name:"Строганово",glp:120},
+      {name:"Строганово – Сиверская, с 76км 10пк",glp:120},
+      {name:"Сиверская, 68км 6пк – 66км 8пк",glp:80,bokp:40},
+      {name:"С-д 12/14 с 8 на 10п; 34/36 с 10 на 24п; 39/43 с 8 на IIп",bokp:25},
+      {name:"— 66км 7пк – 66км 4пк",glp:120},
+      {name:"Сиверская – Гатчина – Варш., с 66км 3пк",glp:140},
+      {name:"— 57км 10пк – 53км 8пк",glp:120},
+      {name:"— переезд головой поезда, 49км 9пк",glp:120},
+      {name:"— 48км 10пк – 8пк",glp:120},
+      {name:"Гатчина – Варш., с 48км 7пк – 44км 4пк",glp:80,bokp:40},
+      {name:"Гатчина – Варш. – Шоссейная, с 44км 3пк",glp:120},
+      {name:"Верево, с 34км 9пк – 33км 7пк",glp:100,bokp:25},
+      {name:"— съезды 1/3, 2/4 с I на II путь",bokp:40},
+      {name:"Александровская",glp:120,bokp:40},
+      {name:"— 17км 1пк",glp:60},
+      {name:"Шоссейная, с 12км 1пк – 11км 9пк",glp:100,bokp:40},
+      {name:"— съезды 6/4, 9/11 с I на II путь",bokp:25},
+      {name:"Шоссейная – Предпортовая, с 11км 8пк",glp:110},
+      {name:"Предпортовая",glp:110,bokp:25},
+      {name:"Предпортовая – Броневая",glp:110},
+      {name:"— с 7км 8пк – 6км 4пк",glp:100},
+      {name:"Броневая, путь «IIБ», с 4км 2пк",glp:60,bokp:40},
+      {name:"Броневая – СПб – Балт., до 2км 2пк",glp:60},
+      {name:"СПб – Балт., 2км 1пк – 1км 9пк",glp:70},
+      {name:"от БРМЦ на все перронные пути",glp:25}
+    ]
+  };
+
+  function renderSpeedRef(){ var box=$("#speedRefBox");
+    function grp(title,rows){ var h='<div class="srGroup"><h3>'+title+'</h3>';
+      rows.forEach(function(r){ h+='<div class="srRow"><div class="srName">'+escapeHtml(r.name)+'</div><div class="srSpd">'+
+        (r.glp!=null?'<span class="srBadge glp">'+r.glp+'</span>':'')+
+        (r.bokp!=null?'<span class="srBadge bokp">'+r.bokp+'</span>':'')+'</div></div>'; });
+      return h+'</div>'; }
+    box.innerHTML=grp("Путь I",SPEEDREF.p1)+grp("Путь II",SPEEDREF.p2)+
+      '<div class="srNote">🔵 Гл.п — главный путь · 🟠 Бок.п — боковой путь<br><br>При движении по неправильному пути двухпутного перегона (автоблокировка, временные устройства) при зелёном огне локомотивного светофора — скорость по этой ведомости, но не более 100 км/ч.</div>'; }
+
+  $("#btnSpeedRef").addEventListener("click",function(){
+    document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");});
+    $("#v-speedref").classList.add("on"); renderSpeedRef(); });
+  $("#srBack").addEventListener("click",function(){
+    $("#v-speedref").classList.remove("on"); $("#v-set").classList.add("on"); });
 
   setSeg("#dirSeg",state.ctx.towards,"d"); syncSw(); renderTrip(); renderList();
 })();
