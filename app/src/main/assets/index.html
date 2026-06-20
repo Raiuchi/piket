@@ -184,6 +184,7 @@
   .srBadge.glp{background:rgba(46,134,240,.16);color:#7FB8FF}
   .srBadge.bokp{background:rgba(245,165,36,.16);color:var(--amber)}
   .srNote{font-size:12px;color:var(--dim);line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 13px;margin-top:6px}
+  .srRow.srHit{border-color:#7FB8FF;background:rgba(46,134,240,.18);box-shadow:0 0 0 2px rgba(127,184,255,.4);transition:background .3s,box-shadow .3s}
   .routeCard{display:flex;align-items:center;gap:10px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;text-align:left;width:100%}
   .routeCard .rcTrain{flex:none;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#7FB8FF;background:rgba(46,134,240,.14);border-radius:6px;padding:4px 8px}
   .routeCard .rcName{flex:1;font-size:14px;line-height:1.3;min-width:0}
@@ -314,6 +315,7 @@
       <button class="btn" id="btnCalib">⊕ Калибровка</button>
     </div>
     <div class="fine"><button class="btn" id="pkMinus">− пикет</button><button class="btn" id="pkPlus">+ пикет</button></div>
+    <div class="fine"><button class="btn" id="btnJumpOrder" style="grid-column:1/-1">📋 Открыть в приказе скоростей (по позиции)</button></div>
 
     <div class="hint">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
@@ -881,16 +883,35 @@
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg></button>';
     }).join(""); }
 
-  function renderSpeedRef(idx){ var r=SPEEDROUTES[idx]; var box=$("#speedRefBox");
+  // Приблизительный км из текста строки — только для прокрутки/подсветки, не для точной цифры
+  function approxKmFromName(name){ var m=name.match(/(\d+)\s*км/); return m?parseInt(m[1],10):null; }
+
+  // Связь перегона (с координатами) с маршрутом в справочнике приказа
+  var ROUTE_LINK={
+    "СпбГл - Москва":{ tuda:null, obratno:null, pickTrain:true, idsTuda:["sap-spb-msk","last-spb-msk"], idsObratno:["sap-msk-spb","last-msk-spb"] },
+    "Броневая - Луга":{ tuda:"last-luga", obratno:"last-luga" },
+    "Горы - Петрозаводск":{ tuda:"last-dd-ptz", obratno:"last-ptz-dd", note:"Координаты пути у нас есть только от Гор — начало документа (Дача Долгорукова) физически дальше, туда не подскролит." }
+  };
+
+  function renderSpeedRef(idx,jumpKm){ var r=SPEEDROUTES[idx]; var box=$("#speedRefBox");
     $("#srTitle").textContent=r.train+" · "+r.route;
     $("#srSub").textContent="Выписка из приказа ОКТ-10 от 17.02.2026. Перенесено вручную — сверь с бланком перед использованием.";
+    var rowSeq=0, nearestEl=null, nearestDiff=Infinity;
     function grp(title,rows){ var h='<div class="srGroup">'+(title?('<h3>'+escapeHtml(title)+'</h3>'):'')+
-      rows.map(function(rr){ return '<div class="srRow"><div class="srName">'+escapeHtml(rr.name)+'</div><div class="srSpd">'+
+      rows.map(function(rr){ var km=approxKmFromName(rr.name); var seq=rowSeq++;
+        return '<div class="srRow" data-seq="'+seq+'" data-km="'+(km==null?'':km)+'"><div class="srName">'+escapeHtml(rr.name)+'</div><div class="srSpd">'+
         (rr.glp!=null?'<span class="srBadge glp">'+rr.glp+'</span>':'')+
         (rr.bokp!=null?'<span class="srBadge bokp">'+rr.bokp+'</span>':'')+'</div></div>'; }).join("")+
       '</div>'; return h; }
-    box.innerHTML=r.groups.map(function(g){ return grp(g.title,g.rows); }).join("")+
-      '<div class="srNote">🔵 Гл.п — главный путь · 🟠 Бок.п — боковой путь<br><br>При движении по неправильному пути двухпутного перегона (автоблокировка, временные устройства) при зелёном огне локомотивного светофора — скорость по этой ведомости, но не более 100 км/ч.</div>'; }
+    box.innerHTML=grp(r.groups[0].title,r.groups[0].rows)+(r.groups[1]?grp(r.groups[1].title,r.groups[1].rows):"")+
+      '<div class="srNote">🔵 Гл.п — главный путь · 🟠 Бок.п — боковой путь<br><br>При движении по неправильному пути двухпутного перегона (автоблокировка, временные устройства) при зелёном огне локомотивного светофора — скорость по этой ведомости, но не более 100 км/ч.</div>';
+    if(jumpKm!=null){
+      box.querySelectorAll(".srRow").forEach(function(el){
+        var km=el.getAttribute("data-km"); if(km==="")return; km=+km;
+        var diff=Math.abs(km-jumpKm); if(diff<nearestDiff){ nearestDiff=diff; nearestEl=el; } });
+      if(nearestEl){ setTimeout(function(){ nearestEl.scrollIntoView({block:"center"}); nearestEl.classList.add("srHit");
+        setTimeout(function(){ nearestEl.classList.remove("srHit"); },4000); },80); }
+    } }
 
   $("#btnSpeedRef").addEventListener("click",function(){
     document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");});
@@ -903,6 +924,31 @@
     $("#v-speedref").classList.add("on"); renderSpeedRef(+b.getAttribute("data-i")); });
   $("#srBack").addEventListener("click",function(){
     $("#v-speedref").classList.remove("on"); $("#v-speedlist").classList.add("on"); renderSpeedList(); });
+
+  function jumpToOrderFromTrip(){
+    var link=ROUTE_LINK[state.ctx.peregon]; if(!link){ toast("Для этого перегона приказа с координатами нет"); return; }
+    var m=currentMeters(); if(m==null){ toast("Сначала откалибруйся"); return; }
+    var km=Math.round(m/1000), up=!state.calib||state.calib.dir!=="down";
+    var ids = link.pickTrain ? (up?link.idsTuda:link.idsObratno) : [up?link.tuda:link.obratno];
+    if(!ids||!ids[0]){ toast("Нет таблицы для этого направления"); return; }
+    function openWith(routeId){
+      var idx=SPEEDROUTES.findIndex(function(x){return x.id===routeId;}); if(idx<0)return;
+      document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on")});
+      $("#v-speedref").classList.add("on"); renderSpeedRef(idx,km);
+      if(link.note)toast(link.note);
+    }
+    if(ids.length>1){
+      var labels=ids.map(function(id){ var rt=SPEEDROUTES.find(function(x){return x.id===id;}); return rt?rt.train:id; });
+      $("#perList").innerHTML=labels.map(function(l,i){ return '<button class="perItem" data-pt="'+ids[i]+'">'+l+'</button>'; }).join("");
+      var handler=function(e){ var b=e.target.closest("[data-pt]"); if(!b)return;
+        $("#sheetPer").classList.remove("on"); $("#scrim").classList.remove("on");
+        $("#perList").removeEventListener("click",handler);
+        openWith(b.getAttribute("data-pt")); };
+      $("#perList").addEventListener("click",handler);
+      openSheet("#sheetPer");
+    } else openWith(ids[0]);
+  }
+  $("#btnJumpOrder").addEventListener("click",jumpToOrderFromTrip);
 
   setSeg("#dirSeg",state.ctx.towards,"d"); syncSw(); renderTrip(); renderList();
 })();
