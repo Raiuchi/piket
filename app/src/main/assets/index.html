@@ -490,7 +490,7 @@
   function dirLabel(d){ return d==="obratno"?"Обратно":"Туда"; }
   function isActive(r){ var t=todayStr(); if(r.from&&t<r.from)return false; if(r.to&&t>r.to)return false; return true; }
   function inCtx(r){ var c=state.ctx;
-    if(c.peregon&&c.peregon!=="Все участки"&&r.peregon&&r.peregon!==c.peregon)return false;
+    if(c.peregon&&c.peregon!=="Все участки"&&r.peregon&&r.peregon!=="Все участки"&&r.peregon!==c.peregon)return false;
     if(r.dir&&c.towards&&r.dir!==c.towards)return false; return true; }
   function haversine(a,b){ var R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,
     la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180,
@@ -549,6 +549,7 @@
     $("#gps").className="gps "+(acc<=25?"live":"weak"); $("#gpsTxt").textContent="±"+Math.round(acc)+" м";
     var now=p.timestamp||Date.now(),pt={lat:c.latitude,lon:c.longitude,t:now};
     var spd=(c.speed!=null&&c.speed>=0)?c.speed*3.6:null;
+    if(spd==null && rt.last){ var dtFb=(now-rt.last.t)/1000; if(dtFb>0.5){ var fb=haversine(rt.last,pt)/dtFb*3.6; if(fb<400)spd=fb; } }
     // GPS → снэппинг к ближайшей точке пути
     if(state.calib!=null && acc<=80){
       var trackM=snapToTrack(c.latitude,c.longitude);
