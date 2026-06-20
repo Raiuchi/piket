@@ -413,29 +413,42 @@
     return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
   }
 
-  function findNearestTrackPoint(lat, lon, segPts) {
+  function findNearestTrackPoint(lat, lon, segPts, loIdx, hiIdx) {
     var bestIdx=-1, bestDist=Infinity;
-    for(var i=0;i<segPts.length;i++) {
+    var i0=(loIdx!=null)?Math.max(0,loIdx):0, i1=(hiIdx!=null)?Math.min(segPts.length-1,hiIdx):segPts.length-1;
+    for(var i=i0;i<=i1;i++) {
       var d=haversineM([lat,lon],[segPts[i][0],segPts[i][1]]);
       if(d<bestDist){ bestDist=d; bestIdx=i; }
     }
     return {idx:bestIdx, dist:bestDist};
   }
 
-  function snapToTrack(lat, lon) {
+  function indexWindow(segPts, targetM, windowM){
+    // точки идут по возрастанию id (метров) — находим диапазон индексов в targetM±windowM
+    var lo=0, hi=segPts.length-1;
+    for(var i=0;i<segPts.length;i++){ if(segPts[i][2]>=targetM-windowM){ lo=i; break; } lo=i; }
+    for(var j=segPts.length-1;j>=0;j--){ if(segPts[j][2]<=targetM+windowM){ hi=j; break; } hi=j; }
+    if(lo>hi){ var t=lo; lo=hi; hi=t; }
+    return {lo:lo, hi:hi};
+  }
+
+  function snapToTrack(lat, lon, expectedM, windowM) {
+    var WINDOW=windowM||5000; // ищем точку пути только в пределах окна от расчётной позиции
     // Ищем нужный сегмент по перегону
     var segIdx = TRACK.labels.indexOf(state.ctx.peregon);
     if(segIdx < 0) {
       // Если "Все участки" — ищем по всем сегментам
       var bestDist=Infinity, bestSeg=-1, bestPtIdx=-1;
       for(var s=0;s<TRACK.segs.length;s++) {
-        var r=findNearestTrackPoint(lat,lon,TRACK.segs[s]);
+        var rng=(expectedM!=null)?indexWindow(TRACK.segs[s],expectedM,WINDOW):null;
+        var r=findNearestTrackPoint(lat,lon,TRACK.segs[s], rng?rng.lo:null, rng?rng.hi:null);
         if(r.dist<bestDist){ bestDist=r.dist; bestSeg=s; bestPtIdx=r.idx; }
       }
       if(bestDist>300) return null; // слишком далеко от пути
       return interpolateTrackM(TRACK.segs[bestSeg], bestPtIdx, lat, lon);
     }
-    var r=findNearestTrackPoint(lat,lon,TRACK.segs[segIdx]);
+    var rng=(expectedM!=null)?indexWindow(TRACK.segs[segIdx],expectedM,WINDOW):null;
+    var r=findNearestTrackPoint(lat,lon,TRACK.segs[segIdx], rng?rng.lo:null, rng?rng.hi:null);
     if(r.dist>300) return null;
     return interpolateTrackM(TRACK.segs[segIdx], r.idx, lat, lon);
   }
@@ -477,7 +490,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; return (+km||0)*1000+(pk-1)*100; }
@@ -558,10 +571,14 @@
 
     if(state.calib!=null){
       var drM=currentMeters(); // тикер уже плавно ведёт позицию между замерами GPS
+      var dv0=state.calib.dir==="down"?-1:1, calibM0=metersOf(state.calib.km,state.calib.pk);
+      var expectedTrackM=state.calib._trackM+dv0*(drM-calibM0);
 
       // Коррекция по GPS — принимаем только если физически правдоподобна
       var candM=null, viaTrack=false;
-      if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude);
+      var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
+      var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
+      if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
         if(tM!=null){ var dv=state.calib.dir==="down"?-1:1, calibM=metersOf(state.calib.km,state.calib.pk);
           candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; } }
 
@@ -570,6 +587,7 @@
         if(acc<=40 || Math.abs(candM-drM)<=maxJump){
           rt.odo=(state.calib.dir==="down"?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk));
           rt.posM=candM;
+          rt.lastGoodFix=now;
           $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
         } else {
           rt.posM=drM;
@@ -772,7 +790,7 @@
     if(rt.last){ var tm=snapToTrack(rt.last.lat,rt.last.lon); cal._trackM=tm!=null?tm:0; }
     else cal._trackM=0;
     state.calib=cal; rt.autoCalib=false;
-    rt.odo=0; rt.last=null; alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км"); });
+    rt.odo=0; rt.last=null; rt.lastGoodFix=Date.now(); alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км"); });
 
   function nudge(d){ if(state.calib==null){ toast("Сначала калибровка"); return; } rt.odo+=d*100*(state.calib.dir==="down"?-1:1); rt.posM=currentMeters(); renderTrip(); renderList(); }
   $("#pkPlus").addEventListener("click",function(){ nudge(1); }); $("#pkMinus").addEventListener("click",function(){ nudge(-1); });
