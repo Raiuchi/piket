@@ -31,20 +31,20 @@ jobs:
         run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
-        run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/ПИКЕТ.apk
+        run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/piket.apk
 
       - name: Upload build artifact (every push)
         uses: actions/upload-artifact@v4
         with:
           name: piket-apk
-          path: app/build/outputs/apk/debug/ПИКЕТ.apk
+          path: app/build/outputs/apk/debug/piket.apk
 
       - name: Create GitHub Release (only on version tag)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: "ПИКЕТ ${{ github.ref_name }}"
-          files: app/build/outputs/apk/debug/ПИКЕТ.apk
+          files: app/build/outputs/apk/debug/piket.apk
           body: |
             ## ⚠️ Важно при обновлении с версии v1.0.0
 
