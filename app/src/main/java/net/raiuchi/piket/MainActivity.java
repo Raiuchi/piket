@@ -26,7 +26,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Locale;
 
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements TrackingService.LocationListener {
 
     private WebView web;
     private TextToSpeech tts;
@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);           // localStorage — сохранение ограничений
-        s.setGeolocationEnabled(true);          // GPS внутри WebView
+        s.setGeolocationEnabled(true);          // запасной браузерный GPS (для теста вне APK)
         s.setAllowFileAccess(true);
         s.setMediaPlaybackRequiresUserGesture(false); // звук/голос без доп. жеста
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -70,8 +70,27 @@ public class MainActivity extends Activity {
         setContentView(web);
         web.loadUrl("file:///android_asset/index.html");
 
+        // координаты от Fused Location (как у Яндекс.Навигатора) идут сюда, даже если
+        // экран потушен или приложение свёрнуто — пока сам объект Activity жив
+        TrackingService.setLocationListener(this);
+
         requestNeededPermissions();
         checkForUpdate();
+    }
+
+    /** Координата от TrackingService (Fused Location) — передаём прямо в WebView */
+    @Override
+    public void onNativeLocation(final double lat, final double lon, final float accuracy,
+                                  final float speedMps, final boolean hasSpeed, final long time) {
+        runOnUiThread(new Runnable() {
+            @Override public void run() {
+                if (web == null) return;
+                String js = "if(window.onNativeLocation)window.onNativeLocation("
+                        + lat + "," + lon + "," + accuracy + ","
+                        + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ");";
+                web.evaluateJavascript(js, null);
+            }
+        });
     }
 
     /** Запрос к GitHub Releases API в фоне; репозиторий публичный — без токена */
@@ -255,6 +274,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        TrackingService.setLocationListener(null);
         stopTrackingService();
         if (tts != null) {
             tts.stop();

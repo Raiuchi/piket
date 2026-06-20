@@ -653,13 +653,26 @@
   function startTrack(){
     if(state.settings.demo){ startSim(); return; }
     if(state.calib==null){ openCal(); toast("Сначала откалибруйся по столбу"); return; }
-    if(!("geolocation"in navigator)){ toast("GPS недоступен"); return; }
     rt.tracking=true; rt.last=null; rt.speed=0;
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
-    rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:2000,timeout:27000}); reqWake();
+    var hasNative=false;
+    try{ hasNative=!!(window.Android&&window.Android.startTracking); }catch(e){}
+    if(hasNative){
+      // Координаты идут от Fused Location (нативно, как у Яндекс.Навигатора) через onNativeLocation
+      window.Android.startTracking();
+    } else if("geolocation"in navigator){
+      // Запасной браузерный GPS — для теста вне APK
+      rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:2000,timeout:27000});
+    } else { toast("GPS недоступен"); rt.tracking=false; return; }
+    reqWake();
     startTicker();
-    try{ if(window.Android&&window.Android.startTracking)window.Android.startTracking(); }catch(e){}
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
+
+  // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
+  window.onNativeLocation=function(lat,lon,acc,speedMps,time){
+    if(!rt.tracking)return;
+    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps) }, timestamp:time };
+    onPos(fakePos); };
 
   function startSim(){
     if(state.calib==null){
