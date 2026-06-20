@@ -548,35 +548,42 @@
   function onPos(p){ var c=p.coords,acc=c.accuracy||999;
     $("#gps").className="gps "+(acc<=25?"live":"weak"); $("#gpsTxt").textContent="±"+Math.round(acc)+" м";
     var now=p.timestamp||Date.now(),pt={lat:c.latitude,lon:c.longitude,t:now};
+    var dt=rt.last?Math.max(0,(now-rt.last.t)/1000):null;
+
+    // Скорость: приоритет показаниям GPS-чипа (доплер устойчивее координат при слабом сигнале),
+    // запасной вариант — по смещению координат
     var spd=(c.speed!=null&&c.speed>=0)?c.speed*3.6:null;
-    if(spd==null && rt.last){ var dtFb=(now-rt.last.t)/1000; if(dtFb>0.5){ var fb=haversine(rt.last,pt)/dtFb*3.6; if(fb<400)spd=fb; } }
-    // GPS → снэппинг к ближайшей точке пути
-    if(state.calib!=null && acc<=80){
-      var trackM=snapToTrack(c.latitude,c.longitude);
-      if(trackM!=null){
-        // trackM — метры от начала сегмента; применяем калибровочный сдвиг
-        var dir=state.calib.dir==="down"?-1:1;
-        var calibM=metersOf(state.calib.km,state.calib.pk);
-        rt.odo=dir*(trackM-state.calib._trackM)+(calibM-metersOf(state.calib.km,state.calib.pk));
-        rt.posM=calibM+dir*(trackM-state.calib._trackM);
-        $("#spdSrc").textContent="GPS + путь ✓"; $("#spdSrc").className="src";
-      } else {
-        // Запасной — одометр
-        if(rt.last){
-          var d=haversine(rt.last,pt),dt=(now-rt.last.t)/1000;
-          if(dt>0&&d>5&&d/dt*3.6<360){ rt.odo+=d; }
-        }
-        rt.posM=currentMeters();
-        $("#spdSrc").textContent="GPS (одометр)"; $("#spdSrc").className="src dr";
-      }
-    } else if(rt.last){
-      var d=haversine(rt.last,pt),dt=(now-rt.last.t)/1000;
-      if(dt>0&&d>5&&d/dt*3.6>5&&d/dt*3.6<360){ rt.odo+=d; }
-      rt.posM=currentMeters();
-      $("#spdSrc").textContent="GPS (одометр)"; $("#spdSrc").className="src";
-    }
-    rt.last=pt;
+    if(spd==null && rt.last && dt>1.2){ var fb=haversine(rt.last,pt)/dt*3.6; if(fb<400)spd=fb; }
     if(spd!=null) rt.speed=(spd>5)?( rt.speed?rt.speed*0.6+spd*0.4:spd ):Math.max(0,rt.speed*0.7);
+
+    if(state.calib!=null){
+      // База: плавно продвигаем позицию по скорости и времени — без скачков
+      if(dt!=null && dt>0 && dt<20) rt.odo+=(rt.speed/3.6)*dt;
+      var drM=currentMeters();
+
+      // Коррекция по GPS — принимаем только если физически правдоподобна
+      var candM=null, viaTrack=false;
+      if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude);
+        if(tM!=null){ var dv=state.calib.dir==="down"?-1:1, calibM=metersOf(state.calib.km,state.calib.pk);
+          candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; } }
+
+      if(candM!=null){
+        var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
+        if(acc<=40 || Math.abs(candM-drM)<=maxJump){
+          rt.odo=(state.calib.dir==="down"?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk));
+          rt.posM=candM;
+          $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
+        } else {
+          rt.posM=drM;
+          $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
+        }
+      } else {
+        rt.posM=drM;
+        $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
+      }
+    }
+
+    rt.last=pt;
     autoDetectPeregon(c.latitude, c.longitude);
     updateAndroidNotification();
     renderTrip(); evalAlerts(); }
