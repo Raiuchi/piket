@@ -529,7 +529,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; return (+km||0)*1000+(pk-1)*100; }
@@ -582,13 +582,17 @@
 
   function currentMeters(){ if(state.calib==null)return null; return metersOf(state.calib.km,state.calib.pk)+(state.calib.dir==="down"?-1:1)*rt.odo; }
 
-  function autoDetectPeregon(lat, lon){
+  function autoDetectPeregon(lat, lon, acc){
+    // Безопасность: после калибровки НЕ трогаем выбранный перегон — иначе один кривой замер
+    // может тихо перекинуть счёт на другой участок. Помогает только на старте, до калибровки.
+    if(state.calib!=null) return;
+    if(acc!=null && acc>60) return; // на шумном замере не определяем
     var best=-1, bestDist=Infinity;
     for(var s=0;s<TRACK.segs.length;s++){
       var r=findNearestTrackPoint(lat,lon,TRACK.segs[s]);
       if(r.dist<bestDist){ bestDist=r.dist; best=s; }
     }
-    if(best>=0 && bestDist<1500){
+    if(best>=0 && bestDist<300){
       var label=TRACK.labels[best];
       if(label!==state.ctx.peregon){ state.ctx.peregon=label; persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d"); }
     }
@@ -610,36 +614,60 @@
 
     if(state.calib!=null){
       var drM=currentMeters(); // тикер уже плавно ведёт позицию между замерами GPS
-      var dv0=state.calib.dir==="down"?-1:1, calibM0=metersOf(state.calib.km,state.calib.pk);
-      var expectedTrackM=state.calib._trackM+dv0*(drM-calibM0);
 
-      // Коррекция по GPS — принимаем только если физически правдоподобна
-      var candM=null, viaTrack=false;
-      var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
-      var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
-      if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
-        if(tM!=null){ var dv=state.calib.dir==="down"?-1:1, calibM=metersOf(state.calib.km,state.calib.pk);
-          candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; } }
+      // Привязка к пути (trackM) ещё не установлена — ставим её только на надёжном сигнале,
+      // а не на том (возможно кривом) замере что был в момент калибровки
+      if(state.calib._trackM==null){
+        if(acc<=80){
+          var tm0=snapToTrack(c.latitude,c.longitude);
+          if(tm0!=null){ state.calib._trackM=tm0; persist(); rt.lastGoodFix=now; }
+        }
+        rt.posM=drM;
+        $("#spdSrc").textContent=state.calib._trackM==null?"Жду точный сигнал для привязки":"GPS слабый — счёт по скорости";
+        $("#spdSrc").className="src dr";
+      } else {
+        var dv0=state.calib.dir==="down"?-1:1, calibM0=metersOf(state.calib.km,state.calib.pk);
+        var expectedTrackM=state.calib._trackM+dv0*(drM-calibM0);
 
-      if(candM!=null){
-        var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
-        if(acc<=40 || Math.abs(candM-drM)<=maxJump){
-          rt.odo=(state.calib.dir==="down"?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk));
-          rt.posM=candM;
-          rt.lastGoodFix=now;
-          $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
+        // Коррекция по GPS — принимаем только если физически правдоподобна И подтверждена дважды подряд
+        var candM=null, viaTrack=false;
+        var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
+        var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
+        if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
+          if(tM!=null){ var dv=state.calib.dir==="down"?-1:1, calibM=metersOf(state.calib.km,state.calib.pk);
+            candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; } }
+
+        if(candM!=null){
+          var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
+          var plausible = acc<=40 || Math.abs(candM-drM)<=maxJump;
+          if(plausible){
+            // Требуем 2 похожих замера подряд (±300м) — один кривой замер больше не сможет всё испортить
+            if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=300){ rt.pendingCount=(rt.pendingCount||0)+1; }
+            else { rt.pendingCount=1; }
+            rt.pendingCandM=candM;
+            if(rt.pendingCount>=2 || acc<=25){
+              rt.odo=(state.calib.dir==="down"?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk));
+              rt.posM=candM;
+              rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
+              $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
+            } else {
+              rt.posM=drM;
+              $("#spdSrc").textContent="GPS — проверяю…"; $("#spdSrc").className="src dr";
+            }
+          } else {
+            rt.pendingCount=0; rt.pendingCandM=null;
+            rt.posM=drM;
+            $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
+          }
         } else {
           rt.posM=drM;
           $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
         }
-      } else {
-        rt.posM=drM;
-        $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
       }
     }
 
     rt.last=pt;
-    autoDetectPeregon(c.latitude, c.longitude);
+    autoDetectPeregon(c.latitude, c.longitude, acc);
     updateAndroidNotification();
     renderTrip(); evalAlerts(); }
   function onErr(e){ if(rt.last){ $("#spdSrc").textContent="GPS потерян — иду по счёту"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="нет сигнала"; }
@@ -655,7 +683,7 @@
   function startTrack(){
     if(state.settings.demo){ startSim(); return; }
     if(state.calib==null){ openCal(); toast("Сначала откалибруйся по столбу"); return; }
-    rt.tracking=true; rt.last=null; rt.speed=0;
+    rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0;
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     var hasNative=false;
     try{ hasNative=!!(window.Android&&window.Android.startTracking); }catch(e){}
@@ -838,11 +866,9 @@
   $("#calSave").addEventListener("click",function(){ var km=parseInt($("#cKm").value,10); if(isNaN(km)){ toast("Впиши километр столба"); return; }
     var pk=parseInt($("#cPk").value,10); if(isNaN(pk))pk=1;
     var cal={km:km,pk:Math.max(1,Math.min(10,pk)),dir:calDir,_trackM:null};
-    // Запоминаем trackM для текущей GPS позиции
-    if(rt.last){ var tm=snapToTrack(rt.last.lat,rt.last.lon); cal._trackM=tm!=null?tm:0; }
-    else cal._trackM=0;
+    // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false;
-    rt.odo=0; rt.last=null; rt.lastGoodFix=Date.now(); alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км"); });
+    rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км"); });
 
   function nudge(d){ if(state.calib==null){ toast("Сначала калибровка"); return; } rt.odo+=d*100*(state.calib.dir==="down"?-1:1); rt.posM=currentMeters(); renderTrip(); renderList(); }
   $("#pkPlus").addEventListener("click",function(){ nudge(1); }); $("#pkMinus").addEventListener("click",function(){ nudge(-1); });
@@ -896,7 +922,7 @@
   function renderSpeedRef(idx,jumpKm){ var r=SPEEDROUTES[idx]; var box=$("#speedRefBox");
     $("#srTitle").textContent=r.train+" · "+r.route;
     $("#srSub").textContent="Выписка из приказа ОКТ-10 от 17.02.2026. Перенесено вручную — сверь с бланком перед использованием.";
-    var rowSeq=0, nearestEl=null, nearestDiff=Infinity;
+    var rowSeq=0;
     function grp(title,rows){ var h='<div class="srGroup">'+(title?('<h3>'+escapeHtml(title)+'</h3>'):'')+
       rows.map(function(rr){ var km=approxKmFromName(rr.name); var seq=rowSeq++;
         return '<div class="srRow" data-seq="'+seq+'" data-km="'+(km==null?'':km)+'"><div class="srName">'+escapeHtml(rr.name)+'</div><div class="srSpd">'+
@@ -905,13 +931,27 @@
       '</div>'; return h; }
     box.innerHTML=grp(r.groups[0].title,r.groups[0].rows)+(r.groups[1]?grp(r.groups[1].title,r.groups[1].rows):"")+
       '<div class="srNote">🔵 Гл.п — главный путь · 🟠 Бок.п — боковой путь<br><br>При движении по неправильному пути двухпутного перегона (автоблокировка, временные устройства) при зелёном огне локомотивного светофора — скорость по этой ведомости, но не более 100 км/ч.</div>';
-    if(jumpKm!=null){
-      box.querySelectorAll(".srRow").forEach(function(el){
-        var km=el.getAttribute("data-km"); if(km==="")return; km=+km;
-        var diff=Math.abs(km-jumpKm); if(diff<nearestDiff){ nearestDiff=diff; nearestEl=el; } });
-      if(nearestEl){ setTimeout(function(){ nearestEl.scrollIntoView({block:"center"}); nearestEl.classList.add("srHit");
-        setTimeout(function(){ nearestEl.classList.remove("srHit"); },4000); },80); }
-    } }
+    if(jumpKm!=null) highlightSpeedRefRow(jumpKm,true); }
+
+  function highlightSpeedRefRow(km,scroll){ var box=$("#speedRefBox"); var nearestEl=null,nearestDiff=Infinity;
+    box.querySelectorAll(".srRow").forEach(function(el){
+      var k=el.getAttribute("data-km"); if(k==="")return; k=+k;
+      var diff=Math.abs(k-km); if(diff<nearestDiff){ nearestDiff=diff; nearestEl=el; } });
+    var prev=box.querySelector(".srHit"); if(prev&&prev!==nearestEl)prev.classList.remove("srHit");
+    if(nearestEl&&!nearestEl.classList.contains("srHit")){ nearestEl.classList.add("srHit"); if(scroll)setTimeout(function(){ nearestEl.scrollIntoView({block:"center"}); },80); } }
+
+  // Живое обновление подсветки, пока открыт справочник — гаснет само, если экран закрыли
+  function startSpeedRefLive(routeId){
+    rt.srRouteId=routeId; if(rt.srLiveTimer)clearInterval(rt.srLiveTimer);
+    rt.srLiveTimer=setInterval(function(){
+      if(!$("#v-speedref").classList.contains("on")){ clearInterval(rt.srLiveTimer); rt.srLiveTimer=null; return; }
+      var link=ROUTE_LINK[state.ctx.peregon]; if(!link)return;
+      var idsAll=(link.idsTuda||[]).concat(link.idsObratno||[],link.tuda?[link.tuda]:[],link.obratno?[link.obratno]:[]);
+      if(idsAll.indexOf(rt.srRouteId)<0)return; // открытая таблица не относится к текущему перегону — не дёргаем
+      var m=currentMeters(); if(m==null)return;
+      highlightSpeedRefRow(Math.round(m/1000),false);
+    },1500);
+  }
 
   $("#btnSpeedRef").addEventListener("click",function(){
     document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");});
@@ -923,6 +963,7 @@
     document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");});
     $("#v-speedref").classList.add("on"); renderSpeedRef(+b.getAttribute("data-i")); });
   $("#srBack").addEventListener("click",function(){
+    if(rt.srLiveTimer){ clearInterval(rt.srLiveTimer); rt.srLiveTimer=null; }
     $("#v-speedref").classList.remove("on"); $("#v-speedlist").classList.add("on"); renderSpeedList(); });
 
   function jumpToOrderFromTrip(){
@@ -935,6 +976,7 @@
       var idx=SPEEDROUTES.findIndex(function(x){return x.id===routeId;}); if(idx<0)return;
       document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on")});
       $("#v-speedref").classList.add("on"); renderSpeedRef(idx,km);
+      startSpeedRefLive(routeId);
       if(link.note)toast(link.note);
     }
     if(ids.length>1){
