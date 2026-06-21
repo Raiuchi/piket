@@ -8,13 +8,20 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.location.Location;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.speech.tts.TextToSpeech;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -23,19 +30,28 @@ import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 
+import java.util.Locale;
+
+/**
+ * Фоновая служба трекинга. Держит СВОЙ собственный headless WebView (без экрана) —
+ * вся JS-логика (счисление позиции, проверка ограничений, решение о голосе/вибро)
+ * продолжает работать здесь независимо от того, жива ли MainActivity и горит ли экран.
+ *
+ * MainActivity, когда открыта, просто отображает зеркало того же WebView — но
+ * источник правды по позиции и предупреждениям один: этот headless движок.
+ */
 public class TrackingService extends Service {
 
     private static final String CHANNEL_ID = "piket_tracking";
+
     private PowerManager.WakeLock wakeLock;
     private FusedLocationProviderClient fusedClient;
     private LocationCallback locationCallback;
 
-    /** Мост к MainActivity — пока она жива, координаты сразу летят в WebView */
-    public interface LocationListener {
-        void onNativeLocation(double lat, double lon, float accuracy, float speedMps, boolean hasSpeed, long time);
-    }
-    private static volatile LocationListener listener;
-    public static void setLocationListener(LocationListener l) { listener = l; }
+    private WebView headlessWeb;
+    private TextToSpeech tts;
+    private boolean ttsReady = false;
+    private Handler mainHandler;
 
     public static void updateNotificationText(Context ctx, String text) {
         Notification notification = new Notification.Builder(ctx, CHANNEL_ID)
@@ -51,6 +67,7 @@ public class TrackingService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        mainHandler = new Handler(Looper.getMainLooper());
 
         createChannel();
 
@@ -79,7 +96,92 @@ public class TrackingService extends Service {
             wakeLock.acquire();
         }
 
+        initTts();
+        initHeadlessWebView();
         startFusedLocation();
+    }
+
+    /** Headless WebView — та же страница, тот же JS-движок, но без экрана. Живёт пока жива служба. */
+    private void initHeadlessWebView() {
+        headlessWeb = new WebView(this);
+        WebSettings s = headlessWeb.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setAllowFileAccess(true);
+        s.setMediaPlaybackRequiresUserGesture(false);
+        s.setCacheMode(WebSettings.LOAD_DEFAULT);
+        headlessWeb.setWebViewClient(new WebViewClient());
+        headlessWeb.addJavascriptInterface(new PiketBridge(), "Android");
+        headlessWeb.loadUrl("file:///android_asset/index.html");
+    }
+
+    /** Тот же мост, что раньше был у MainActivity — теперь живёт здесь, в службе */
+    public class PiketBridge {
+        @JavascriptInterface
+        public void updatePosition(final String text) {
+            updateNotificationText(TrackingService.this, text);
+        }
+
+        @JavascriptInterface
+        public void startTracking() {
+            // headless движок сам уже активен с момента запуска службы — это просто подтверждение от UI
+        }
+
+        @JavascriptInterface
+        public void stopTracking() {
+            mainHandler.post(new Runnable() {
+                @Override public void run() { stopSelf(); }
+            });
+        }
+
+        @JavascriptInterface
+        public void openUrl(final String url) {
+            // открытие ссылок не имеет смысла без экрана — игнорируем здесь,
+            // в видимой Activity это всё равно работает через её собственный bridge
+        }
+
+        @JavascriptInterface
+        public String getAppVersion() {
+            try {
+                PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+                return pi.versionName != null ? pi.versionName : "0.0.0";
+            } catch (Exception e) {
+                return "0.0.0";
+            }
+        }
+
+        @JavascriptInterface
+        public void speak(final String text) {
+            mainHandler.post(new Runnable() {
+                @Override public void run() { speakNative(text); }
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isTtsReady() {
+            return ttsReady;
+        }
+
+        @JavascriptInterface
+        public boolean isHeadless() {
+            return true;
+        }
+    }
+
+    private void initTts() {
+        tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
+            @Override public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS) {
+                    int res = tts.setLanguage(new Locale("ru", "RU"));
+                    ttsReady = (res != TextToSpeech.LANG_MISSING_DATA && res != TextToSpeech.LANG_NOT_SUPPORTED);
+                }
+            }
+        });
+    }
+
+    private void speakNative(String text) {
+        if (tts == null || !ttsReady || text == null || text.isEmpty()) return;
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "piket_say");
     }
 
     /** Fused Location — то же самое, чем пользуется Яндекс.Навигатор (GPS + WiFi + сотовые вышки) */
@@ -101,15 +203,7 @@ public class TrackingService extends Service {
                 if (result == null) return;
                 Location loc = result.getLastLocation();
                 if (loc == null) return;
-                LocationListener l = listener;
-                if (l != null) {
-                    l.onNativeLocation(
-                            loc.getLatitude(), loc.getLongitude(),
-                            loc.hasAccuracy() ? loc.getAccuracy() : 999f,
-                            loc.hasSpeed() ? loc.getSpeed() : 0f,
-                            loc.hasSpeed(),
-                            loc.getTime());
-                }
+                feedLocationToWebView(loc);
             }
         };
 
@@ -118,6 +212,26 @@ public class TrackingService extends Service {
         } catch (SecurityException e) {
             // разрешение не выдано — координаты просто не пойдут, без падения приложения
         }
+    }
+
+    /** Передаём координату прямо в headless WebView — работает независимо от Activity и экрана */
+    private void feedLocationToWebView(Location loc) {
+        if (headlessWeb == null) return;
+        final double lat = loc.getLatitude();
+        final double lon = loc.getLongitude();
+        final float accuracy = loc.hasAccuracy() ? loc.getAccuracy() : 999f;
+        final boolean hasSpeed = loc.hasSpeed();
+        final float speedMps = hasSpeed ? loc.getSpeed() : 0f;
+        final long time = loc.getTime();
+        mainHandler.post(new Runnable() {
+            @Override public void run() {
+                if (headlessWeb == null) return;
+                String js = "if(window.onNativeLocation)window.onNativeLocation("
+                        + lat + "," + lon + "," + accuracy + ","
+                        + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ");";
+                headlessWeb.evaluateJavascript(js, null);
+            }
+        });
     }
 
     private void createChannel() {
@@ -139,7 +253,7 @@ public class TrackingService extends Service {
 
     @Override
     public void onTaskRemoved(Intent rootIntent) {
-        // приложение смахнули из списка задач — гасим уведомление и службу
+        // приложение смахнули из списка задач — гасим уведомление и службу, как договорились
         super.onTaskRemoved(rootIntent);
         stopForeground(true);
         stopSelf();
@@ -152,6 +266,15 @@ public class TrackingService extends Service {
         }
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
+        }
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+            tts = null;
+        }
+        if (headlessWeb != null) {
+            headlessWeb.destroy();
+            headlessWeb = null;
         }
         super.onDestroy();
     }

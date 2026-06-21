@@ -8,7 +8,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
-import android.view.View;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
@@ -26,7 +25,16 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Locale;
 
-public class MainActivity extends Activity implements TrackingService.LocationListener {
+/**
+ * Видимый экран приложения. С переходом на headless-движок в TrackingService:
+ * - НЕ принимает GPS напрямую и не ведёт собственный расчёт позиции во время активного трекинга —
+ *   этим занимается headless WebView внутри службы, независимо от того, открыт этот экран или нет.
+ * - Просто отображает UI (настройки, список ограничений, справочник) и, если трекинг уже идёт
+ *   в фоне, входит в режим зеркала (JS сам считывает снэпшот состояния из localStorage).
+ * - Голос на этом экране используется только пока сам экран открыт (например, демо-режим);
+ *   реальные предупреждения во время поездки озвучивает служба через свой собственный TTS.
+ */
+public class MainActivity extends Activity {
 
     private WebView web;
     private TextToSpeech tts;
@@ -36,7 +44,7 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // держим экран включённым во время поездки
+        // держим экран включённым во время поездки, если приложение открыто на экране
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         initTts();
@@ -45,8 +53,8 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);           // localStorage — сохранение ограничений
-        s.setGeolocationEnabled(true);          // запасной браузерный GPS (для теста вне APK)
+        s.setDomStorageEnabled(true);           // localStorage — общий со службой (тот же процесс)
+        s.setGeolocationEnabled(true);          // запасной браузерный GPS (для теста вне APK, экран открыт)
         s.setAllowFileAccess(true);
         s.setMediaPlaybackRequiresUserGesture(false); // звук/голос без доп. жеста
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
@@ -56,7 +64,7 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin,
                     GeolocationPermissions.Callback callback) {
-                // разрешаем геолокацию странице
+                // разрешаем геолокацию странице (запасной канал, когда headless-служба не используется)
                 callback.invoke(origin, true, true);
             }
 
@@ -70,27 +78,8 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
         setContentView(web);
         web.loadUrl("file:///android_asset/index.html");
 
-        // координаты от Fused Location (как у Яндекс.Навигатора) идут сюда, даже если
-        // экран потушен или приложение свёрнуто — пока сам объект Activity жив
-        TrackingService.setLocationListener(this);
-
         requestNeededPermissions();
         checkForUpdate();
-    }
-
-    /** Координата от TrackingService (Fused Location) — передаём прямо в WebView */
-    @Override
-    public void onNativeLocation(final double lat, final double lon, final float accuracy,
-                                  final float speedMps, final boolean hasSpeed, final long time) {
-        runOnUiThread(new Runnable() {
-            @Override public void run() {
-                if (web == null) return;
-                String js = "if(window.onNativeLocation)window.onNativeLocation("
-                        + lat + "," + lon + "," + accuracy + ","
-                        + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ");";
-                web.evaluateJavascript(js, null);
-            }
-        });
     }
 
     /** Запрос к GitHub Releases API в фоне; репозиторий публичный — без токена */
@@ -185,7 +174,7 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
         // разрешения получены — служба запустится сама при нажатии «Старт» в приложении
     }
 
-    /** Нативный Android TTS — Web Speech API внутри WebView не работает, это известное ограничение */
+    /** Нативный Android TTS для этого экрана (демо-режим и т.п., пока экран открыт) */
     private void initTts() {
         tts = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
             @Override public void onInit(int status) {
@@ -211,6 +200,15 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
         }
     }
 
+    private boolean isTrackingServiceRunning() {
+        android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        if (am == null) return false;
+        for (android.app.ActivityManager.RunningServiceInfo info : am.getRunningServices(Integer.MAX_VALUE)) {
+            if (TrackingService.class.getName().equals(info.service.getClassName())) return true;
+        }
+        return false;
+    }
+
     private void stopTrackingService() {
         stopService(new Intent(this, TrackingService.class));
     }
@@ -218,7 +216,8 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
     class PiketBridge {
         @android.webkit.JavascriptInterface
         public void updatePosition(final String text) {
-            TrackingService.updateNotificationText(MainActivity.this, text);
+            // во время активного трекинга уведомление уже обновляет сама служба (headless-движок);
+            // здесь не дублируем, чтобы не было гонки двух источников одного и того же текста
         }
 
         @android.webkit.JavascriptInterface
@@ -260,6 +259,16 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
         public boolean isTtsReady() {
             return ttsReady;
         }
+
+        @android.webkit.JavascriptInterface
+        public boolean isHeadless() {
+            return false;
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean isServiceTracking() {
+            return isTrackingServiceRunning();
+        }
     }
 
     @Override
@@ -274,8 +283,8 @@ public class MainActivity extends Activity implements TrackingService.LocationLi
 
     @Override
     protected void onDestroy() {
-        TrackingService.setLocationListener(null);
-        stopTrackingService();
+        // Трекинг НЕ останавливается здесь — он живёт в headless-службе независимо
+        // от жизни этого экрана. Останов только по явному «Стоп» или смахиванию задачи.
         if (tts != null) {
             tts.stop();
             tts.shutdown();
