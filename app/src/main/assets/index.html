@@ -530,7 +530,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; return (+km||0)*1000+(pk-1)*100; }
@@ -696,28 +696,38 @@
       peregon:state.ctx.peregon, towards:state.ctx.towards }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
-  function mirrorTick(graceMs){
+  function mirrorTick(graceMs,gen){
+    if(gen!==rt.mirrorGen) return; // зеркало уже остановлено/перезапущено — этот отложенный вызов устарел, игнорируем
     var snap=readTrackSnapshot();
     var fresh = snap && snap.tracking && (Date.now()-snap.ts)<=5000;
     if(!fresh){
       if(graceMs && graceMs>0){
         // Даём headless-копии в службе время прогрузиться и сделать первый тик —
         // не гасим кнопку из-за пустого localStorage в первые секунды после старта.
-        setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700)); }, 700);
+        setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700),gen); }, 700);
         return;
       }
       // headless перестал писать снэпшоты (служба остановлена) — выходим из зеркала
-      IS_MIRROR=false; stopTicker(); setTrackBtn(false);
-      $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
-      renderTrip(); renderList(); return;
+      if(gen===rt.mirrorGen){ IS_MIRROR=false; stopTicker();
+        $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
+        setTrackBtn(false); renderTrip(); renderList(); }
+      return;
     }
+    if(gen!==rt.mirrorGen) return;
     rt.posM=snap.posM; rt.speed=snap.speed; rt.tracking=true;
-    $("#gps").className="gps live"; $("#gpsTxt").textContent="фон"; $("#spdSrc").textContent="GPS — фоновая служба"; $("#spdSrc").className="src live";
+    $("#gps").className="gps live"; $("#gpsTxt").textContent="GPS вкл"; $("#spdSrc").textContent="GPS — фоновая служба"; $("#spdSrc").className="src live";
     setTrackBtn(true); renderTrip(); setGauge();
-    if(!rt.tickTimer){ rt.tickTimer=setInterval(function(){ mirrorTick(0); },700); }
+    if(!rt.tickTimer){ rt.tickTimer=setInterval(function(){ mirrorTick(0,gen); },700); }
   }
   function startMirror(){ IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
-    if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(8000); }
+    rt.mirrorGen=(rt.mirrorGen||0)+1;
+    if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(8000,rt.mirrorGen); }
+  function stopMirror(){
+    rt.mirrorGen=(rt.mirrorGen||0)+1; // обесценивает все отложенные вызовы mirrorTick этой сессии
+    IS_MIRROR=false; stopTicker(); rt.tracking=false; rt.speed=0;
+    $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
+    setTrackBtn(false); renderTrip(); renderList();
+  }
 
 
   function startTrack(){
@@ -948,7 +958,7 @@
   document.querySelectorAll(".nav button").forEach(function(b){ b.addEventListener("click",function(){ var v=b.getAttribute("data-v");
     document.querySelectorAll(".nav button").forEach(function(x){x.classList.toggle("on",x===b);}); document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");}); $("#v-"+v).classList.add("on"); if(v==="list")renderList(); }); });
   $("#btnTrack").addEventListener("click",function(){
-    if(IS_MIRROR){ try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){} IS_MIRROR=false; stopTicker(); setTrackBtn(false); return; }
+    if(IS_MIRROR){ try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){} stopMirror(); return; }
     rt.tracking?stopTrack():startTrack();
   });
 
