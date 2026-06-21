@@ -296,7 +296,6 @@
         <div class="sv num" id="spdVal">0</div><div class="su">КМ/Ч</div>
         <div class="g-limit" id="gLimit" style="display:none"><span class="lv num" id="limVal">—</span><span class="lu">доп.</span></div>
         <div class="src" id="spdSrc">GPS не активен</div>
-        <div id="gpsDiag" style="margin:4px 0 0;font-size:11px;color:var(--dim2);opacity:.75"></div>
       </div>
     </div>
 
@@ -534,7 +533,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,lastFixAt:null,lastFixAcc:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -613,7 +612,6 @@
   function onPos(p){ var c=p.coords,acc=c.accuracy||999;
     $("#gps").className="gps "+(acc<=25?"live":"weak"); $("#gpsTxt").textContent="±"+Math.round(acc)+" м";
     var now=p.timestamp||Date.now(),pt={lat:c.latitude,lon:c.longitude,t:now};
-    rt.lastFixAt=Date.now(); rt.lastFixAcc=acc;
     var dt=rt.last?Math.max(0,(now-rt.last.t)/1000):null;
 
     // Скорость: приоритет показаниям GPS-чипа (доплер устойчивее координат при слабом сигнале),
@@ -683,18 +681,10 @@
   function onErr(e){ if(rt.last){ $("#spdSrc").textContent="GPS потерян — иду по счёту"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="нет сигнала"; }
     else { $("#gps").className="gps dead"; $("#gpsTxt").textContent=(e&&e.code===1)?"нет доступа":"нет сигнала"; $("#spdSrc").textContent=(e&&e.code===1)?"GPS запрещён (file://)":"жду спутники…"; $("#spdSrc").className="src dr"; } }
 
-  function updateGpsDiag(fixAt, fixAcc){
-    var el=$("#gpsDiag"); if(!el) return;
-    if(fixAt==null){ el.textContent=""; return; }
-    var sec=Math.round((Date.now()-fixAt)/1000);
-    var ago = sec<1?"только что":(sec+" с назад");
-    el.textContent = "последний сигнал: "+ago+(fixAcc!=null?(", ±"+Math.round(fixAcc)+" м"):"");
-  }
   function tickerStep(){ if(state.calib==null)return;
     var now=Date.now(), dt=(now-(rt.lastTick||now))/1000; rt.lastTick=now;
     if(dt>0&&dt<10) rt.odo+=(rt.speed/3.6)*dt;
     rt.posM=currentMeters(); renderTrip(); evalAlerts();
-    updateGpsDiag(rt.lastFixAt, rt.lastFixAcc);
     if(IS_HEADLESS) saveTrackSnapshot(); }
   function startTicker(){ rt.lastTick=Date.now(); if(rt.tickTimer)clearInterval(rt.tickTimer); rt.tickTimer=setInterval(tickerStep,600); }
   function stopTicker(){ if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } }
@@ -707,8 +697,7 @@
   var IS_MIRROR = false; // видимый экран обнаружил, что трекинг уже идёт в headless-движке службы
   function saveTrackSnapshot(){
     try{ save("sap_snap",{ posM:rt.posM, speed:rt.speed, tracking:rt.tracking, ts:Date.now(),
-      peregon:state.ctx.peregon, towards:state.ctx.towards,
-      lastFixAt:rt.lastFixAt, lastFixAcc:rt.lastFixAcc }); }catch(e){}
+      peregon:state.ctx.peregon, towards:state.ctx.towards }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
   function mirrorTick(graceMs,gen){
@@ -725,14 +714,12 @@
       // headless перестал писать снэпшоты (служба остановлена) — выходим из зеркала
       if(gen===rt.mirrorGen){ IS_MIRROR=false; stopTicker();
         $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
-        updateGpsDiag(null,null);
         setTrackBtn(false); renderTrip(); renderList(); }
       return;
     }
     if(gen!==rt.mirrorGen) return;
     rt.posM=snap.posM; rt.speed=snap.speed; rt.tracking=true;
     $("#gps").className="gps live"; $("#gpsTxt").textContent="GPS вкл"; $("#spdSrc").textContent="GPS — фоновая служба"; $("#spdSrc").className="src live";
-    updateGpsDiag(snap.lastFixAt, snap.lastFixAcc);
     setTrackBtn(true); renderTrip(); setGauge();
     if(!rt.tickTimer){ rt.tickTimer=setInterval(function(){ mirrorTick(0,gen); },700); }
   }
@@ -810,7 +797,6 @@
     try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){}
     if(rt.autoCalib){ state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; }
     $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
-    updateGpsDiag(null,null);
     setTrackBtn(false); renderTrip(); renderList(); }
 
   function nextRestriction(){ if(state.calib==null||rt.posM==null)return null;
