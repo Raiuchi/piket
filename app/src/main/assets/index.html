@@ -696,9 +696,16 @@
       peregon:state.ctx.peregon, towards:state.ctx.towards }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
-  function mirrorTick(){
+  function mirrorTick(graceMs){
     var snap=readTrackSnapshot();
-    if(!snap || !snap.tracking || (Date.now()-snap.ts)>5000){
+    var fresh = snap && snap.tracking && (Date.now()-snap.ts)<=5000;
+    if(!fresh){
+      if(graceMs && graceMs>0){
+        // Даём headless-копии в службе время прогрузиться и сделать первый тик —
+        // не гасим кнопку из-за пустого localStorage в первые секунды после старта.
+        setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700)); }, 700);
+        return;
+      }
       // headless перестал писать снэпшоты (служба остановлена) — выходим из зеркала
       IS_MIRROR=false; stopTicker(); setTrackBtn(false);
       $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
@@ -707,22 +714,29 @@
     rt.posM=snap.posM; rt.speed=snap.speed; rt.tracking=true;
     $("#gps").className="gps live"; $("#gpsTxt").textContent="фон"; $("#spdSrc").textContent="GPS — фоновая служба"; $("#spdSrc").className="src live";
     setTrackBtn(true); renderTrip(); setGauge();
+    if(!rt.tickTimer){ rt.tickTimer=setInterval(function(){ mirrorTick(0); },700); }
   }
-  function startMirror(){ IS_MIRROR=true; rt.tracking=true;
-    if(rt.tickTimer)clearInterval(rt.tickTimer); rt.tickTimer=setInterval(mirrorTick,700); mirrorTick(); }
+  function startMirror(){ IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
+    if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(8000); }
 
 
   function startTrack(){
     if(state.settings.demo){ startSim(); return; }
     if(state.calib==null){ openCal(); toast("Сначала откалибруйся по столбу"); return; }
-    rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0;
-    try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     var hasNative=false;
     try{ hasNative=!!(window.Android&&window.Android.startTracking); }catch(e){}
-    if(hasNative){
-      // Координаты идут от Fused Location (нативно, как у Яндекс.Навигатора) через onNativeLocation
+    if(hasNative && !IS_HEADLESS){
+      // На телефоне реальный GPS принимает headless-копия внутри службы (работает без экрана).
+      // Этот видимый экран запускает службу и сразу переходит в режим зеркала — читает
+      // позицию/скорость из её снэпшота, не пытаясь сам слушать onNativeLocation (туда больше
+      // ничего не приходит, см. TrackingService).
       window.Android.startTracking();
-    } else if("geolocation"in navigator){
+      startMirror();
+      return;
+    }
+    rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0;
+    try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
+    if("geolocation"in navigator){
       // Запасной браузерный GPS — для теста вне APK
       rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:2000,timeout:27000});
     } else { toast("GPS недоступен"); rt.tracking=false; return; }
@@ -966,6 +980,9 @@
     "СпбГл - Москва":{ tuda:null, obratno:null, pickTrain:true, idsTuda:["sap-spb-msk","last-spb-msk"], idsObratno:["sap-msk-spb","last-msk-spb"] },
     "Броневая - Луга":{ tuda:"last-luga", obratno:"last-luga" },
     "Горы - Петрозаводск":{ tuda:"last-dd-ptz", obratno:"last-ptz-dd", note:"Координаты пути у нас есть только от Гор — начало документа (Дача Долгорукова) физически дальше, туда не подскролит." },
+    "Д. Долг - Павлово":{ tuda:"last-dd-ptz", obratno:"last-dd-ptz" },
+    "Павлово - Горы II путь":{ tuda:"last-dd-ptz", obratno:"last-dd-ptz" },
+    "Горы - Павлово I путь":{ tuda:"last-ptz-dd", obratno:"last-ptz-dd" },
     "СПбФин - Выборг":{ tuda:"last-spbfin-kamenn", obratno:"last-kamenn-spbfin" },
     "Выборг - Каменногорск":{ tuda:"last-spbfin-kamenn", obratno:"last-kamenn-spbfin" },
     "Чудово - Новгород":{ tuda:"last-vnov-volh2", obratno:"last-vnov-volh2" },
