@@ -302,6 +302,7 @@
     <div class="odo">
       <div class="blk"><div class="v km num" id="oKm">—</div><div class="u">КМ</div></div>
       <div class="blk"><div class="v num" id="oPk">—</div><div class="u">ПК</div></div>
+      <div class="blk"><div class="v num" id="oM">—</div><div class="u">М</div></div>
     </div>
     <div class="trav">пройдено от калибровки: <span class="num" id="oTrav">0 м</span></div>
 
@@ -537,6 +538,7 @@
   function metersOf(km,pk){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; return (+km||0)*1000+(pk-1)*100; }
   function kmFrom(m){ return Math.floor(m/1000); }
   function pkFrom(m){ var r=((m%1000)+1000)%1000; return Math.max(1,Math.min(10,Math.floor(r/100)+1)); }
+  function meterInPk(m){ var r=((m%1000)+1000)%1000; return r%100; }
   function fmtM(m){ m=Math.round(m); return m>=1000?(m/1000).toFixed(m%1000?1:0)+" км":m+" м"; }
   function fmtLead(m){ return m>=1000?(m/1000).toFixed(m%1000?1:0)+" км":m+" м"; }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -831,7 +833,7 @@
     el.className="g-limit "+speedClass(r.spd); el.style.display="flex"; $("#limVal").textContent=r.spd||"—"; }
 
   function renderTrip(){ var m=currentMeters(); if(m!=null)rt.posM=m;
-    $("#oKm").textContent=m==null?"—":kmFrom(m); $("#oPk").textContent=m==null?"—":pkFrom(m);
+    $("#oKm").textContent=m==null?"—":kmFrom(m); $("#oPk").textContent=m==null?"—":pkFrom(m); $("#oM").textContent=m==null?"—":meterInPk(m);
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=state.ctx.peregon;
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
     if(state.calib==null){ sig.className="signal"; stEl.textContent="нет калибровки"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null);
