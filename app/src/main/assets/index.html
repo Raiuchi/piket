@@ -533,7 +533,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -631,6 +631,7 @@
           if(tm0!=null){ state.calib._trackM=tm0; persist(); rt.lastGoodFix=now; }
         }
         rt.posM=drM;
+        rt.fixQuality = state.calib._trackM==null?"waiting":"weak";
         $("#spdSrc").textContent=state.calib._trackM==null?"Жду точный сигнал для привязки":"GPS слабый — счёт по скорости";
         $("#spdSrc").className="src dr";
       } else {
@@ -657,18 +658,22 @@
               rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
               rt.posM=candM;
               rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
+              rt.fixQuality="good";
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
             } else {
               rt.posM=drM;
+              rt.fixQuality="checking";
               $("#spdSrc").textContent="GPS — проверяю…"; $("#spdSrc").className="src dr";
             }
           } else {
             rt.pendingCount=0; rt.pendingCandM=null;
             rt.posM=drM;
+            rt.fixQuality="weak";
             $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
           }
         } else {
           rt.posM=drM;
+          rt.fixQuality="weak";
           $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
         }
       }
@@ -697,9 +702,16 @@
   var IS_MIRROR = false; // видимый экран обнаружил, что трекинг уже идёт в headless-движке службы
   function saveTrackSnapshot(){
     try{ save("sap_snap",{ posM:rt.posM, speed:rt.speed, tracking:rt.tracking, ts:Date.now(),
-      peregon:state.ctx.peregon, towards:state.ctx.towards }); }catch(e){}
+      peregon:state.ctx.peregon, towards:state.ctx.towards, fixQuality:rt.fixQuality }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
+  function fixQualityText(q){
+    if(q==="good") return {gps:"live", txt:"GPS вкл", src:"GPS активен — позиция точная", srcCls:"src live"};
+    if(q==="checking") return {gps:"weak", txt:"GPS — проверяю", src:"Сигнал есть, уточняю позицию", srcCls:"src dr"};
+    if(q==="weak") return {gps:"dead", txt:"GPS слабый", src:"Сигнал слабый — счёт по скорости", srcCls:"src dr"};
+    if(q==="waiting") return {gps:"weak", txt:"GPS — жду сигнал", src:"Жду точный сигнал для привязки", srcCls:"src dr"};
+    return {gps:"live", txt:"GPS вкл", src:"GPS — фоновая служба", srcCls:"src live"};
+  }
   function mirrorTick(graceMs,gen){
     if(gen!==rt.mirrorGen) return; // зеркало уже остановлено/перезапущено — этот отложенный вызов устарел, игнорируем
     var snap=readTrackSnapshot();
@@ -719,7 +731,8 @@
     }
     if(gen!==rt.mirrorGen) return;
     rt.posM=snap.posM; rt.speed=snap.speed; rt.tracking=true;
-    $("#gps").className="gps live"; $("#gpsTxt").textContent="GPS вкл"; $("#spdSrc").textContent="GPS — фоновая служба"; $("#spdSrc").className="src live";
+    var st=fixQualityText(snap.fixQuality);
+    $("#gps").className="gps "+st.gps; $("#gpsTxt").textContent=st.txt; $("#spdSrc").textContent=st.src; $("#spdSrc").className=st.srcCls;
     setTrackBtn(true); renderTrip(); setGauge();
     if(!rt.tickTimer){ rt.tickTimer=setInterval(function(){ mirrorTick(0,gen); },700); }
   }
