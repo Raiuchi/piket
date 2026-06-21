@@ -205,6 +205,7 @@
   .chiprow button.on{background:rgba(46,134,240,.16);color:#7FB8FF;border-color:var(--blue);font-weight:700}
   .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .trio{display:grid;grid-template-columns:1.3fr 1fr auto;gap:8px;align-items:end}
+  .quad{display:grid;grid-template-columns:1.1fr 0.8fr 0.8fr auto;gap:6px;align-items:end}
   .unit{font-family:var(--mono);font-size:13px;color:var(--dim);padding-bottom:13px}
   .seg2{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .seg2 button{flex:1;padding:12px 4px;font-size:14px;color:var(--dim);background:var(--panel)}
@@ -415,8 +416,9 @@
   <div class="grab"></div>
   <h3>Калибровка по столбу</h3>
   <p class="small" style="text-align:left;margin:-6px 0 16px">Проезжая столб, впиши его номер. Пикет обычно 1 (у столба). Направление — растёт или убывает километраж по ходу.</p>
-  <div class="f"><label>Я сейчас на — км и пикет</label>
-    <div class="trio"><input id="cKm" class="num" inputmode="numeric" placeholder="напр. 1"><input id="cPk" class="num" inputmode="numeric" placeholder="1"><span class="unit">км · пк</span></div>
+  <div class="f"><label>Я сейчас на — км, пикет и метр</label>
+    <div class="quad"><input id="cKm" class="num" inputmode="numeric" placeholder="напр. 1"><input id="cPk" class="num" inputmode="numeric" placeholder="1"><input id="cM" class="num" inputmode="numeric" placeholder="0"><span class="unit">км·пк·м</span></div>
+    <p class="small" style="text-align:left;margin:6px 2px 0">Метр внутри пикета — если стоишь не точно у столба, а где-то посередине (например, на станции). Не знаешь точно — оставь 0.</p>
   </div>
   <div class="f"><label>Километраж по ходу</label>
     <div class="srNote" id="cDirInfo" style="margin:0;font-size:13px"></div>
@@ -535,7 +537,7 @@
   var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,lastFixAt:null,lastFixAcc:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
-  function metersOf(km,pk){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; return (+km||0)*1000+(pk-1)*100; }
+  function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
   function kmFrom(m){ return Math.floor(m/1000); }
   function pkFrom(m){ var r=((m%1000)+1000)%1000; return Math.max(1,Math.min(10,Math.floor(r/100)+1)); }
   function meterInPk(m){ var r=((m%1000)+1000)%1000; return r%100; }
@@ -587,7 +589,7 @@
   // Единый источник направления — всегда live с главного переключателя Туда/Обратно,
   // а не замороженный снимок из момента калибровки (это и было причиной багов с разворотом счёта)
   function dirDown(){ return state.ctx.towards==="obratno"; }
-  function currentMeters(){ if(state.calib==null)return null; return metersOf(state.calib.km,state.calib.pk)+(dirDown()?-1:1)*rt.odo; }
+  function currentMeters(){ if(state.calib==null)return null; return metersOf(state.calib.km,state.calib.pk,state.calib.m)+(dirDown()?-1:1)*rt.odo; }
 
   function autoDetectPeregon(lat, lon, acc){
     // Безопасность: после калибровки НЕ трогаем выбранный перегон — иначе один кривой замер
@@ -634,7 +636,7 @@
         $("#spdSrc").textContent=state.calib._trackM==null?"Жду точный сигнал для привязки":"GPS слабый — счёт по скорости";
         $("#spdSrc").className="src dr";
       } else {
-        var dv0=dirDown()?-1:1, calibM0=metersOf(state.calib.km,state.calib.pk);
+        var dv0=dirDown()?-1:1, calibM0=metersOf(state.calib.km,state.calib.pk,state.calib.m);
         var expectedTrackM=state.calib._trackM+dv0*(drM-calibM0);
 
         // Коррекция по GPS — принимаем только если физически правдоподобна И подтверждена дважды подряд
@@ -642,7 +644,7 @@
         var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
         var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
         if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
-          if(tM!=null){ var dv=dirDown()?-1:1, calibM=metersOf(state.calib.km,state.calib.pk);
+          if(tM!=null){ var dv=dirDown()?-1:1, calibM=metersOf(state.calib.km,state.calib.pk,state.calib.m);
             candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; } }
 
         if(candM!=null){
@@ -654,7 +656,7 @@
             else { rt.pendingCount=1; }
             rt.pendingCandM=candM;
             if(rt.pendingCount>=2 || acc<=25){
-              rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk));
+              rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
               rt.posM=candM;
               rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
@@ -780,7 +782,7 @@
       var firstM=null;
       state.restrictions.forEach(function(r){ if(!isActive(r)||!inCtx(r))return; var s=metersOf(r.km,r.pk); if(firstM==null||s<firstM)firstM=s; });
       var baseKm=firstM!=null?Math.max(0,kmFrom(firstM)-3):0;
-      state.calib={km:baseKm,pk:0,dir:"up"}; rt.autoCalib=true;
+      state.calib={km:baseKm,pk:0,m:0,dir:"up"}; rt.autoCalib=true;
     }
     rt.tracking=true; rt.speed=0; rt.last=null; alertState={}; rt.posM=currentMeters();
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
@@ -946,12 +948,14 @@
     persist(); closeSheets(); renderList(); renderTrip(); toast(editId?"Сохранено":"Ограничение добавлено"); });
 
   function openCal(){ var m=currentMeters(); $("#cKm").value=state.calib?state.calib.km:(m!=null?kmFrom(m):""); $("#cPk").value=state.calib?state.calib.pk:1;
+    $("#cM").value=state.calib?(state.calib.m||0):(m!=null?meterInPk(m):0);
     $("#cDirInfo").textContent=(state.ctx.towards==="obratno"?"⬇ Убывает (выбрано «Обратно»)":"⬆ Растёт (выбрано «Туда»)");
     openSheet("#sheetCal"); }
   $("#calCancel").addEventListener("click",closeSheets); $("#btnCalib").addEventListener("click",openCal);
   $("#calSave").addEventListener("click",function(){ var km=parseInt($("#cKm").value,10); if(isNaN(km)){ toast("Впиши километр столба"); return; }
     var pk=parseInt($("#cPk").value,10); if(isNaN(pk))pk=1;
-    var cal={km:km,pk:Math.max(1,Math.min(10,pk)),dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null};
+    var mm=parseInt($("#cM").value,10); if(isNaN(mm))mm=0; mm=Math.max(0,Math.min(99,mm));
+    var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null};
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false;
     rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км"); });
