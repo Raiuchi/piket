@@ -567,7 +567,11 @@
       var st=t+i*0.14,en=st+0.11; g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.22,st+0.01);
       g.gain.exponentialRampToValueAtTime(0.0001,en); o.connect(g); g.connect(ac.destination); o.start(st); o.stop(en+0.02); });
   }catch(e){} }
-  function vibe(kind){ if(!state.settings.vibe||!navigator.vibrate)return; navigator.vibrate(kind==="danger"?[160,80,160,80,260]:[120,90,120]); }
+  function vibe(kind){ if(!state.settings.vibe)return;
+    // Нативная вибрация (Android.vibrate) работает гарантированно и в headless-службе —
+    // в отличие от navigator.vibrate(), который может не сработать в скрытом WebView.
+    try{ if(window.Android&&window.Android.vibrate){ window.Android.vibrate(kind); return; } }catch(e){}
+    if(navigator.vibrate) navigator.vibrate(kind==="danger"?[160,80,160,80,260]:[120,90,120]); }
   function pickVoice(){ if(!("speechSynthesis"in window))return null; var vs=speechSynthesis.getVoices()||[];
     var ruv=vs.filter(function(v){return /ru[-_]/i.test(v.lang||"")||/russian|русск/i.test(v.name||"");});
     if(!ruv.length)ruv=vs.filter(function(v){return /^ru/i.test(v.lang||"");});

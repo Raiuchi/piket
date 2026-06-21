@@ -17,6 +17,9 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.speech.tts.TextToSpeech;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
@@ -51,6 +54,7 @@ public class TrackingService extends Service {
     private WebView headlessWeb;
     private TextToSpeech tts;
     private boolean ttsReady = false;
+    private Vibrator vibrator;
     private Handler mainHandler;
 
     public static void updateNotificationText(Context ctx, String text) {
@@ -94,6 +98,13 @@ public class TrackingService extends Service {
         if (pm != null) {
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "piket:tracking");
             wakeLock.acquire();
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            VibratorManager vm = (VibratorManager) getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+            vibrator = vm != null ? vm.getDefaultVibrator() : null;
+        } else {
+            vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         }
 
         initTts();
@@ -158,6 +169,13 @@ public class TrackingService extends Service {
         }
 
         @JavascriptInterface
+        public void vibrate(final String kind) {
+            mainHandler.post(new Runnable() {
+                @Override public void run() { vibrateNative(kind); }
+            });
+        }
+
+        @JavascriptInterface
         public boolean isTtsReady() {
             return ttsReady;
         }
@@ -182,6 +200,21 @@ public class TrackingService extends Service {
     private void speakNative(String text) {
         if (tts == null || !ttsReady || text == null || text.isEmpty()) return;
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "piket_say");
+    }
+
+    /** Нативная вибрация — гарантированно работает в фоне, в отличие от navigator.vibrate()
+     * из JS, который может не сработать в скрытом (headless) WebView. pattern — массив
+     * длительностей в мс, как в браузерном Vibration API (даже индексы — паузы). */
+    private void vibrateNative(String kind) {
+        if (vibrator == null || !vibrator.hasVibrator()) return;
+        long[] timings = "danger".equals(kind)
+                ? new long[]{0, 160, 80, 160, 80, 260}
+                : new long[]{0, 120, 90, 120};
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(VibrationEffect.createWaveform(timings, -1));
+        } else {
+            vibrator.vibrate(timings, -1);
+        }
     }
 
     /** Fused Location — то же самое, чем пользуется Яндекс.Навигатор (GPS + WiFi + сотовые вышки) */

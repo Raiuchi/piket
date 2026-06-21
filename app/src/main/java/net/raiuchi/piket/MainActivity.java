@@ -7,6 +7,9 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.os.VibratorManager;
 import android.speech.tts.TextToSpeech;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
@@ -191,6 +194,27 @@ public class MainActivity extends Activity {
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "piket_say");
     }
 
+    private Vibrator getVibrator() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            VibratorManager vm = (VibratorManager) getSystemService(VIBRATOR_MANAGER_SERVICE);
+            return vm != null ? vm.getDefaultVibrator() : null;
+        }
+        return (Vibrator) getSystemService(VIBRATOR_SERVICE);
+    }
+
+    private void vibrateNative(String kind) {
+        Vibrator v = getVibrator();
+        if (v == null || !v.hasVibrator()) return;
+        long[] timings = "danger".equals(kind)
+                ? new long[]{0, 160, 80, 160, 80, 260}
+                : new long[]{0, 120, 90, 120};
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            v.vibrate(VibrationEffect.createWaveform(timings, -1));
+        } else {
+            v.vibrate(timings, -1);
+        }
+    }
+
     private void startTrackingService() {
         Intent i = new Intent(this, TrackingService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -252,6 +276,13 @@ public class MainActivity extends Activity {
         public void speak(final String text) {
             runOnUiThread(new Runnable() {
                 @Override public void run() { speakNative(text); }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void vibrate(final String kind) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { vibrateNative(kind); }
             });
         }
 
