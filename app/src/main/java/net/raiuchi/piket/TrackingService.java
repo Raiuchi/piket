@@ -135,7 +135,14 @@ public class TrackingService extends Service {
 
         @JavascriptInterface
         public void startTracking() {
-            // headless движок сам уже активен с момента запуска службы — это просто подтверждение от UI
+            // КРИТИЧНЫЙ ФИКС: headless-копия создаётся один раз в onCreate() и живёт
+            // молча всё время жизни службы — её JS-состояние (state.calib, state.settings)
+            // не обновляется само просто потому что видимый экран что-то записал в localStorage.
+            // Раньше этот метод был пустой заглушкой → headless продолжал работать со старой
+            // (или вообще отсутствующей) калибровкой, и счётчик км не двигался, хотя GPS
+            // и тикер технически были живы. Теперь явно командуем headless-копии заново
+            // прочитать состояние из storage и реально запустить трекинг.
+            forceHeadlessStart();
         }
 
         @JavascriptInterface
@@ -245,6 +252,20 @@ public class TrackingService extends Service {
         } catch (SecurityException e) {
             // разрешение не выдано — координаты просто не пойдут, без падения приложения
         }
+    }
+
+    /** Команда headless-копии: перечитать калибровку/настройки из localStorage и реально
+     *  запустить тикер. Вызывается из видимого экрана при каждом нажатии «Старт» — это
+     *  единственный момент, когда headless-JS обязан подхватить актуальное состояние. */
+    private void forceHeadlessStart() {
+        if (headlessWeb == null) return;
+        mainHandler.post(new Runnable() {
+            @Override public void run() {
+                if (headlessWeb == null) return;
+                headlessWeb.evaluateJavascript(
+                    "if(window.headlessRestart)window.headlessRestart();", null);
+            }
+        });
     }
 
     /** Передаём координату прямо в headless WebView — работает независимо от Activity и экрана */

@@ -765,6 +765,7 @@
       // ничего не приходит, см. TrackingService).
       window.Android.startTracking();
       startMirror();
+      toast("Отслеживание включено");
       return;
     }
     rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0;
@@ -1103,10 +1104,43 @@
 
   setSeg("#dirSeg",state.ctx.towards,"d"); syncSw(); renderTrip(); renderList();
   if(IS_HEADLESS){
-    // headless-копия живёт в службе без экрана и без кнопок — запускаем приём координат сама,
-    // если калибровка уже есть; если её нет — ждём, как и обычно (currentMeters() вернёт null)
-    rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0;
-    reqWake(); startTicker(); saveTrackSnapshot();
+    // КРИТИЧНЫЙ ФИКС: раньше headless-копия запускала трекинг сама при ЗАГРУЗКЕ страницы
+    // (то есть один раз, в момент создания службы) и больше никогда не перечитывала
+    // калибровку/настройки. Если калибровка менялась ПОСЛЕ этого (а она почти всегда
+    // меняется позже — служба стартует раньше, чем машинист успевает откалиброваться по
+    // столбу), headless продолжал работать со старым/пустым state.calib, и счётчик км
+    // не двигался, хотя GPS и тикер технически были живы — именно это произошло в поездке.
+    //
+    // Теперь headless НЕ стартует сам по загрузке — он ждёт явный вызов headlessRestart(),
+    // который Java вызывает из PiketBridge.startTracking() РОВНО в момент нажатия «Старт»
+    // на видимом экране. Это гарантирует, что headless видит ту калибровку, которая
+    // реально была введена перед поездкой, а не ту, что была (или не было) при создании службы.
+    window.headlessRestart=function(){
+      state.restrictions=load("sap_res",state.restrictions);
+      state.settings=Object.assign({lead:3000,voice:true,sound:true,vibe:true,wake:true,demo:false}, load("sap_set",{}));
+      state.calib=load("sap_cal",null);
+      state.ctx=Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}));
+      rt.tracking=true; rt.last=null; rt.speed=0; rt.odo=0; rt.pendingCandM=null; rt.pendingCount=0;
+      rt.lastGoodFix=null; rt.fixQuality=null;
+      if(state.calib) state.calib._trackM=null; // заново ищем привязку к пути на свежей калибровке
+      reqWake(); startTicker(); saveTrackSnapshot();
+      // Звук "Контроль включён" — раньше пропадал, так как видимый экран уходил в
+      // startMirror() и return до вызова warmVoice(). TTS-движок службы инициализируется
+      // асинхронно (initTts() в onCreate), поэтому в первые ~1-2с после самого первого
+      // запуска службы isTtsReady() может ещё быть false — ждём готовности, не теряя звук.
+      (function tryVoice(attempt){
+        var ready=true;
+        try{ if(window.Android&&window.Android.isTtsReady) ready=window.Android.isTtsReady(); }catch(e){}
+        if(ready || attempt>=8){ warmVoice(); return; }
+        setTimeout(function(){ tryVoice(attempt+1); }, 300);
+      })(0);
+    };
+    // Если служба пересоздаёт headless ПОСЛЕ того как трекинг уже шёл (например, систему
+    // тряхнуло и она пересобрала процесс) — калибровка в storage уже актуальна, можно стартовать
+    // сразу. Во всех остальных случаях ждём headlessRestart() от настоящего нажатия «Старт».
+    if(load("sap_cal",null)!=null && load("sap_snap",null) && load("sap_snap",null).tracking){
+      window.headlessRestart();
+    }
   } else if(window.Android && window.Android.isServiceTracking && (function(){try{return window.Android.isServiceTracking();}catch(e){return false;}})()){
     startMirror();
   }
