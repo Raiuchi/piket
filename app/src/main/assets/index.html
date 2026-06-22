@@ -541,7 +541,7 @@
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
   function kmFrom(m){ return Math.floor(m/1000); }
   function pkFrom(m){ var r=((m%1000)+1000)%1000; return Math.max(1,Math.min(10,Math.floor(r/100)+1)); }
-  function meterInPk(m){ var r=((m%1000)+1000)%1000; return r%100; }
+  function meterInPk(m){ var r=((m%1000)+1000)%1000; return Math.floor(r%100); }
   function fmtM(m){ m=Math.round(m); return m>=1000?(m/1000).toFixed(m%1000?1:0)+" км":m+" м"; }
   function fmtLead(m){ return m>=1000?(m/1000).toFixed(m%1000?1:0)+" км":m+" м"; }
   function todayStr(){ return new Date().toISOString().slice(0,10); }
@@ -805,7 +805,12 @@
       $("#spdSrc").textContent="ДЕМО — симуляция"; $("#spdSrc").className="src";
       renderTrip(); evalAlerts();
     },250);
-    warmVoice(); toast("Демо запущено"); }
+    // Голос "Контроль включён" теперь озвучивает сама служба через headlessRestart()
+    // (вызван выше через Android.startTracking()) — повторный прямой вызов здесь
+    // дублировал фразу дважды подряд. Если службы нет (например, тест в браузере,
+    // не в APK) — Android.startTracking просто не определён, и нужен запасной вызов.
+    if(!(window.Android&&window.Android.startTracking)) warmVoice();
+    toast("Демо запущено"); }
 
   function setTrackBtn(on){ var b=$("#btnTrack"); if(on){ b.textContent="■ Стоп"; b.classList.remove("primary"); b.classList.add("stop"); } else { b.textContent="▶ Старт"; b.classList.add("primary"); b.classList.remove("stop"); }
     var dirSeg=$("#dirSeg"); if(dirSeg) dirSeg.style.opacity = on ? "0.5" : "1"; }
