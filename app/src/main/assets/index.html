@@ -817,7 +817,6 @@
     rt.tracking=true; rt.speed=0; rt.last=null; alertState={}; rt.posM=currentMeters();
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     reqWake(); setTrackBtn(true);
-    try{ if(window.Android&&window.Android.startTracking)window.Android.startTracking(); }catch(e){}
     $("#gps").className="gps live"; $("#gpsTxt").textContent="ДЕМО";
     var t=Date.now();
     rt.simTimer=setInterval(function(){
@@ -828,11 +827,11 @@
       $("#spdSrc").textContent="ДЕМО — симуляция"; $("#spdSrc").className="src";
       renderTrip(); evalAlerts();
     },250);
-    // Голос "Контроль включён" теперь озвучивает сама служба через headlessRestart()
-    // (вызван выше через Android.startTracking()) — повторный прямой вызов здесь
-    // дублировал фразу дважды подряд. Если службы нет (например, тест в браузере,
-    // не в APK) — Android.startTracking просто не определён, и нужен запасной вызов.
-    if(!(window.Android&&window.Android.startTracking)) warmVoice();
+    // Демо — это чисто визуальная симуляция в видимом экране, ей не нужна настоящая
+    // Android-служба (GPS, foreground-уведомление, headless WebView). Раньше демо всё
+    // равно запускало реальную службу через Android.startTracking() — без пользы, только
+    // расход батареи и лишнее уведомление, пока человек просто проверяет интерфейс.
+    warmVoice();
     toast("Демо запущено"); }
 
   function setTrackBtn(on){ var b=$("#btnTrack"); if(on){ b.textContent="■ Стоп"; b.classList.remove("primary"); b.classList.add("stop"); } else { b.textContent="▶ Старт"; b.classList.add("primary"); b.classList.remove("stop"); }
