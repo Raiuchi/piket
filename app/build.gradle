@@ -15,11 +15,26 @@ android {
     }
 
     signingConfigs {
+        // Пароль и алиас раньше лежали тут открытым текстом — видно любому в публичном репо.
+        // Теперь берутся ТОЛЬКО из переменных окружения:
+        //  - в CI (GitHub Actions) — из GitHub Secrets, см. .github/workflows/build.yml
+        //  - при сборке руками — положить файл local.properties (он в .gitignore, не попадёт
+        //    в репозиторий) со строками:
+        //      PIKET_KEYSTORE_PASSWORD=...
+        //      PIKET_KEY_ALIAS=piket
+        //      PIKET_KEY_PASSWORD=...
+        // Сам ключ подписи (piket-release.keystore) и сам пароль внутри него — НЕ менялись,
+        // поэтому все будущие обновления продолжают ставиться поверх старых как раньше.
+        def localProps = new Properties()
+        def localFile = rootProject.file("local.properties")
+        if (localFile.exists()) {
+            localProps.load(new FileInputStream(localFile))
+        }
         piket {
             storeFile file("piket-release.keystore")
-            storePassword "PiketRaiuchi2026"
-            keyAlias "piket"
-            keyPassword "PiketRaiuchi2026"
+            storePassword System.getenv("PIKET_KEYSTORE_PASSWORD") ?: localProps.getProperty("PIKET_KEYSTORE_PASSWORD")
+            keyAlias System.getenv("PIKET_KEY_ALIAS") ?: localProps.getProperty("PIKET_KEY_ALIAS")
+            keyPassword System.getenv("PIKET_KEY_PASSWORD") ?: localProps.getProperty("PIKET_KEY_PASSWORD")
         }
     }
 

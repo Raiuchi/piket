@@ -28,6 +28,10 @@ jobs:
           gradle-version: '8.7'
 
       - name: Build debug APK
+        env:
+          PIKET_KEYSTORE_PASSWORD: ${{ secrets.PIKET_KEYSTORE_PASSWORD }}
+          PIKET_KEY_ALIAS: ${{ secrets.PIKET_KEY_ALIAS }}
+          PIKET_KEY_PASSWORD: ${{ secrets.PIKET_KEY_PASSWORD }}
         run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
