@@ -52,6 +52,8 @@ public class TrackingService extends Service {
     private LocationCallback locationCallback;
 
     private WebView headlessWeb;
+    private boolean headlessPageReady = false;
+    private boolean headlessRestartPending = false;
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private Vibrator vibrator;
@@ -121,7 +123,25 @@ public class TrackingService extends Service {
         s.setAllowFileAccess(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
-        headlessWeb.setWebViewClient(new WebViewClient());
+        // КРИТИЧНЫЙ ФИКС: при первом запуске службы (после установки или перезагрузки
+        // телефона) onCreate() -> onStartCommand() выполняются практически сразу друг за
+        // другом, но loadUrl() асинхронный - страница может физически не успеть загрузиться
+        // к моменту, когда onStartCommand вызывает forceHeadlessStart(). evaluateJavascript
+        // на ещё не загруженной странице просто молча ничего не делает - команда терялась
+        // без какой-либо ошибки, счётчик не двигался именно в первую поездку после установки.
+        // Теперь явно ждём onPageFinished и держим "отложенную команду", если Старт был
+        // нажат раньше, чем страница успела прогрузиться.
+        headlessWeb.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                headlessPageReady = true;
+                if (headlessRestartPending) {
+                    headlessRestartPending = false;
+                    forceHeadlessStart();
+                }
+            }
+        });
         headlessWeb.addJavascriptInterface(new PiketBridge(), "Android");
         headlessWeb.loadUrl("file:///android_asset/index.html");
     }
@@ -135,13 +155,13 @@ public class TrackingService extends Service {
 
         @JavascriptInterface
         public void startTracking() {
-            // КРИТИЧНЫЙ ФИКС: headless-копия создаётся один раз в onCreate() и живёт
-            // молча всё время жизни службы — её JS-состояние (state.calib, state.settings)
-            // не обновляется само просто потому что видимый экран что-то записал в localStorage.
-            // Раньше этот метод был пустой заглушкой → headless продолжал работать со старой
-            // (или вообще отсутствующей) калибровкой, и счётчик км не двигался, хотя GPS
-            // и тикер технически были живы. Теперь явно командуем headless-копии заново
-            // прочитать состояние из storage и реально запустить трекинг.
+            // Этот bridge принадлежит ТОЛЬКО headless-копии (см. addJavascriptInterface выше) -
+            // нажатие "Старт" на видимом экране сюда не попадает, оно идёт в ДРУГОЙ PiketBridge,
+            // определённый в MainActivity.java. Реальный путь команды от кнопки "Старт" до
+            // headless-копии - через onStartCommand() этой службы, см. forceHeadlessStart().
+            // Этот метод остаётся как запасной путь, если JS headless-страницы когда-либо сам
+            // вызовет window.Android.startTracking() из своего кода.
+
             forceHeadlessStart();
         }
 
@@ -255,10 +275,14 @@ public class TrackingService extends Service {
     }
 
     /** Команда headless-копии: перечитать калибровку/настройки из localStorage и реально
-     *  запустить тикер. Вызывается из видимого экрана при каждом нажатии «Старт» — это
-     *  единственный момент, когда headless-JS обязан подхватить актуальное состояние. */
+     *  запустить тикер. Вызывается onStartCommand'ом при каждом нажатии «Старт» (через
+     *  startForegroundService из MainActivity) — это единственный реальный путь, которым
+     *  команда добирается до headless-JS. Если страница headless ещё не успела загрузиться
+     *  (первый запуск службы после установки/перезагрузки телефона) — откладываем команду,
+     *  её выполнит сам onPageFinished, как только страница будет готова. */
     private void forceHeadlessStart() {
         if (headlessWeb == null) return;
+        if (!headlessPageReady) { headlessRestartPending = true; return; }
         mainHandler.post(new Runnable() {
             @Override public void run() {
                 if (headlessWeb == null) return;
@@ -302,6 +326,17 @@ public class TrackingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // КРИТИЧНЫЙ ФИКС: видимый экран (MainActivity) вызывает Android.startTracking(), который
+        // бьёт в СВОЙ собственный PiketBridge (определённый в MainActivity.java, а не здесь) —
+        // тот лишь делает startForegroundService(...), что и приводит сюда, в onStartCommand.
+        // Если служба уже жива (обычный случай - служба не пересоздаётся), Android вызывает
+        // именно onStartCommand, а НЕ onCreate(). Раньше здесь ничего не происходило -
+        // headless-копия не получала команду перечитать калибровку, и счётчик не двигался.
+        // forceHeadlessStart() (TrackingService.PiketBridge.startTracking()) физически
+        // никогда не вызывался реальным потоком выполнения - тот bridge принадлежит ДРУГОМУ
+        // WebView (headless), а не видимому экрану, который и инициирует "Старт".
+        // Здесь - единственная реальная точка, куда долетает команда от нажатия "Старт".
+        forceHeadlessStart();
         return START_STICKY;
     }
 
