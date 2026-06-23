@@ -348,7 +348,10 @@
       <div class="row"><div><div class="t">Демо-режим</div><div class="d">Симуляция движения для проверки без GPS. Включи и нажми «Старт» — поедет к ближайшему ограничению.</div></div><div class="sw" id="swDemo"></div></div>
     </div>
     <div class="card" style="padding:14px">
-      <div class="row" id="btnBgHelp" style="cursor:pointer"><div><div class="t">🔋 Если приложение перестаёт считать в фоне</div></div><div style="opacity:.5;font-size:20px">›</div></div>
+      <button class="lb" id="btnOpenAutostart" style="width:100%;margin-bottom:8px;background:#1d4ed8;color:#fff;font-weight:600">🔋 Разрешить работать в фоне (важно для поездки)</button>
+      <div class="row" id="btnBgHelp" style="cursor:pointer;border-bottom:none;padding:8px 0"><div><div class="t" style="font-size:13px;opacity:.75">Если после этого всё равно не работает в фоне — что проверить</div></div><div style="opacity:.4;font-size:18px">›</div></div>
+    </div>
+    <div class="card" style="padding:14px">
       <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><div class="t">📋 Справочник скоростей по приказу ОКТ-10</div></div><div style="opacity:.5;font-size:20px">›</div></div>
     </div>
     <div class="card" style="padding:14px">
@@ -442,7 +445,6 @@
     <p><b>Vivo:</b><br>Настройки → Батарея → Высокий расход заряда в фоне → включить для ПИКЕТ. Ещё: Настройки → Ещё настройки → Приложения → Автозапуск → включить для ПИКЕТ. Если есть пункт «Спящий режим» — отключи его на время поездки, иначе телефон может «заморозить» приложение, решив, что ты спишь.</p>
     <p><b>OPPO / OnePlus / Realme:</b><br>Настройки → Управление батареей → Автозапуск приложений → включить для ПИКЕТ.</p>
     <p>При первом запуске телефон сам спросит, можно ли приложению работать без ограничения заряда — обязательно нажми «Да» или «Разрешить». На некоторых телефонах этого мало, и нужны ручные шаги выше.</p>
-    <button class="lb" id="btnOpenAutostart" style="width:100%;margin-top:8px">📲 Открыть нужные настройки сейчас</button>
   </div>
 </div>
 
