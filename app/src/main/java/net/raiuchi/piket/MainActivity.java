@@ -192,6 +192,42 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Android НЕ разрешает приложению самому включить чужой системный переключатель
+     *  (автозапуск, "без ограничений" и т.п.) - это было бы дырой безопасности, и ни одно
+     *  стороннее приложение (Яндекс.Навигатор, WhatsApp и другие) не может это обойти.
+     *  Но можно ОТКРЫТЬ человеку нужный экран настроек одним нажатием, вместо того чтобы
+     *  он искал его сам по инструкции - финальное нажатие переключателя остаётся за ним,
+     *  это единственное, что разрешает система. */
+    private boolean openManufacturerAutostartSettings() {
+        String manufacturer = Build.MANUFACTURER.toLowerCase(Locale.ROOT);
+        Intent intent = new Intent();
+        try {
+            if (manufacturer.contains("xiaomi")) {
+                intent.setComponent(new android.content.ComponentName("com.miui.securitycenter",
+                        "com.miui.permcenter.autostart.AutoStartManagementActivity"));
+            } else if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
+                intent.setComponent(new android.content.ComponentName("com.huawei.systemmanager",
+                        "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));
+            } else if (manufacturer.contains("vivo")) {
+                intent.setComponent(new android.content.ComponentName("com.iqoo.secure",
+                        "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));
+            } else if (manufacturer.contains("samsung")) {
+                intent.setComponent(new android.content.ComponentName("com.samsung.android.lool",
+                        "com.samsung.android.sm.battery.ui.BatteryActivity"));
+            } else {
+                return false;
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            // Конкретный экран настроек у этой версии прошивки называется иначе или не
+            // существует - честно говорим JS, что не получилось, дальше показываем
+            // обычную текстовую инструкцию вместо кнопки
+            return false;
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -271,6 +307,11 @@ public class MainActivity extends Activity {
             runOnUiThread(new Runnable() {
                 @Override public void run() { startTrackingService(); }
             });
+        }
+
+        @android.webkit.JavascriptInterface
+        public boolean openAutostartSettings() {
+            return openManufacturerAutostartSettings();
         }
 
         @android.webkit.JavascriptInterface
