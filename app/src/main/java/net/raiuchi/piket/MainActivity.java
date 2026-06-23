@@ -200,6 +200,26 @@ public class MainActivity extends Activity {
      *  это единственное, что разрешает система. */
     private boolean openManufacturerAutostartSettings() {
         String manufacturer = Build.MANUFACTURER.toLowerCase(Locale.ROOT);
+
+        // Samsung - официальный, документированный deeplink API (developer.samsung.com),
+        // а не угаданный component name как у остальных производителей. Открывает прямо
+        // экран "Никогда не переводить в спящий режим" - именно то, что нужно ПИКЕТ.
+        if (manufacturer.contains("samsung")) {
+            try {
+                Intent intent = new Intent();
+                intent.setAction("com.samsung.android.sm.ACTION_OPEN_CHECKABLE_LISTACTIVITY");
+                intent.setPackage("com.samsung.android.lool");
+                intent.putExtra("activity_type", 2); // 2 = never sleeping apps
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                if (intent.resolveActivity(getPackageManager()) != null) {
+                    startActivity(intent);
+                    return true;
+                }
+            } catch (Exception e) {
+                // переходим к попытке через обычный component name ниже как запасной путь
+            }
+        }
+
         // На каждого производителя — несколько известных вариантов компонента, так как
         // разные версии прошивки/модели одного и того же бренда могут называть экран
         // настроек по-разному. Пробуем по очереди, пока один не откроется успешно.
