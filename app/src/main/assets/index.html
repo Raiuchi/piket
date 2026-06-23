@@ -558,7 +558,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -644,10 +644,36 @@
     var dt=rt.last?Math.max(0,(now-rt.last.t)/1000):null;
 
     // Скорость: приоритет показаниям GPS-чипа (доплер устойчивее координат при слабом сигнале),
-    // запасной вариант — по смещению координат
+    // запасной вариант — по смещению координат. Порог dt>1.2 был слишком близок к интервалу
+    // GPS-обновлений (1-2с) и мог систематически не срабатывать, если доплер-скорость от чипа
+    // недоступна (hasSpeed()==false) или нестабильна в кабине поезда — тогда rt.speed застывал
+    // на 0, хотя поезд реально едет. Понижен до dt>0.5 — надёжнее подхватывает скорость.
     var spd=(c.speed!=null&&c.speed>=0)?c.speed*3.6:null;
-    if(spd==null && rt.last && dt>1.2){ var fb=haversine(rt.last,pt)/dt*3.6; if(fb<400)spd=fb; }
+    if(spd==null && rt.last && dt>0.5){
+      var fbDist=haversine(rt.last,pt);
+      // Минимум 15м накопленного смещения — иначе обычное дрожание стоящего GPS-приёмника
+      // (5-10м между фиксами) даёт кажущуюся скорость 20-40 км/ч и ложно "оживляет" счётчик,
+      // хотя поезд реально стоит на станции.
+      if(fbDist>=15){ var fb=fbDist/dt*3.6; if(fb<400)spd=fb; }
+      else spd=0;
+    }
     if(spd!=null) rt.speed=(spd>5)?( rt.speed?rt.speed*0.6+spd*0.4:spd ):Math.max(0,rt.speed*0.7);
+
+    // WATCHDOG: страховка на случай, если скорость застряла на 0 дольше 8 секунд, хотя
+    // координаты реально смещаются (доплер недоступен/нестабилен И обычный fallback выше
+    // не сработал, например из-за частых мелких dt). Без этого счётчик мог намертво
+    // зависнуть на всю поездку, даже когда поезд реально едет.
+    if(rt.speed<=0.5){
+      if(rt.zeroSpeedSince==null){ rt.zeroSpeedSince=now; rt.zeroSpeedAnchor=rt.last; }
+      else if(rt.zeroSpeedAnchor==null) rt.zeroSpeedAnchor=rt.last; // застой начался на самом первом фиксе — якорь подхватываем как только появится первая точка
+    } else { rt.zeroSpeedSince=null; rt.zeroSpeedAnchor=null; }
+    if(rt.zeroSpeedSince!=null && (now-rt.zeroSpeedSince)>8000 && rt.zeroSpeedAnchor){
+      var totalDt=(now-rt.zeroSpeedSince)/1000;
+      var totalDist=haversine(rt.zeroSpeedAnchor,pt);
+      // Порог 30м (выше, чем у обычного fallback) — watchdog копит шум дольше (8+с),
+      // выше шанс случайного выброса GPS-шума дать ложное "движение" на стоянке.
+      if(totalDt>0 && totalDist>=30){ var forced=totalDist/totalDt*3.6; if(forced>5&&forced<400){ rt.speed=forced; rt.zeroSpeedSince=null; rt.zeroSpeedAnchor=null; } }
+    }
 
     if(state.calib!=null){
       var drM=currentMeters(); // тикер уже плавно ведёт позицию между замерами GPS
