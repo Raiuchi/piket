@@ -200,32 +200,67 @@ public class MainActivity extends Activity {
      *  это единственное, что разрешает система. */
     private boolean openManufacturerAutostartSettings() {
         String manufacturer = Build.MANUFACTURER.toLowerCase(Locale.ROOT);
-        Intent intent = new Intent();
-        try {
-            if (manufacturer.contains("xiaomi")) {
-                intent.setComponent(new android.content.ComponentName("com.miui.securitycenter",
-                        "com.miui.permcenter.autostart.AutoStartManagementActivity"));
-            } else if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
-                intent.setComponent(new android.content.ComponentName("com.huawei.systemmanager",
-                        "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"));
-            } else if (manufacturer.contains("vivo")) {
-                intent.setComponent(new android.content.ComponentName("com.iqoo.secure",
-                        "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"));
-            } else if (manufacturer.contains("samsung")) {
-                intent.setComponent(new android.content.ComponentName("com.samsung.android.lool",
-                        "com.samsung.android.sm.battery.ui.BatteryActivity"));
-            } else {
-                return false;
-            }
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-            return true;
-        } catch (Exception e) {
-            // Конкретный экран настроек у этой версии прошивки называется иначе или не
-            // существует - честно говорим JS, что не получилось, дальше показываем
-            // обычную текстовую инструкцию вместо кнопки
+        // На каждого производителя — несколько известных вариантов компонента, так как
+        // разные версии прошивки/модели одного и того же бренда могут называть экран
+        // настроек по-разному. Пробуем по очереди, пока один не откроется успешно.
+        String[][] candidates;
+        if (manufacturer.contains("xiaomi") || manufacturer.contains("redmi") || manufacturer.contains("poco")) {
+            candidates = new String[][]{
+                {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"}
+            };
+        } else if (manufacturer.contains("huawei") || manufacturer.contains("honor")) {
+            candidates = new String[][]{
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"},
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.appcontrol.activity.StartupAppControlActivity"}
+            };
+        } else if (manufacturer.contains("vivo") || manufacturer.contains("iqoo")) {
+            candidates = new String[][]{
+                {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+                {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"},
+                {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartupManagerDetailActivity"}
+            };
+        } else if (manufacturer.contains("samsung")) {
+            candidates = new String[][]{
+                {"com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"}
+            };
+        } else if (manufacturer.contains("oppo") || manufacturer.contains("oneplus") || manufacturer.contains("realme")) {
+            candidates = new String[][]{
+                {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
+                {"com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity"},
+                {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"}
+            };
+        } else if (manufacturer.contains("letv")) {
+            candidates = new String[][]{
+                {"com.letv.android.letvsafe", "com.letv.android.letvsafe.AutobootManageActivity"}
+            };
+        } else if (manufacturer.contains("asus")) {
+            candidates = new String[][]{
+                {"com.asus.mobilemanager", "com.asus.mobilemanager.entry.FunctionActivity"}
+            };
+        } else {
+            // Незнакомый производитель — нет смысла угадывать наугад, честно говорим
+            // JS, что автоматического перехода нет, дальше показываем обычную инструкцию
             return false;
         }
+        PackageManager pm = getPackageManager();
+        for (String[] c : candidates) {
+            try {
+                Intent intent = new Intent();
+                intent.setComponent(new android.content.ComponentName(c[0], c[1]));
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                // Проверяем заранее, что система реально может обработать этот intent -
+                // иначе startActivity бросит ActivityNotFoundException, и на части
+                // прошивок это может показать пользователю системный краш-тост
+                if (intent.resolveActivity(pm) != null) {
+                    startActivity(intent);
+                    return true;
+                }
+            } catch (Exception e) {
+                // этот конкретный вариант не подошёл - пробуем следующий
+            }
+        }
+        return false;
     }
 
     @Override
