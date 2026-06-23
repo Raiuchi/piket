@@ -348,6 +348,7 @@
       <div class="row"><div><div class="t">Демо-режим</div><div class="d">Симуляция движения для проверки без GPS. Включи и нажми «Старт» — поедет к ближайшему ограничению.</div></div><div class="sw" id="swDemo"></div></div>
     </div>
     <div class="card" style="padding:14px">
+      <button class="lb" id="btnBgHelp" style="width:100%;margin-bottom:8px">🔋 Если трекинг останавливается с потухшим экраном</button>
       <button class="lb" id="btnSpeedRef" style="width:100%;margin-bottom:8px">📋 Справочник скоростей по приказу ОКТ-10</button>
       <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
     </div>
@@ -429,6 +430,16 @@
 <div class="sheet" id="sheetPer"><div class="grab"></div><h3>Перегон</h3><div id="perList"></div></div>
 
 <div class="sheet" id="sheetReason"><div class="grab"></div><h3>Причина</h3><div id="reasonList"></div></div>
+<div class="sheet" id="sheetBgHelp"><div class="grab"></div><h3>Если трекинг останавливается с потухшим экраном</h3>
+  <div style="padding:0 4px 16px;line-height:1.5;font-size:14px">
+    <p>Некоторые телефоны (особенно Xiaomi/Redmi/POCO на MIUI, иногда Samsung и Huawei) сами «убивают» приложения в фоне ради экономии батареи — даже когда ПИКЕТ работает как настоящая фоновая служба с уведомлением. Это не баг приложения, это поведение конкретной прошивки.</p>
+    <p><b>Что проверить вручную в настройках телефона:</b></p>
+    <p><b>Xiaomi / Redmi / POCO (MIUI):</b><br>Настройки → Приложения → ПИКЕТ → Сэкономия батареи → «Без ограничений». Также: Настройки → Разрешения → Автозапуск → включить для ПИКЕТ.</p>
+    <p><b>Samsung:</b><br>Настройки → Уход за устройством → Батарея → Ограничения для приложений в фоне → убрать ПИКЕТ из списка спящих/ограниченных.</p>
+    <p><b>Huawei:</b><br>Настройки → Батарея → Запуск приложений → ПИКЕТ → переключить на «Управлять вручную» и включить все три пункта (автозапуск, вторичный запуск, работа в фоне).</p>
+    <p>После первого запуска приложение само попросит исключить его из стандартной оптимизации батареи Android — обязательно подтверди это окно. Но на некоторых прошивках этого недостаточно, нужны ручные шаги выше.</p>
+  </div>
+</div>
 
 <div class="alert" id="alert">
   <div class="head" id="alHead">Внимание</div>
@@ -946,7 +957,7 @@
         '<div class="iright">'+(status?'<span class="status '+sc+'">'+status+'</span>':'<span></span>')+'<button class="del" data-del="'+r.id+'">удалить</button></div></div>'; }).join(""); }
 
   function openSheet(id){ $("#scrim").classList.add("on"); $(id).classList.add("on"); }
-  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason"].forEach(function(s){$(s).classList.remove("on");}); }
+  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason","#sheetBgHelp"].forEach(function(s){$(s).classList.remove("on");}); }
   $("#scrim").addEventListener("click",closeSheets);
   function setSeg(sel,val,attr){ document.querySelectorAll(sel+" button").forEach(function(b){ b.classList.toggle("on",b.getAttribute("data-"+attr)===val); }); }
   function renderChips(rowSel,opts,val,onPick){ var row=$(rowSel);
@@ -1116,6 +1127,7 @@
     },1500);
   }
 
+  $("#btnBgHelp").addEventListener("click",function(){ openSheet("#sheetBgHelp"); });
   $("#btnSpeedRef").addEventListener("click",function(){
     document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");});
     $("#v-speedlist").classList.add("on"); renderSpeedList(); });

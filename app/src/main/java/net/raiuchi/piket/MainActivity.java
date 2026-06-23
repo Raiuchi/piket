@@ -171,10 +171,32 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Многие производители (особенно Xiaomi/MIUI, частично Samsung, Huawei) убивают
+     *  foreground-службы с GPS вопреки официальной политике Android - это подтверждённая,
+     *  массовая проблема (см. dontkillmyapp.com), не специфичная для нашего приложения.
+     *  Системного способа полностью обойти агрессивные OEM-надстройки нет, но запрос
+     *  исключения из официальной оптимизации батареи Android снимает хотя бы стандартный
+     *  слой ограничений - и явно показывает машинисту, что нужно проверить вручную в
+     *  настройках телефона, если трекинг останавливается при потушенном экране. */
+    private void requestIgnoreBatteryOptimizations() {
+        try {
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE);
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                Intent intent = new Intent(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            }
+        } catch (Exception e) {
+            // если системный диалог недоступен на этой прошивке - просто пропускаем,
+            // не критично для запуска приложения
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         // разрешения получены — служба запустится сама при нажатии «Старт» в приложении
+        requestIgnoreBatteryOptimizations();
     }
 
     /** Нативный Android TTS для этого экрана (демо-режим и т.п., пока экран открыт) */
