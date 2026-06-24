@@ -719,6 +719,18 @@
           if(tM!=null){ var dv=dirDown()?-1:1, calibM=metersOf(state.calib.km,state.calib.pk,state.calib.m);
             candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; } }
 
+        // АВАРИЙНЫЙ ШИРОКИЙ ПОИСК: если обычное окно (растёт со временем, но не более 40км)
+        // долго (>25с) не находит совпадение рядом с ожидаемой позицией - значит счёт и
+        // реальность разошлись на расстояние БОЛЬШЕ самого окна поиска (например, простой
+        // с потухшим трекингом, ручной пропуск большого участка). Тогда ищем по ВСЕЙ длине
+        // выбранного перегона/маршрута, без привязки к ожидаемой позиции - дороже по расчётам,
+        // но без этого приложение никогда не найдёт реальную позицию при большом разрыве.
+        if(candM==null && acc<=120 && rt.lastGoodFix!=null && (now-rt.lastGoodFix)>25000){
+          var tMwide=snapToTrack(c.latitude,c.longitude); // без expectedM/windowM — ищет по всему треку
+          if(tMwide!=null){ var dvW=dirDown()?-1:1, calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
+            candM=calibMW+dvW*(tMwide-state.calib._trackM); viaTrack=true; }
+        }
+
         if(candM!=null){
           var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
           var plausible = acc<=40 || Math.abs(candM-drM)<=maxJump;
