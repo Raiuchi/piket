@@ -1031,8 +1031,13 @@
     if(editId){ var i=state.restrictions.findIndex(function(x){return x.id===editId;}); if(i>=0)state.restrictions[i]=r; } else state.restrictions.push(r);
     persist(); closeSheets(); renderList(); renderTrip(); toast(editId?"Сохранено":"Ограничение добавлено"); });
 
-  function openCal(){ var m=currentMeters(); $("#cKm").value=state.calib?state.calib.km:(m!=null?kmFrom(m):""); $("#cPk").value=state.calib?state.calib.pk:1;
-    $("#cM").value=state.calib?(state.calib.m||0):(m!=null?meterInPk(m):0);
+  function openCal(){ var m=currentMeters();
+    // Показываем ТЕКУЩУЮ вычисленную позицию (если она есть) - именно её машинист хочет
+    // подправить по факту проезжаемого столба. Раньше тут показывалось застывшее значение
+    // прошлой калибровки, даже если поезд уже далеко уехал от того места.
+    $("#cKm").value=m!=null?kmFrom(m):(state.calib?state.calib.km:"");
+    $("#cPk").value=m!=null?pkFrom(m):(state.calib?state.calib.pk:1);
+    $("#cM").value=m!=null?meterInPk(m):(state.calib?(state.calib.m||0):0);
     $("#cDirInfo").textContent=(state.ctx.towards==="obratno"?"⬇ Убывает (выбрано «Обратно»)":"⬆ Растёт (выбрано «Туда»)");
     openSheet("#sheetCal"); }
   $("#calCancel").addEventListener("click",closeSheets); $("#btnCalib").addEventListener("click",openCal);
@@ -1042,7 +1047,12 @@
     var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null};
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false;
-    rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км"); });
+    rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км");
+    // Если меняем калибровку во время активной поездки (видимый экран в режиме зеркала,
+    // реальный счёт идёт в headless-службе) - сразу командуем службе перечитать калибровку.
+    // Без этого headless продолжал бы считать со старой калибровкой до Стоп/Старт.
+    if(!IS_HEADLESS && rt.tracking){ try{ if(window.Android&&window.Android.recalibrate)window.Android.recalibrate(); }catch(e){} }
+  });
 
   function nudge(d){ if(state.calib==null){ toast("Сначала калибровка"); return; } rt.odo+=d*100*(dirDown()?-1:1); rt.posM=currentMeters(); renderTrip(); renderList(); }
   $("#pkPlus").addEventListener("click",function(){ nudge(1); }); $("#pkMinus").addEventListener("click",function(){ nudge(-1); });
@@ -1221,6 +1231,21 @@
         if(ready || attempt>=8){ warmVoice(); return; }
         setTimeout(function(){ tryVoice(attempt+1); }, 300);
       })(0);
+    };
+    // Лёгкая версия для перекалибровки НА ХОДУ (без остановки трекинга): пользователь
+    // на остановке поправил км/пикет/метр на видимом экране (persist() уже записал в
+    // localStorage), но headless продолжает крутить тикер со СТАРОЙ калибровкой в памяти -
+    // localStorage сам по себе не заставляет JS-переменную перечитаться. Раньше это
+    // требовало полного Стоп->Старт (через headlessRestart), теряя смысл "поправить на ходу".
+    // Эта версия НЕ трогает звук/wake lock/тикер - только подхватывает новую калибровку.
+    window.headlessRecalibrate=function(){
+      var fresh=load("sap_cal",null);
+      if(fresh==null) return;
+      state.calib=fresh;
+      rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0;
+      rt.fixQuality=null;
+      state.calib._trackM=null; // заново ищем привязку к пути на свежей калибровке
+      saveTrackSnapshot();
     };
     // Если служба пересоздаёт headless ПОСЛЕ того как трекинг уже шёл (например, систему
     // тряхнуло и она пересобрала процесс) — калибровка в storage уже актуальна, можно стартовать

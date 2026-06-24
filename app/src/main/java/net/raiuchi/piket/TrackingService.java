@@ -46,6 +46,7 @@ import java.util.Locale;
 public class TrackingService extends Service {
 
     private static final String CHANNEL_ID = "piket_tracking";
+    public static final String ACTION_RECALIBRATE = "net.raiuchi.piket.ACTION_RECALIBRATE";
 
     private PowerManager.WakeLock wakeLock;
     private FusedLocationProviderClient fusedClient;
@@ -292,6 +293,22 @@ public class TrackingService extends Service {
         });
     }
 
+    /** Команда headless-копии: перечитать ТОЛЬКО калибровку, без полного перезапуска
+     *  трекинга (звук, wake lock, тикер не трогаются). Нужна, когда машинист на остановке
+     *  поправляет км/пикет/метр прямо во время активной поездки, не нажимая «Стоп» -
+     *  без этого headless продолжал бы считать со старой калибровкой в памяти, пока её
+     *  явно не попросят перечитать (localStorage сам по себе JS-переменную не обновляет). */
+    private void forceHeadlessRecalibrate() {
+        if (headlessWeb == null || !headlessPageReady) return;
+        mainHandler.post(new Runnable() {
+            @Override public void run() {
+                if (headlessWeb == null) return;
+                headlessWeb.evaluateJavascript(
+                    "if(window.headlessRecalibrate)window.headlessRecalibrate();", null);
+            }
+        });
+    }
+
     /** Передаём координату прямо в headless WebView — работает независимо от Activity и экрана */
     private void feedLocationToWebView(Location loc) {
         if (headlessWeb == null) return;
@@ -336,7 +353,16 @@ public class TrackingService extends Service {
         // никогда не вызывался реальным потоком выполнения - тот bridge принадлежит ДРУГОМУ
         // WebView (headless), а не видимому экрану, который и инициирует "Старт".
         // Здесь - единственная реальная точка, куда долетает команда от нажатия "Старт".
-        forceHeadlessStart();
+        //
+        // ACTION_RECALIBRATE - отдельный путь для перекалибровки НА ХОДУ (машинист поправил
+        // км/пикет/метр прямо во время поездки, не нажимая «Стоп»). Полный forceHeadlessStart()
+        // здесь не подходит - он сбросил бы звук/тикер/wake lock без необходимости, когда
+        // трекинг и так уже активен. Нужна только лёгкая перечитка калибровки.
+        if (intent != null && ACTION_RECALIBRATE.equals(intent.getAction())) {
+            forceHeadlessRecalibrate();
+        } else {
+            forceHeadlessStart();
+        }
         return START_STICKY;
     }
 

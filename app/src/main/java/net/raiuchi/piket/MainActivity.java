@@ -337,6 +337,21 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** Лёгкая команда перекалибровки на ходу - используется, когда машинист поправил
+     *  км/пикет/метр прямо во время активной поездки, не нажимая «Стоп». Если служба
+     *  не запущена (трекинг не активен) - команда просто проигнорируется самой системой,
+     *  это нормально: при следующем настоящем «Старт» возьмётся уже свежая калибровка. */
+    private void recalibrateTrackingService() {
+        if (!isTrackingServiceRunning()) return;
+        Intent i = new Intent(this, TrackingService.class);
+        i.setAction(TrackingService.ACTION_RECALIBRATE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(i);
+        } else {
+            startService(i);
+        }
+    }
+
     private boolean isTrackingServiceRunning() {
         android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
         if (am == null) return false;
@@ -361,6 +376,13 @@ public class MainActivity extends Activity {
         public void startTracking() {
             runOnUiThread(new Runnable() {
                 @Override public void run() { startTrackingService(); }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void recalibrate() {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { recalibrateTrackingService(); }
             });
         }
 
