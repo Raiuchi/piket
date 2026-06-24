@@ -305,6 +305,7 @@
       <div class="blk"><div class="v num" id="oM">—</div><div class="u">М</div></div>
     </div>
     <div class="trav">пройдено от калибровки: <span class="num" id="oTrav">0 м</span></div>
+    <div class="trav" id="autoCalWarn" style="display:none;color:#f5a623;font-weight:600">⚠ Позиция определена автоматически — проверь и поправь при возможности</div>
 
     <div class="signal clear" id="signal">
       <div class="sig-top"><div class="sig-eb"><span class="lamp"></span><span id="sigState">путь свободен</span></div><div class="sig-dist" id="sigDist"></div></div>
@@ -576,7 +577,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -706,6 +707,37 @@
       if(totalDt>0 && totalDist>=30){ var forced=totalDist/totalDt*3.6; if(forced>5&&forced<300){ rt.speed=forced; rt.zeroSpeedSince=null; rt.zeroSpeedAnchor=null; } }
     }
 
+    // ЗАПАСНАЯ АВТОКАЛИБРОВКА: машинист нажал «Старт», но забыл откалиброваться вручную.
+    // Ручной ввод остаётся ОСНОВНЫМ и приоритетным способом - это срабатывает только когда
+    // калибровки вообще нет, и только после нескольких подтверждённых отличных замеров подряд
+    // (не один кривой замер). Калибровка ставится с флагом rt.autoCalib=true - на экране
+    // должно быть явное предупреждение, что позиция определена автоматически и её стоит
+    // проверить/исправить, точность ниже чем при ручном вводе по факту проезжаемого столба.
+    if(state.calib==null && rt.tracking && !IS_MIRROR){
+      if(acc<=20){
+        var autoTM=snapToTrack(c.latitude,c.longitude);
+        if(autoTM==null && state.ctx.peregon!=="Все участки"){
+          // Возможно выбран неправильный/устаревший перегон - пробуем честно по всем участкам
+          var savedPeregon=state.ctx.peregon; state.ctx.peregon="Все участки";
+          autoTM=snapToTrack(c.latitude,c.longitude);
+          state.ctx.peregon=savedPeregon;
+          if(autoTM!=null) state.ctx.peregon="Все участки"; // нашли только так - оставляем "Все участки", autoDetectPeregon сам подберёт точный на следующих кадрах
+        }
+        if(autoTM!=null){
+          if(rt.autoCalCand!=null && Math.abs(autoTM-rt.autoCalCand)<=150){ rt.autoCalCount=(rt.autoCalCount||0)+1; }
+          else { rt.autoCalCount=1; }
+          rt.autoCalCand=autoTM;
+          if(rt.autoCalCount>=4){
+            var acKm=kmFrom(autoTM), acPk=pkFrom(autoTM), acM=meterInPk(autoTM);
+            state.calib={km:acKm,pk:acPk,m:acM,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:autoTM};
+            rt.autoCalib=true; rt.odo=0; persist();
+            toast("Автоопределение: "+acKm+" км "+acPk+" пк — проверь и поправь при необходимости");
+            rt.autoCalCand=null; rt.autoCalCount=0;
+          }
+        }
+      } else { rt.autoCalCand=null; rt.autoCalCount=0; }
+    }
+
     if(state.calib!=null){
       var drM=currentMeters(); // тикер уже плавно ведёт позицию между замерами GPS
 
@@ -767,6 +799,17 @@
               rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
               rt.fixQuality="good";
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
+              // ПЕРИОДИЧЕСКАЯ РЕСИНХРОНИЗАЦИЯ БАЗОВОЙ ПРИВЯЗКИ: если базовая точка (_trackM)
+              // была установлена неточно при самой первой калибровке (старые версии этого
+              // не проверяли), счёт мог систематически отставать/забегать вперёд даже при
+              // отличном сигнале - watchdog для слабого сигнала сюда не доходит, потому что
+              // plausible почти всегда true при хорошем acc. На отличном сигнале (acc<=20)
+              // с несколько раз подряд подтверждённой позицией - досинхронизируем саму базу.
+              if(viaTrack && acc<=20){
+                if(rt.tmResyncCount==null) rt.tmResyncCount=0;
+                rt.tmResyncCount++;
+                if(rt.tmResyncCount>=5 && tMfinal!=null){ state.calib._trackM=tMfinal; persist(); rt.tmResyncCount=0; }
+              } else rt.tmResyncCount=0;
             } else {
               rt.posM=drM;
               rt.fixQuality="checking";
@@ -828,7 +871,7 @@
   var IS_MIRROR = false; // видимый экран обнаружил, что трекинг уже идёт в headless-движке службы
   function saveTrackSnapshot(){
     try{ save("sap_snap",{ posM:rt.posM, speed:rt.speed, odo:rt.odo, tracking:rt.tracking, ts:Date.now(),
-      peregon:state.ctx.peregon, towards:state.ctx.towards, fixQuality:rt.fixQuality }); }catch(e){}
+      peregon:state.ctx.peregon, towards:state.ctx.towards, fixQuality:rt.fixQuality, autoCalib:rt.autoCalib }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
   function fixQualityText(q){
@@ -857,6 +900,12 @@
     }
     if(gen!==rt.mirrorGen) return;
     rt.posM=snap.posM; rt.speed=snap.speed; rt.odo=(snap.odo!=null?snap.odo:rt.odo); rt.tracking=true;
+    rt.autoCalib=!!snap.autoCalib;
+    // Если headless только что сама определила позицию (запасная автокалибровка), а на
+    // видимом экране калибровки до сих пор не было - подхватываем её из localStorage,
+    // иначе экран продолжал бы показывать "Откалибруйся по столбу", хотя headless уже
+    // считает и калибровка реально есть (просто на другой стороне, headless её записала).
+    if(state.calib==null && rt.autoCalib){ state.calib=load("sap_cal",null); }
     var st=fixQualityText(snap.fixQuality);
     $("#gps").className="gps "+st.gps; $("#gpsTxt").textContent=st.txt; $("#spdSrc").textContent=st.src; $("#spdSrc").className=st.srcCls;
     setTrackBtn(true); renderTrip(); setGauge();
@@ -974,6 +1023,7 @@
     if(!IS_MIRROR && m!=null) rt.posM=m;
     $("#oKm").textContent=m==null?"—":kmFrom(m); $("#oPk").textContent=m==null?"—":pkFrom(m); $("#oM").textContent=m==null?"—":meterInPk(m);
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=state.ctx.peregon;
+    var acwEl=$("#autoCalWarn"); if(acwEl) acwEl.style.display=rt.autoCalib?"block":"none";
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
     if(state.calib==null){ sig.className="signal"; stEl.textContent="нет калибровки"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null);
       var cnt=state.restrictions.length;
