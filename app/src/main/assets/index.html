@@ -576,7 +576,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -638,10 +638,13 @@
   function currentMeters(){ if(state.calib==null)return null; return metersOf(state.calib.km,state.calib.pk,state.calib.m)+(dirDown()?-1:1)*rt.odo; }
 
   function autoDetectPeregon(lat, lon, acc){
-    // Безопасность: после калибровки НЕ трогаем выбранный перегон — иначе один кривой замер
-    // может тихо перекинуть счёт на другой участок. Помогает только на старте, до калибровки.
-    if(state.calib!=null) return;
-    if(acc!=null && acc>60) return; // на шумном замере не определяем
+    // После калибровки переключаем перегон автоматически ТОЛЬКО при очень хорошем сигнале
+    // и нескольких подтверждениях подряд - один кривой замер не должен тихо перекинуть
+    // счёт на другой участок. До калибровки - как раньше, без этих ограничений (это
+    // помогает определить начальный перегон при самом первом запуске).
+    var strictMode = state.calib!=null;
+    if(strictMode && (acc==null || acc>25)) return; // после калибровки нужен только отличный сигнал
+    if(!strictMode && acc!=null && acc>60) return;
     var best=-1, bestDist=Infinity;
     for(var s=0;s<TRACK.segs.length;s++){
       var r=findNearestSegment(lat,lon,TRACK.segs[s], null, null);
@@ -649,7 +652,17 @@
     }
     if(best>=0 && bestDist<300){
       var label=TRACK.labels[best];
-      if(label!==state.ctx.peregon){ state.ctx.peregon=label; persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d"); }
+      if(label!==state.ctx.peregon){
+        if(strictMode){
+          // Требуем 3 подтверждения подряд на ДРУГОЙ перегон, прежде чем переключиться -
+          // защита от единичного шумного замера у границы двух участков
+          if(rt.peregonCandLabel===label){ rt.peregonCandCount=(rt.peregonCandCount||0)+1; }
+          else { rt.peregonCandLabel=label; rt.peregonCandCount=1; }
+          if(rt.peregonCandCount<3) return;
+          rt.peregonCandLabel=null; rt.peregonCandCount=0;
+        }
+        state.ctx.peregon=label; persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
+      } else if(strictMode){ rt.peregonCandLabel=null; rt.peregonCandCount=0; }
     }
   }
 
@@ -672,7 +685,7 @@
       // Минимум 15м накопленного смещения — иначе обычное дрожание стоящего GPS-приёмника
       // (5-10м между фиксами) даёт кажущуюся скорость 20-40 км/ч и ложно "оживляет" счётчик,
       // хотя поезд реально стоит на станции.
-      if(fbDist>=15){ var fb=fbDist/dt*3.6; if(fb<400)spd=fb; }
+      if(fbDist>=15){ var fb=fbDist/dt*3.6; if(fb<300)spd=fb; }
       else spd=0;
     }
     if(spd!=null) rt.speed=(spd>5)?( rt.speed?rt.speed*0.6+spd*0.4:spd ):Math.max(0,rt.speed*0.7);
@@ -690,18 +703,26 @@
       var totalDist=haversine(rt.zeroSpeedAnchor,pt);
       // Порог 30м (выше, чем у обычного fallback) — watchdog копит шум дольше (8+с),
       // выше шанс случайного выброса GPS-шума дать ложное "движение" на стоянке.
-      if(totalDt>0 && totalDist>=30){ var forced=totalDist/totalDt*3.6; if(forced>5&&forced<400){ rt.speed=forced; rt.zeroSpeedSince=null; rt.zeroSpeedAnchor=null; } }
+      if(totalDt>0 && totalDist>=30){ var forced=totalDist/totalDt*3.6; if(forced>5&&forced<300){ rt.speed=forced; rt.zeroSpeedSince=null; rt.zeroSpeedAnchor=null; } }
     }
 
     if(state.calib!=null){
       var drM=currentMeters(); // тикер уже плавно ведёт позицию между замерами GPS
 
       // Привязка к пути (trackM) ещё не установлена — ставим её только на надёжном сигнале,
-      // а не на том (возможно кривом) замере что был в момент калибровки
+      // подтверждённом дважды подряд (а не на одном, возможно шумном замере). Раньше один
+      // замер с acc<=80 (довольно щедрый порог) сразу фиксировал базовую точку - если этот
+      // первый замер был хоть немного смещён, ВСЯ дальнейшая система наследовала эту ошибку
+      // навсегда (формула candM считается ОТНОСИТЕЛЬНО этой точки), даже при отличном сигнале
+      // на всех последующих замерах. Это и объясняло жалобу "GPS точный, а км/пикет не точен".
       if(state.calib._trackM==null){
-        if(acc<=80){
+        if(acc<=60){
           var tm0=snapToTrack(c.latitude,c.longitude);
-          if(tm0!=null){ state.calib._trackM=tm0; persist(); rt.lastGoodFix=now; }
+          if(tm0!=null){
+            if(rt.trackMCand!=null && Math.abs(tm0-rt.trackMCand)<=150){
+              state.calib._trackM=tm0; persist(); rt.lastGoodFix=now; rt.trackMCand=null;
+            } else { rt.trackMCand=tm0; }
+          }
         }
         rt.posM=drM;
         rt.fixQuality = state.calib._trackM==null?"waiting":"weak";
@@ -712,12 +733,12 @@
         var expectedTrackM=state.calib._trackM+dv0*(drM-calibM0);
 
         // Коррекция по GPS — принимаем только если физически правдоподобна И подтверждена дважды подряд
-        var candM=null, viaTrack=false;
+        var candM=null, viaTrack=false, tMfinal=null;
         var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
         var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
         if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
           if(tM!=null){ var dv=dirDown()?-1:1, calibM=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; } }
+            candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; } }
 
         // АВАРИЙНЫЙ ШИРОКИЙ ПОИСК: если обычное окно (растёт со временем, но не более 40км)
         // долго (>25с) не находит совпадение рядом с ожидаемой позицией - значит счёт и
@@ -728,7 +749,7 @@
         if(candM==null && acc<=120 && rt.lastGoodFix!=null && (now-rt.lastGoodFix)>25000){
           var tMwide=snapToTrack(c.latitude,c.longitude); // без expectedM/windowM — ищет по всему треку
           if(tMwide!=null){ var dvW=dirDown()?-1:1, calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibMW+dvW*(tMwide-state.calib._trackM); viaTrack=true; }
+            candM=calibMW+dvW*(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; }
         }
 
         if(candM!=null){
@@ -768,6 +789,10 @@
             if(rt.driftSince && (now-rt.driftSince)>20000){
               rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
               rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
+              // Синхронизируем саму базовую привязку (_trackM), не только текущий счёт -
+              // иначе следующая коррекция снова считала бы относительно старой, смещённой
+              // базы, и систематическая ошибка возвращалась бы заново.
+              if(tMfinal!=null) state.calib._trackM=tMfinal, persist();
               $("#spdSrc").textContent="GPS — автоподстройка"; $("#spdSrc").className="src";
               rt.driftSince=null; rt.driftCandM=null;
             }
@@ -926,7 +951,7 @@
       var a=up?(s-pos):(pos-s); r._ahead=a; r._zone=false; if(a>0&&a<bestA){ bestA=a; best=r; } });
     return inzone||best; }
 
-  function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#spdVal").textContent=rt.tracking?Math.round(rt.speed):0; }
+  function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
 
   function chipsOf(r){ var c="";
     if(r.dir)c+='<span class="chip c-dir">'+dirLabel(r.dir)+'</span>';
