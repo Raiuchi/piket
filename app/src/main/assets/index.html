@@ -644,7 +644,7 @@
     // счёт на другой участок. До калибровки - как раньше, без этих ограничений (это
     // помогает определить начальный перегон при самом первом запуске).
     var strictMode = state.calib!=null;
-    if(strictMode && (acc==null || acc>25)) return; // после калибровки нужен только отличный сигнал
+    if(strictMode && (acc==null || acc>35)) return; // после калибровки нужен хороший сигнал
     if(!strictMode && acc!=null && acc>60) return;
     var best=-1, bestDist=Infinity;
     for(var s=0;s<TRACK.segs.length;s++){
@@ -659,7 +659,7 @@
           // защита от единичного шумного замера у границы двух участков
           if(rt.peregonCandLabel===label){ rt.peregonCandCount=(rt.peregonCandCount||0)+1; }
           else { rt.peregonCandLabel=label; rt.peregonCandCount=1; }
-          if(rt.peregonCandCount<3) return;
+          if(rt.peregonCandCount<2) return;
           rt.peregonCandLabel=null; rt.peregonCandCount=0;
         }
         state.ctx.peregon=label; persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
@@ -797,27 +797,16 @@
           var plausible = acc<=40 || Math.abs(candM-drM)<=maxJump;
           if(plausible){
             // Требуем 2 похожих замера подряд (±300м) — один кривой замер больше не сможет всё испортить
-            if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=300){ rt.pendingCount=(rt.pendingCount||0)+1; }
+            if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){ rt.pendingCount=(rt.pendingCount||0)+1; }
             else { rt.pendingCount=1; }
             rt.pendingCandM=candM;
             rt.driftSince=null; rt.driftCandM=null; // расхождения больше нет — сбрасываем счётчик застоя
-            if(rt.pendingCount>=2 || acc<=25){
+            if(rt.pendingCount>=2 || acc<=30){
               rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
               rt.posM=candM;
               rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
               rt.fixQuality="good";
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
-              // ПЕРИОДИЧЕСКАЯ РЕСИНХРОНИЗАЦИЯ БАЗОВОЙ ПРИВЯЗКИ: если базовая точка (_trackM)
-              // была установлена неточно при самой первой калибровке (старые версии этого
-              // не проверяли), счёт мог систематически отставать/забегать вперёд даже при
-              // отличном сигнале - watchdog для слабого сигнала сюда не доходит, потому что
-              // plausible почти всегда true при хорошем acc. На отличном сигнале (acc<=20)
-              // с несколько раз подряд подтверждённой позицией - досинхронизируем саму базу.
-              if(viaTrack && acc<=20){
-                if(rt.tmResyncCount==null) rt.tmResyncCount=0;
-                rt.tmResyncCount++;
-                if(rt.tmResyncCount>=5 && tMfinal!=null){ state.calib._trackM=tMfinal; persist(); rt.tmResyncCount=0; }
-              } else rt.tmResyncCount=0;
             } else {
               rt.posM=drM;
               rt.fixQuality="checking";
