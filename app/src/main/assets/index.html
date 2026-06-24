@@ -773,7 +773,7 @@
         var expectedTrackM=state.calib._trackM+(drM-calibM0);
 
         // Коррекция по GPS — принимаем только если физически правдоподобна И подтверждена дважды подряд
-        var candM=null, viaTrack=false, tMfinal=null;
+        var candM=null, viaTrack=false, tMfinal=null, usedWideSearch=false;
         var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
         var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
         if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
@@ -797,10 +797,28 @@
         if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
           var tMwide=snapToTrack(c.latitude,c.longitude); // без expectedM/windowM — ищет по всему треку
           if(tMwide!=null){ var calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibMW+(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; }
+            candM=calibMW+(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
         }
 
-        if(candM!=null){
+        // КРИТИЧНО: если candM найден через АВАРИЙНЫЙ широкий поиск (usedWideSearch=true) -
+        // обычная проверка plausible (maxJump) здесь неприменима по смыслу: расхождение
+        // candM-drM ОГРОМНОЕ по определению (это и есть причина, почему сработал аварийный
+        // поиск), а maxJump рассчитан на защиту от мелких случайных прыжков GPS-шума, не на
+        // подобные ситуации. Раньше правильно найденная аварийным поиском позиция тут же
+        // отбраковывалась этой же проверкой - порочный круг: поиск находит правильную точку,
+        // а защита от прыжков не даёт её принять именно потому что прыжок большой.
+        if(candM!=null && usedWideSearch){
+          rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
+          rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good"; rt.pendingCount=0; rt.pendingCandM=null;
+          // НЕ трогаем state.calib._trackM здесь - rt.odo уже пересчитан правильно через
+          // candM и ИСХОДНУЮ калибровку (calib.km/pk/m). _trackM и calib.km/pk/m - это
+          // согласованная пара для формулы expectedTrackM на СЛЕДУЮЩИХ кадрах; обновление
+          // только _trackM без изменения calib.km/pk/m ломает эту согласованность и создаёт
+          // новую систематическую ошибку того же порядка, что и была - именно это произошло
+          // при первой версии этого фикса (нашли стресс-тестом: ошибка росла дальше после
+          // успешного первого срабатывания, вместо того чтобы остаться маленькой).
+          $("#spdSrc").textContent="GPS — найдена позиция"; $("#spdSrc").className="src";
+        } else if(candM!=null){
           var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
           var plausible = acc<=40 || Math.abs(candM-drM)<=maxJump;
           if(plausible){
@@ -837,10 +855,10 @@
             if(rt.driftSince && (now-rt.driftSince)>20000){
               rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
               rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
-              // Синхронизируем саму базовую привязку (_trackM), не только текущий счёт -
-              // иначе следующая коррекция снова считала бы относительно старой, смещённой
-              // базы, и систематическая ошибка возвращалась бы заново.
-              if(tMfinal!=null) state.calib._trackM=tMfinal, persist();
+              // НЕ трогаем _trackM здесь - см. подробное объяснение у аналогичного фикса
+              // в блоке широкого поиска выше. rt.odo уже пересчитан правильно через candM
+              // и исходную калибровку - трогать _trackM отдельно ломает согласованность пары
+              // _trackM/calib.km-pk-m, создавая новую систематическую ошибку того же порядка.
               $("#spdSrc").textContent="GPS — автоподстройка"; $("#spdSrc").className="src";
               rt.driftSince=null; rt.driftCandM=null;
             }
