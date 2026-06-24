@@ -761,16 +761,24 @@
         $("#spdSrc").textContent=state.calib._trackM==null?"Жду точный сигнал для привязки":"GPS слабый — счёт по скорости";
         $("#spdSrc").className="src dr";
       } else {
-        var dv0=dirDown()?-1:1, calibM0=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-        var expectedTrackM=state.calib._trackM+dv0*(drM-calibM0);
+        var calibM0=metersOf(state.calib.km,state.calib.pk,state.calib.m);
+        // КРИТИЧНО: здесь НЕТ dirDown() множителя - TRACK.segs всегда растёт в одну и ту же
+        // физическую сторону (проверено на реальных координатах: СПб=0км, Москва=648км),
+        // независимо от того, в какую сторону едет машинист. dirDown() нужен только для
+        // преобразования odo<->позиция (накопленное расстояние всегда положительно, а
+        // позиция растёт или убывает по направлению) - но НЕ для позиция<->trackM, которые
+        // обе меняются в одну сторону всегда. Раньше здесь был тот же знак, что давало
+        // РАСТУЩИЙ candM при движении Обратно, хотя реальная позиция должна убывать -
+        // именно это вызывало 'счётчик дёргается туда-обратно' при обратном направлении.
+        var expectedTrackM=state.calib._trackM+(drM-calibM0);
 
         // Коррекция по GPS — принимаем только если физически правдоподобна И подтверждена дважды подряд
         var candM=null, viaTrack=false, tMfinal=null;
         var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
         var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
         if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
-          if(tM!=null){ var dv=dirDown()?-1:1, calibM=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibM+dv*(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; } }
+          if(tM!=null){ var calibM=metersOf(state.calib.km,state.calib.pk,state.calib.m);
+            candM=calibM+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; } }
 
         // АВАРИЙНЫЙ ШИРОКИЙ ПОИСК: если обычное окно (растёт со временем, но не более 40км)
         // долго (>25с) не находит совпадение рядом с ожидаемой позицией - значит счёт и
@@ -788,8 +796,8 @@
         var sinceAnyGoodOrStart = rt.lastGoodFix!=null ? (now-rt.lastGoodFix) : (now-rt.trackingSince);
         if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
           var tMwide=snapToTrack(c.latitude,c.longitude); // без expectedM/windowM — ищет по всему треку
-          if(tMwide!=null){ var dvW=dirDown()?-1:1, calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibMW+dvW*(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; }
+          if(tMwide!=null){ var calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
+            candM=calibMW+(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; }
         }
 
         if(candM!=null){
