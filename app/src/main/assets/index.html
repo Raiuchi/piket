@@ -774,7 +774,7 @@
   try{ IS_HEADLESS = !!(window.Android && window.Android.isHeadless && window.Android.isHeadless()); }catch(e){}
   var IS_MIRROR = false; // видимый экран обнаружил, что трекинг уже идёт в headless-движке службы
   function saveTrackSnapshot(){
-    try{ save("sap_snap",{ posM:rt.posM, speed:rt.speed, tracking:rt.tracking, ts:Date.now(),
+    try{ save("sap_snap",{ posM:rt.posM, speed:rt.speed, odo:rt.odo, tracking:rt.tracking, ts:Date.now(),
       peregon:state.ctx.peregon, towards:state.ctx.towards, fixQuality:rt.fixQuality }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
@@ -803,7 +803,7 @@
       return;
     }
     if(gen!==rt.mirrorGen) return;
-    rt.posM=snap.posM; rt.speed=snap.speed; rt.tracking=true;
+    rt.posM=snap.posM; rt.speed=snap.speed; rt.odo=(snap.odo!=null?snap.odo:rt.odo); rt.tracking=true;
     var st=fixQualityText(snap.fixQuality);
     $("#gps").className="gps "+st.gps; $("#gpsTxt").textContent=st.txt; $("#spdSrc").textContent=st.src; $("#spdSrc").className=st.srcCls;
     setTrackBtn(true); renderTrip(); setGauge();
@@ -911,7 +911,14 @@
     if(!r){ el.style.display="none"; return; }
     el.className="g-limit "+speedClass(r.spd); el.style.display="flex"; $("#limVal").textContent=r.spd||"—"; }
 
-  function renderTrip(){ var m=currentMeters(); if(m!=null)rt.posM=m;
+  function renderTrip(){
+    // В режиме зеркала (IS_MIRROR) видимый экран НЕ ведёт свой расчёт позиции - rt.odo
+    // здесь всегда 0 (считает только headless-копия в службе). currentMeters() пересчитывал
+    // бы позицию через локальный (нулевой) rt.odo и затирал бы правильное значение rt.posM,
+    // которое mirrorTick() только что поставил из снэпшота headless. Поэтому в зеркале просто
+    // используем rt.posM как есть, не трогая его здесь.
+    var m = IS_MIRROR ? rt.posM : currentMeters();
+    if(!IS_MIRROR && m!=null) rt.posM=m;
     $("#oKm").textContent=m==null?"—":kmFrom(m); $("#oPk").textContent=m==null?"—":pkFrom(m); $("#oM").textContent=m==null?"—":meterInPk(m);
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=state.ctx.peregon;
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
