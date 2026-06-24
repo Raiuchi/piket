@@ -576,7 +576,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -654,7 +654,7 @@
   }
 
   function updateAndroidNotification(){
-    try{ var m=rt.posM; if(m==null)return; var txt=kmFrom(m)+" км · ПК"+pkFrom(m); if(window.Android&&window.Android.updatePosition)window.Android.updatePosition(txt); }catch(e){}
+    try{ var m=rt.posM; if(m==null)return; var txt=kmFrom(m)+" км · ПК"+pkFrom(m)+" · "+Math.round(rt.speed)+" км/ч"; if(window.Android&&window.Android.updatePosition)window.Android.updatePosition(txt); }catch(e){}
   }
   function onPos(p){ var c=p.coords,acc=c.accuracy||999;
     $("#gps").className="gps "+(acc<=25?"live":"weak"); $("#gpsTxt").textContent="±"+Math.round(acc)+" м";
@@ -727,6 +727,7 @@
             if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=300){ rt.pendingCount=(rt.pendingCount||0)+1; }
             else { rt.pendingCount=1; }
             rt.pendingCandM=candM;
+            rt.driftSince=null; rt.driftCandM=null; // расхождения больше нет — сбрасываем счётчик застоя
             if(rt.pendingCount>=2 || acc<=25){
               rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
               rt.posM=candM;
@@ -743,6 +744,21 @@
             rt.posM=drM;
             rt.fixQuality="weak";
             $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
+            // АВТОКАЛИБРОВКА ПРИ ЗАТЯНУВШЕМСЯ РАСХОЖДЕНИИ: один кривой замер плавающим
+            // GPS-сигналом мы правильно отбрасываем (maxJump). Но если расхождение
+            // СТАБИЛЬНО держится одного порядка дольше 20 секунд (не разовый скачок,
+            // а систематическое "счёт разъехался с реальностью") — лучше довериться GPS,
+            // чем продолжать копить ошибку до бесконечности.
+            if(rt.driftCandM!=null && Math.abs(candM-rt.driftCandM)<=400){
+              if(rt.driftSince==null) rt.driftSince=now;
+            } else { rt.driftSince=now; }
+            rt.driftCandM=candM;
+            if(rt.driftSince && (now-rt.driftSince)>20000){
+              rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
+              rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
+              $("#spdSrc").textContent="GPS — автоподстройка"; $("#spdSrc").className="src";
+              rt.driftSince=null; rt.driftCandM=null;
+            }
           }
         } else {
           rt.posM=drM;
