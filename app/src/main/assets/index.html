@@ -640,6 +640,28 @@
   function dirDown(){ return state.ctx.towards==="obratno"; }
   function currentMeters(){ if(state.calib==null)return null; return metersOf(state.calib.km,state.calib.pk,state.calib.m)+(dirDown()?-1:1)*rt.odo; }
 
+  // ИЗВЕСТНЫЕ ЦЕПОЧКИ МАРШРУТОВ: для типового пути Дача Долгорукова - Петрозаводск
+  // (и обратно) машинист почти всегда едет по одному и тому же заранее известному
+  // порядку участков. Это особенно важно на участке между Манушкино и Павлово, где
+  // I и II пути физически совпадают по координатам - там GPS принципиально не может
+  // отличить, по какому из участков едет машинист (см. подробности в комментариях
+  // ниже в autoDetectPeregon). Вместо угадывания через геометрию, переключаемся по
+  // заранее известному порядку - когда счёт доходит до конца текущего участка цепочки,
+  // переключаем на следующий в этой же цепочке, без сравнения GPS-координат вообще.
+  // Если реальный маршрут отличается - машинист всегда может переключить участок
+  // вручную, после чего автоматика по цепочке отключается до следующей калибровки.
+  var RAILCHAINS = {
+    tuda: ["Д. Долг - Павлово", "Павлово - Горы II путь", "Горы - Петрозаводск"],
+    obratno: ["Горы - Петрозаводск", "Горы - Павлово I путь", "Д. Долг - Павлово"]
+  };
+  function nextInChain(){
+    var chain = RAILCHAINS[state.ctx.towards];
+    if(!chain) return null;
+    var idx = chain.indexOf(state.ctx.peregon);
+    if(idx<0 || idx>=chain.length-1) return null;
+    return chain[idx+1];
+  }
+
   function autoDetectPeregon(lat, lon, acc){
     // После калибровки переключаем перегон автоматически ТОЛЬКО при очень хорошем сигнале
     // и нескольких подтверждениях подряд - один кривой замер не должен тихо перекинуть
@@ -663,6 +685,33 @@
       var curM0=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(rt.tracking?(dirDown()?-1:1)*rt.odo:0);
       if(curM0 > curSeg0[0][2]+500 && curM0 < curSeg0[curSeg0.length-1][2]-500){
         rt.peregonCandLabel=null; rt.peregonCandCount=0;
+        return;
+      }
+      // ИЗВЕСТНАЯ ЦЕПОЧКА: счёт подошёл к границе своего участка. КРИТИЧНО - нужно
+      // выйти через ПРАВИЛЬНЫЙ край, соответствующий направлению движения, а не любой
+      // из двух (иначе на старте маршрута, рядом с НАЧАЛОМ сегмента, ложно срабатывало
+      // бы переключение, как если бы мы доехали до КОНЦА - именно это вызывало дребезг
+      // в первых секундах после старта). Едем "Туда" (растущий км) - выход через конец
+      // сегмента. Едем "Обратно" - выход через начало.
+      var exitingThroughRight = dirDown()
+        ? (curM0 <= curSeg0[0][2]+500)
+        : (curM0 >= curSeg0[curSeg0.length-1][2]-500);
+      if(!exitingThroughRight){ rt.peregonCandLabel=null; rt.peregonCandCount=0; return; }
+      // Если для текущего направления есть заранее известный следующий участок в
+      // цепочке - переключаемся НА НЕГО прямо, без геометрического сравнения сегментов.
+      // Это решает проблему дублирующихся координат принципиально: не угадываем через
+      // GPS на участке, где это физически невозможно, а используем заранее известный
+      // типовой маршрут. Если реальность отличается (машинист едет не по обычному
+      // маршруту) - он переключит участок вручную, что сразу отключает цепочку для
+      // текущей калибровки (chain используется только пока currentIdx есть в ней).
+      var chainNext = nextInChain();
+      if(chainNext){
+        if(rt.peregonCandLabel===chainNext){ rt.peregonCandCount=(rt.peregonCandCount||0)+1; }
+        else { rt.peregonCandLabel=chainNext; rt.peregonCandCount=1; }
+        if(rt.peregonCandCount>=2){
+          rt.peregonCandLabel=null; rt.peregonCandCount=0;
+          state.ctx.peregon=chainNext; persist(); renderTrip(); toast("Перегон: "+chainNext); setSeg("#dirSeg",state.ctx.towards,"d");
+        }
         return;
       }
     }
