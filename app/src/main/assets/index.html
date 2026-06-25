@@ -648,8 +648,25 @@
     var strictMode = state.calib!=null;
     if(strictMode && (acc==null || acc>35)) return; // после калибровки нужен хороший сигнал
     if(!strictMode && acc!=null && acc>60) return;
-    var best=-1, bestDist=Infinity, currentDist=Infinity;
     var currentIdx = TRACK.labels.indexOf(state.ctx.peregon);
+    // ГЛАВНОЕ ПРАВИЛО: разные физические пути (I/II путь и т.п.) между одними станциями
+    // могут проходить по ОДНИМ И ТЕМ ЖЕ координатам на общем участке до точки расхождения -
+    // на таком участке геометрический поиск даёт одинаковое расстояние для НЕСКОЛЬКИХ
+    // сегментов одновременно, сравнение "кто ближе" там принципиально ненадёжно (не шум,
+    // оба варианта физически верны). Поэтому: если текущий счёт ВСЁ ЕЩЁ внутри диапазона
+    // метража своего сегмента (с запасом 500м от любого края) - доверяем уже выбранному
+    // перегону безусловно, даже не пытаясь сравнивать с другими. Переключение имеет смысл
+    // рассматривать только когда счёт подходит к границе СВОЕГО диапазона - то есть машинист
+    // физически приближается к концу того, что уже выбрано.
+    if(strictMode && currentIdx>=0 && state.calib){
+      var curSeg0=TRACK.segs[currentIdx];
+      var curM0=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(rt.tracking?(dirDown()?-1:1)*rt.odo:0);
+      if(curM0 > curSeg0[0][2]+500 && curM0 < curSeg0[curSeg0.length-1][2]-500){
+        rt.peregonCandLabel=null; rt.peregonCandCount=0;
+        return;
+      }
+    }
+    var best=-1, bestDist=Infinity, currentDist=Infinity;
     for(var s=0;s<TRACK.segs.length;s++){
       var r=findNearestSegment(lat,lon,TRACK.segs[s], null, null);
       if(r.dist<bestDist){ bestDist=r.dist; best=s; }
