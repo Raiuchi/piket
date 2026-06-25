@@ -577,7 +577,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -966,7 +966,8 @@
   var IS_MIRROR = false; // видимый экран обнаружил, что трекинг уже идёт в headless-движке службы
   function saveTrackSnapshot(){
     try{ save("sap_snap",{ posM:rt.posM, speed:rt.speed, odo:rt.odo, tracking:rt.tracking, ts:Date.now(),
-      peregon:state.ctx.peregon, towards:state.ctx.towards, fixQuality:rt.fixQuality, autoCalib:rt.autoCalib }); }catch(e){}
+      peregon:state.ctx.peregon, towards:state.ctx.towards, fixQuality:rt.fixQuality, autoCalib:rt.autoCalib,
+      activeAlert:rt.activeAlert||null }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
   function fixQualityText(q){
@@ -1004,6 +1005,25 @@
     var st=fixQualityText(snap.fixQuality);
     $("#gps").className="gps "+st.gps; $("#gpsTxt").textContent=st.txt; $("#spdSrc").textContent=st.src; $("#spdSrc").className=st.srcCls;
     setTrackBtn(true); renderTrip(); setGauge();
+    // КРИТИЧНО: видимый экран сам никогда не вызывал evalAlerts() (он вызывается только
+    // в onPos(), который реально выполняется только в headless-копии службы) - поэтому
+    // большое окно предупреждения (#alert, красное/жёлтое с цифрой скорости) никогда не
+    // появлялось на ЭКРАНЕ, который человек реально видит, хотя сам звук/голос из headless
+    // мог прозвучать. Подхватываем активное предупреждение из снэпшота (headless пишет его
+    // туда же) и показываем визуально - НЕ вызывая say()/beep()/vibe() здесь повторно,
+    // те уже сработали внутри headless, дублировать их не нужно.
+    if(snap.activeAlert && snap.activeAlert.key!==rt.ackedAlertKey){
+      var aa=snap.activeAlert;
+      if(rt.lastShownAlertKey!==aa.key){
+        rt.lastShownAlertKey=aa.key;
+        var al=$("#alert"); al.className="alert on "+aa.kind;
+        $("#alHead").textContent=aa.kind==="danger"?"ОГРАНИЧЕНИЕ — ЗОНА":"ВНИМАНИЕ — ОГРАНИЧЕНИЕ"; $("#alBig").textContent=aa.spd||"—";
+        $("#alDet").innerHTML=aa.detHtml;
+      }
+    } else if(rt.lastShownAlertKey!=null){
+      rt.lastShownAlertKey=null;
+      $("#alert").className="alert";
+    }
     if(!rt.tickTimer){ rt.tickTimer=setInterval(function(){ mirrorTick(0,gen); },700); }
   }
   function startMirror(){ IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
@@ -1146,11 +1166,15 @@
       if(inzone&&!st.z){ st.z=true; st.a=true; fireAlert("danger",r,0); }
       else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); } }); }
   function fireAlert(kind,r,ahead){ var al=$("#alert"); al.className="alert on "+kind; var loc=r.km+" км "+r.pk+" пк";
+    var detHtml=kind==="danger"?(loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':'')):('<small>через</small> '+fmtM(ahead)+' · '+loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':''));
     $("#alHead").textContent=kind==="danger"?"ОГРАНИЧЕНИЕ — ЗОНА":"ВНИМАНИЕ — ОГРАНИЧЕНИЕ"; $("#alBig").textContent=r.spd||"—";
-    $("#alDet").innerHTML=kind==="danger"?(loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':'')):('<small>через</small> '+fmtM(ahead)+' · '+loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':''));
+    $("#alDet").innerHTML=detHtml;
+    // Сохраняем для передачи на видимый экран через снэпшот (тот сам звук/голос не дублирует -
+    // только показывает то же визуальное окно, что уже отображено здесь в headless)
+    rt.activeAlert={ key:(r.id||(r.km+"_"+r.pk))+"_"+kind, kind:kind, spd:r.spd, detHtml:detHtml };
     say(kind==="danger"? sayPhrase(r) : (distWords(ahead)+", "+sayPhrase(r)));
     beep(kind); vibe(kind); }
-  $("#alAck").addEventListener("click",function(){ $("#alert").className="alert"; });
+  $("#alAck").addEventListener("click",function(){ $("#alert").className="alert"; rt.ackedAlertKey=(rt.activeAlert?rt.activeAlert.key:null); rt.activeAlert=null; });
 
   function renderList(){ var box=$("#listBox"),arr=state.restrictions.slice(); $("#listCount").textContent=arr.length;
     if(!arr.length){ box.innerHTML='<div class="empty"><div class="ico">⬡</div><b>Список пуст</b><p>Добавь предупреждения с бланка:<br>перегон, км/пк, скорость, срок.</p></div>'; return; }
