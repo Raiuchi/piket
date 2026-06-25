@@ -646,20 +646,28 @@
     var strictMode = state.calib!=null;
     if(strictMode && (acc==null || acc>35)) return; // после калибровки нужен хороший сигнал
     if(!strictMode && acc!=null && acc>60) return;
-    var best=-1, bestDist=Infinity;
+    var best=-1, bestDist=Infinity, currentDist=Infinity;
+    var currentIdx = TRACK.labels.indexOf(state.ctx.peregon);
     for(var s=0;s<TRACK.segs.length;s++){
       var r=findNearestSegment(lat,lon,TRACK.segs[s], null, null);
       if(r.dist<bestDist){ bestDist=r.dist; best=s; }
+      if(s===currentIdx) currentDist=r.dist;
     }
     if(best>=0 && bestDist<300){
       var label=TRACK.labels[best];
-      if(label!==state.ctx.peregon){
+      // КРИТИЧНО: некоторые маршруты физически проходят в 200-800м друг от друга (например,
+      // Горы-Петрозаводск и Горы-Павлово рядом со станцией Горы) - GPS-шум на таком расстоянии
+      // легко может показать "другой маршрут ближе" по ошибке. Переключаем только если новый
+      // кандидат ЗАМЕТНО (минимум на 150м) ближе текущего выбранного перегона - иначе это
+      // может быть просто шум на границе двух физически близких путей, не реальная смена участка.
+      var meaningfullyCloser = currentIdx<0 || (currentDist - bestDist) > 150;
+      if(label!==state.ctx.peregon && meaningfullyCloser){
         if(strictMode){
           // Требуем 3 подтверждения подряд на ДРУГОЙ перегон, прежде чем переключиться -
           // защита от единичного шумного замера у границы двух участков
           if(rt.peregonCandLabel===label){ rt.peregonCandCount=(rt.peregonCandCount||0)+1; }
           else { rt.peregonCandLabel=label; rt.peregonCandCount=1; }
-          if(rt.peregonCandCount<2) return;
+          if(rt.peregonCandCount<3) return;
           rt.peregonCandLabel=null; rt.peregonCandCount=0;
         }
         state.ctx.peregon=label; persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
