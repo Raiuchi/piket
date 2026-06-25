@@ -204,6 +204,13 @@ public class TrackingService extends Service {
         }
 
         @JavascriptInterface
+        public void beep(final String kind) {
+            mainHandler.post(new Runnable() {
+                @Override public void run() { beepNative(kind); }
+            });
+        }
+
+        @JavascriptInterface
         public boolean isTtsReady() {
             return ttsReady;
         }
@@ -242,6 +249,31 @@ public class TrackingService extends Service {
             vibrator.vibrate(VibrationEffect.createWaveform(timings, -1));
         } else {
             vibrator.vibrate(timings, -1);
+        }
+    }
+
+    /** Нативный звуковой сигнал через ToneGenerator - в отличие от Web Audio API (AudioContext)
+     *  в JS, это надёжно работает в headless-службе (фоновый WebView без видимого окна не
+     *  всегда подключён к аудио-выходу системы так же надёжно, как обычная Activity). */
+    private void beepNative(String kind) {
+        try {
+            android.media.ToneGenerator tg = new android.media.ToneGenerator(
+                    android.media.AudioManager.STREAM_NOTIFICATION, 90);
+            if ("danger".equals(kind)) {
+                tg.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 150);
+                mainHandler.postDelayed(() -> {
+                    android.media.ToneGenerator tg2 = new android.media.ToneGenerator(
+                            android.media.AudioManager.STREAM_NOTIFICATION, 90);
+                    tg2.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 150);
+                    mainHandler.postDelayed(tg2::release, 250);
+                }, 280);
+            } else {
+                tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 200);
+            }
+            mainHandler.postDelayed(tg::release, 300);
+        } catch (Exception e) {
+            // если тональный генератор недоступен на этой прошивке - не критично,
+            // вибрация и голос всё равно сработают
         }
     }
 

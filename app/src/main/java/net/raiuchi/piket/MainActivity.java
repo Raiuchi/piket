@@ -328,6 +328,27 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void beepNative(String kind) {
+        try {
+            android.media.ToneGenerator tg = new android.media.ToneGenerator(
+                    android.media.AudioManager.STREAM_NOTIFICATION, 90);
+            if ("danger".equals(kind)) {
+                tg.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 150);
+                new android.os.Handler(getMainLooper()).postDelayed(() -> {
+                    android.media.ToneGenerator tg2 = new android.media.ToneGenerator(
+                            android.media.AudioManager.STREAM_NOTIFICATION, 90);
+                    tg2.startTone(android.media.ToneGenerator.TONE_CDMA_PIP, 150);
+                    new android.os.Handler(getMainLooper()).postDelayed(tg2::release, 250);
+                }, 280);
+            } else {
+                tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 200);
+            }
+            new android.os.Handler(getMainLooper()).postDelayed(tg::release, 300);
+        } catch (Exception e) {
+            // не критично - вибрация и голос всё равно сработают
+        }
+    }
+
     private void startTrackingService() {
         Intent i = new Intent(this, TrackingService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -423,6 +444,13 @@ public class MainActivity extends Activity {
         public void vibrate(final String kind) {
             runOnUiThread(new Runnable() {
                 @Override public void run() { vibrateNative(kind); }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void beep(final String kind) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { beepNative(kind); }
             });
         }
 

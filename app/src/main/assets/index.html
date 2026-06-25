@@ -602,7 +602,9 @@
 
   var toastT; function toast(m){ var e=$("#toast"); e.textContent=m; e.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(function(){e.classList.remove("on");},2200); }
 
-  function beep(kind){ if(!state.settings.sound)return; try{
+  function beep(kind){ if(!state.settings.sound)return;
+    try{ if(window.Android&&window.Android.beep){ window.Android.beep(kind); return; } }catch(e){}
+    try{
     if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); var ac=rt.audio; if(ac.state==="suspended")ac.resume();
     var seq=kind==="danger"?[880,0,880,0,880]:[660,0,660],t=ac.currentTime;
     seq.forEach(function(f,i){ if(!f)return; var o=ac.createOscillator(),g=ac.createGain(); o.type="square"; o.frequency.value=f;
