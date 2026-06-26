@@ -577,7 +577,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -690,6 +690,13 @@
     // перегону безусловно, даже не пытаясь сравнивать с другими. Переключение имеет смысл
     // рассматривать только когда счёт подходит к границе СВОЕГО диапазона - то есть машинист
     // физически приближается к концу того, что уже выбрано.
+    //
+    // ИСКЛЮЧЕНИЕ: если только что произошла смена кабины без пересчёта калибровки
+    // (rt.awaitingManualCalib), calib физически в СТАРОЙ системе координат, не совпадающей
+    // с диапазоном текущего (нового) сегмента - сравнение ниже бессмысленно и давало
+    // дребезг переключений (найдено стресс-тестом). Полностью пропускаем geometрическую
+    // логику до тех пор, пока машинист не введёт новую калибровку вручную.
+    if(rt.awaitingManualCalib) return;
     if(strictMode && currentIdx>=0 && state.calib){
       var curSeg0=TRACK.segs[currentIdx];
       var curM0=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(rt.tracking?(dirDown()?-1:1)*rt.odo:0);
@@ -750,6 +757,13 @@
             // это нормальный рабочий процесс, не техническая проблема. Переключаем только
             // название участка для удобства (не лезть в меню руками), калибровку машинист
             // должен ввести заново сам по факту нового состава/направления.
+            // КРИТИЧНО: calib физически остаётся в СТАРОЙ системе координат, не совпадающей
+            // с диапазоном НОВОГО сегмента - "главное правило диапазона" (выше в этой же
+            // функции) сравнивает curM0 с границами текущего сегмента, и это сравнение
+            // становится бессмысленным/ломается, давая постоянные ложные переключения
+            // туда-обратно (дребезг, найден стресс-тестом). Ставим флаг, который отключает
+            // главное правило для этого случая, пока машинист не введёт новую калибровку.
+            rt.awaitingManualCalib = true;
             toast("Смена кабины — откалибруйся по новому столбу");
           }
           state.ctx.peregon=label; persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
@@ -1549,7 +1563,7 @@
       state.calib=load("sap_cal",null);
       state.ctx=Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}));
       rt.tracking=true; rt.last=null; rt.speed=0; rt.odo=0; rt.pendingCandM=null; rt.pendingCount=0;
-      rt.lastGoodFix=null; rt.fixQuality=null; rt.trackingSince=null;
+      rt.lastGoodFix=null; rt.fixQuality=null; rt.trackingSince=null; rt.awaitingManualCalib=false;
       if(state.calib) state.calib._trackM=null; // заново ищем привязку к пути на свежей калибровке
       reqWake(); startTicker(); saveTrackSnapshot();
       // Звук "Контроль включён" — раньше пропадал, так как видимый экран уходил в
@@ -1574,7 +1588,7 @@
       if(fresh==null) return;
       state.calib=fresh;
       rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0;
-      rt.fixQuality=null; rt.trackingSince=null;
+      rt.fixQuality=null; rt.trackingSince=null; rt.awaitingManualCalib=false;
       state.calib._trackM=null; // заново ищем привязку к пути на свежей калибровке
       saveTrackSnapshot();
     };
