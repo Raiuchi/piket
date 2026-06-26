@@ -51,6 +51,9 @@ public class TrackingService extends Service {
     private PowerManager.WakeLock wakeLock;
     private FusedLocationProviderClient fusedClient;
     private LocationCallback locationCallback;
+    private long lastFixReceivedAt = 0;
+    private long locationUnavailableSince = 0;
+    private Runnable locationWatchdogRunnable;
 
     private WebView headlessWeb;
     private boolean headlessPageReady = false;
@@ -296,15 +299,61 @@ public class TrackingService extends Service {
                 if (result == null) return;
                 Location loc = result.getLastLocation();
                 if (loc == null) return;
+                lastFixReceivedAt = System.currentTimeMillis();
                 feedLocationToWebView(loc);
+            }
+
+            @Override
+            public void onLocationAvailability(com.google.android.gms.location.LocationAvailability availability) {
+                // Система явно сообщает - сейчас GPS/сеть не могут дать локацию. Это не
+                // ошибка, просто сигнал "жди" - но если это длится слишком долго (видно
+                // через watchdog ниже), активно перезапускаем сам запрос, а не пассивно
+                // ждать, пока система сама решит прислать новые координаты.
+                if (!availability.isLocationAvailable()) {
+                    locationUnavailableSince = System.currentTimeMillis();
+                } else {
+                    locationUnavailableSince = 0;
+                }
             }
         };
 
+        lastFixReceivedAt = System.currentTimeMillis();
         try {
             fusedClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper());
         } catch (SecurityException e) {
             // разрешение не выдано — координаты просто не пойдут, без падения приложения
         }
+        startLocationWatchdog();
+    }
+
+    /** Watchdog: если за последние 15 секунд не пришёл ни один фикс GPS (ни хороший, ни
+     *  плохой) - принудительно перезапускаем сам LocationRequest (отписка+подписка). Это
+     *  имитирует то, что многие навигационные приложения (включая, предположительно,
+     *  Яндекс.Навигатор) делают агрессивнее системы по умолчанию - активно борются за
+     *  восстановление сигнала, а не пассивно ждут, когда система сама решит его вернуть.
+     *  Без этого после потери сигнала восстановление может занимать заметно дольше, чем
+     *  открытие другого навигационного приложения, которое запрашивает локацию заново
+     *  при каждом своём старте. */
+    private void startLocationWatchdog() {
+        if (locationWatchdogRunnable != null) return;
+        locationWatchdogRunnable = new Runnable() {
+            @Override public void run() {
+                long now = System.currentTimeMillis();
+                if (fusedClient != null && locationCallback != null && (now - lastFixReceivedAt) > 15000) {
+                    try {
+                        fusedClient.removeLocationUpdates(locationCallback);
+                        LocationRequest req = new LocationRequest.Builder(2000)
+                                .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                                .setMinUpdateIntervalMillis(1000)
+                                .build();
+                        fusedClient.requestLocationUpdates(req, locationCallback, Looper.getMainLooper());
+                        lastFixReceivedAt = now; // не дёргаем перезапрос на каждом тике, ждём ещё 15с
+                    } catch (SecurityException ignored) {}
+                }
+                mainHandler.postDelayed(this, 5000);
+            }
+        };
+        mainHandler.postDelayed(locationWatchdogRunnable, 5000);
     }
 
     /** Команда headless-копии: перечитать калибровку/настройки из localStorage и реально
@@ -408,6 +457,10 @@ public class TrackingService extends Service {
 
     @Override
     public void onDestroy() {
+        if (locationWatchdogRunnable != null) {
+            mainHandler.removeCallbacks(locationWatchdogRunnable);
+            locationWatchdogRunnable = null;
+        }
         if (fusedClient != null && locationCallback != null) {
             fusedClient.removeLocationUpdates(locationCallback);
         }
