@@ -1046,7 +1046,17 @@
     autoDetectPeregon(c.latitude, c.longitude, acc);
     updateAndroidNotification();
     renderTrip(); evalAlerts(); }
-  function onErr(e){ if(rt.last){ $("#spdSrc").textContent="GPS потерян — иду по счёту"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="нет сигнала"; }
+  function onErr(e){ if(rt.last){ $("#spdSrc").textContent="GPS потерян — иду по счёту"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="нет сигнала";
+      // КРИТИЧНО: при полной потере сигнала скорость раньше оставалась ЗАСТЫВШЕЙ на
+      // последнем известном значении - если перед самой потерей был случайный шумовой
+      // выброс (GPS даёт скачок скорости в момент ухудшения сигнала перед тем как пропасть
+      // совсем), это неправильное значение продолжало применяться к счёту километража
+      // ВЕСЬ период потери сигнала (tickerStep считает odo по rt.speed каждые 600мс).
+      // Плавно снижаем скорость к 0, честно отражая что реальная скорость неизвестна -
+      // не идеально (поезд может реально ехать), но безопаснее, чем доверять застывшему
+      // случайному выбросу неопределённо долго.
+      rt.speed = rt.speed*0.85;
+    }
     else { $("#gps").className="gps dead"; $("#gpsTxt").textContent=(e&&e.code===1)?"нет доступа":"нет сигнала"; $("#spdSrc").textContent=(e&&e.code===1)?"GPS запрещён (file://)":"жду спутники…"; $("#spdSrc").className="src dr"; } }
 
   function tickerStep(){ if(state.calib==null)return;
