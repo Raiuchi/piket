@@ -1466,8 +1466,21 @@
     $("#srTitle").textContent=r.train+" · "+r.route;
     $("#srSub").textContent="Выписка из приказа ОКТ-10 от 17.02.2026. Перенесено вручную — сверь с бланком перед использованием.";
     var rowSeq=0;
-    function grp(title,rows){ var h='<div class="srGroup">'+(title?('<h3>'+escapeHtml(title)+'</h3>'):'')+
-      rows.map(function(rr){ var km=approxKmFromName(rr.name); var seq=rowSeq++;
+    function grp(title,rows){
+      // КРИТИЧНО: многие строки (особенно названия станций/перегонов вида "Горы – Волховстрой-1
+      // II гл.п." или просто "Мга") НЕ содержат явного числа км в самом тексте - км там
+      // подразумевается по смыслу как "от этой точки и до следующей". Без распространения
+      // км вперёд такие строки получали km=null и НИКОГДА не подсвечивались сами по себе -
+      // подсветка перепрыгивала прямо к следующей строке с явным числом (обычно это
+      // промежуточное ограничение скорости), создавая впечатление, что станция "пропущена".
+      var lastKm=null;
+      var withKm=rows.map(function(rr){
+        var km=approxKmFromName(rr.name);
+        if(km==null) km=lastKm; else lastKm=km;
+        return {rr:rr, km:km};
+      });
+      var h='<div class="srGroup">'+(title?('<h3>'+escapeHtml(title)+'</h3>'):'')+
+      withKm.map(function(item){ var rr=item.rr, km=item.km, seq=rowSeq++;
         return '<div class="srRow" data-seq="'+seq+'" data-km="'+(km==null?'':km)+'"><div class="srName">'+escapeHtml(rr.name)+'</div><div class="srSpd">'+
         (rr.glp!=null?'<span class="srBadge glp">'+rr.glp+'</span>':'')+
         (rr.bokp!=null?'<span class="srBadge bokp">'+rr.bokp+'</span>':'')+'</div></div>'; }).join("")+
