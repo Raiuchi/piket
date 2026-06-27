@@ -431,6 +431,8 @@
     <p class="small" style="text-align:left;margin:8px 2px 0">Направление берётся из переключателя «Туда/Обратно» на главном экране — поменяешь там, пересчитается сразу, без повторной калибровки.</p>
   </div>
   <div class="save-row"><button class="btn" id="calCancel" style="background:transparent;border:1px solid var(--line)">Отмена</button><button class="btn primary" id="calSave">Установить</button></div>
+  <button class="btn" id="calReset" style="width:100%;margin-top:10px;background:transparent;border:1px solid var(--line);color:#f5a623">↻ Новая поездка — сбросить старую калибровку</button>
+  <p class="small" style="text-align:left;margin:8px 2px 0">Если в приложении осталась позиция с прошлой, уже завершённой поездки (мешает автоопределению на новой) — нажми это, не вводя числа выше. Дальше можно дождаться автоопределения или сразу впиши новый километр и нажми «Установить».</p>
 </div>
 
 <div class="sheet" id="sheetPer"><div class="grab"></div><h3>Перегон</h3><div id="perList"></div></div>
@@ -1386,6 +1388,13 @@
     $("#cDirInfo").textContent=(state.ctx.towards==="obratno"?"⬇ Убывает (выбрано «Обратно»)":"⬆ Растёт (выбрано «Туда»)");
     openSheet("#sheetCal"); }
   $("#calCancel").addEventListener("click",closeSheets); $("#btnCalib").addEventListener("click",openCal);
+  $("#calReset").addEventListener("click",function(){
+    if(!confirm("Сбросить текущую позицию? Это нужно только если едешь НОВЫЙ маршрут, а в приложении осталась позиция с прошлой поездки."))return;
+    state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; rt.autoCalCand=null; rt.autoCalCount=0;
+    rt.peregonCandLabel=null; rt.peregonCandCount=0; rt.awaitingManualCalib=false;
+    persist(); closeSheets(); renderTrip(); renderList();
+    toast(rt.tracking?"Калибровка сброшена — жду автоопределение или впиши km вручную":"Калибровка сброшена");
+  });
   $("#calSave").addEventListener("click",function(){ var km=parseInt($("#cKm").value,10); if(isNaN(km)){ toast("Впиши километр столба"); return; }
     var pk=parseInt($("#cPk").value,10); if(isNaN(pk))pk=1;
     var mm=parseInt($("#cM").value,10); if(isNaN(mm))mm=0; mm=Math.max(0,Math.min(99,mm));
