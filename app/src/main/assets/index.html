@@ -579,7 +579,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -1398,6 +1398,21 @@
   $("#calSave").addEventListener("click",function(){ var km=parseInt($("#cKm").value,10); if(isNaN(km)){ toast("Впиши километр столба"); return; }
     var pk=parseInt($("#cPk").value,10); if(isNaN(pk))pk=1;
     var mm=parseInt($("#cM").value,10); if(isNaN(mm))mm=0; mm=Math.max(0,Math.min(99,mm));
+    var enteredM=metersOf(km,pk,mm);
+    // ПРОВЕРКА: если GPS уже реально работает (rt.posM есть, неважно headless или обычный
+    // режим - posM актуальна в обоих) - сравниваем то, что машинист только что ВВЁЛ, с тем,
+    // что приложение УЖЕ ВЫЧИСЛИЛО по факту GPS прямо сейчас. Это не относится к самому
+    // первому старту (там rt.posM ещё нет, calib==null, GPS только запускается) - там и
+    // нечего сравнивать. Применимо именно к рекалибровке НА ХОДУ, когда GPS уже зелёный.
+    if(!rt.pendingCalibConfirm && rt.tracking && rt.posM!=null && Math.abs(rt.posM-enteredM)>1000){
+      rt.pendingCalibConfirm=true;
+      var gpsKm=kmFrom(rt.posM), gpsPk=pkFrom(rt.posM), gpsM=meterInPk(rt.posM);
+      if(!confirm("GPS сейчас видит позицию около "+gpsKm+" км "+gpsPk+" пк ("+Math.round(Math.abs(rt.posM-enteredM)/1000)+" км от того, что ты вписал). Всё равно сохранить твоё число? (Отмена — впишу значение по GPS)")){
+        $("#cKm").value=gpsKm; $("#cPk").value=gpsPk; $("#cM").value=gpsM;
+        rt.pendingCalibConfirm=false; return;
+      }
+      rt.pendingCalibConfirm=false;
+    }
     var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null};
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false;
