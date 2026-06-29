@@ -54,6 +54,8 @@ public class TrackingService extends Service {
 
     private PowerManager.WakeLock wakeLock;
     private FusedLocationProviderClient fusedClient;
+    private LocationCallback networkBackupCallback;
+    private boolean networkBackupActive = false;
     private SensorManager sensorManager;
     private Sensor accelSensor;
     private float accelMag = 0f; // та же логика, что в JS: модуль вектора ускорения, сглаженный
@@ -355,7 +357,24 @@ public class TrackingService extends Service {
         locationWatchdogRunnable = new Runnable() {
             @Override public void run() {
                 long now = System.currentTimeMillis();
-                if (fusedClient != null && locationCallback != null && (now - lastFixReceivedAt) > 15000) {
+                long sinceGoodFix = now - lastFixReceivedAt;
+
+                // ЗАПАСНОЙ КАНАЛ (по просьбе Владислава - "перебросить на другой канал" при
+                // глушении): дополнительный, менее точный источник позиции через сети/сотовые
+                // вышки (Priority.PRIORITY_BALANCED_POWER_ACCURACY) - НЕ заменяет основной
+                // точный GPS, включается только как подстраховка, когда основной молчит
+                // дольше 10 секунд, и отключается, как только основной сигнал восстановился
+                // (чтобы не путать данные зря и не расходовать лишнюю батарею). Передаём
+                // данные через ТОТ ЖЕ JS-мост (onNativeLocation) с ЧЕСТНОЙ, обычно худшей
+                // accuracy от сетевого провайдера - существующая JS-логика приоритезации GPS
+                // по точности и так правильно учитывает это, без необходимости менять JS.
+                if (sinceGoodFix > 10000 && !networkBackupActive) {
+                    startNetworkBackup();
+                } else if (sinceGoodFix <= 10000 && networkBackupActive) {
+                    stopNetworkBackup();
+                }
+
+                if (fusedClient != null && locationCallback != null && sinceGoodFix > 15000) {
                     try {
                         // КРИТИЧНО: найден документированный баг конкретно Samsung One UI 8 /
                         // Android 16 на серии Galaxy S24 - GPS физически "застывает" через
@@ -381,6 +400,39 @@ public class TrackingService extends Service {
             }
         };
         mainHandler.postDelayed(locationWatchdogRunnable, 5000);
+    }
+
+    /** Включает запасной сетевой канал определения позиции - см. подробный комментарий в
+     *  watchdog выше. PRIORITY_BALANCED_POWER_ACCURACY - это современный эквивалент старого
+     *  NETWORK_PROVIDER, определяет позицию через Wi-Fi/сотовые вышки, не спутники. */
+    private void startNetworkBackup() {
+        if (fusedClient == null || networkBackupActive) return;
+        try {
+            networkBackupCallback = new LocationCallback() {
+                @Override public void onLocationResult(LocationResult result) {
+                    if (result == null) return;
+                    Location loc = result.getLastLocation();
+                    if (loc == null) return;
+                    // НЕ обновляем lastFixReceivedAt здесь - это поле отслеживает именно
+                    // ОСНОВНОЙ (точный) канал, чтобы watchdog продолжал пытаться его восстановить
+                    // даже пока запасной подстраховывает.
+                    feedLocationToWebView(loc);
+                }
+            };
+            LocationRequest backupReq = new LocationRequest.Builder(3000)
+                    .setPriority(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
+                    .setMinUpdateIntervalMillis(2000)
+                    .build();
+            fusedClient.requestLocationUpdates(backupReq, networkBackupCallback, Looper.getMainLooper());
+            networkBackupActive = true;
+        } catch (SecurityException ignored) {}
+    }
+
+    private void stopNetworkBackup() {
+        if (fusedClient == null || !networkBackupActive || networkBackupCallback == null) return;
+        try { fusedClient.removeLocationUpdates(networkBackupCallback); } catch (Exception ignored) {}
+        networkBackupActive = false;
+        networkBackupCallback = null;
     }
 
     /** Команда headless-копии: перечитать калибровку/настройки из localStorage и реально
@@ -543,6 +595,7 @@ public class TrackingService extends Service {
             mainHandler.removeCallbacks(locationWatchdogRunnable);
             locationWatchdogRunnable = null;
         }
+        stopNetworkBackup();
         if (fusedClient != null && locationCallback != null) {
             fusedClient.removeLocationUpdates(locationCallback);
         }
