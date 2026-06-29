@@ -579,7 +579,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -636,6 +636,32 @@
   function reqWake(){ if(!state.settings.wake||!("wakeLock"in navigator))return; navigator.wakeLock.request("screen").then(function(w){rt.wake=w;w.addEventListener("release",function(){rt.wake=null;});}).catch(function(){}); }
   function relWake(){ if(rt.wake){try{rt.wake.release();}catch(e){} rt.wake=null;} }
   document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&rt.tracking)reqWake(); });
+
+  // ВСПОМОГАТЕЛЬНЫЙ АКСЕЛЕРОМЕТР — мягкая подсказка при потере/глушении GPS, НЕ замена GPS.
+  // Перенесено из веб-версии piket-web (правило синхронизации) — см. там подробные комментарии.
+  // Не вычисляем точную скорость через интегрирование (физически ненадёжно), используем
+  // только общую величину (модуль) вектора ускорения как индикатор "идёт ли явное резкое
+  // изменение скорости прямо сейчас" — не зависит от ориентации телефона.
+  function handleMotion(e){
+    var a=e.acceleration;
+    if(!a||a.x==null) return;
+    rt.accelAvailable=true;
+    var mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
+    rt.accelMag=rt.accelMag*0.7+mag*0.3;
+  }
+  function startAccelHelper(){
+    if(!("DeviceMotionEvent"in window)) return;
+    try{
+      if(typeof DeviceMotionEvent.requestPermission==="function"){
+        DeviceMotionEvent.requestPermission().then(function(resp){
+          if(resp==="granted") window.addEventListener("devicemotion",handleMotion);
+        }).catch(function(){});
+      } else {
+        window.addEventListener("devicemotion",handleMotion);
+      }
+    }catch(e){}
+  }
+  function stopAccelHelper(){ try{ window.removeEventListener("devicemotion",handleMotion); }catch(e){} rt.accelMag=0; rt.accelAvailable=false; }
 
   // Единый источник направления — всегда live с главного переключателя Туда/Обратно,
   // а не замороженный снимок из момента калибровки (это и было причиной багов с разворотом счёта)
@@ -1088,7 +1114,15 @@
       // Плавно снижаем скорость к 0, честно отражая что реальная скорость неизвестна -
       // не идеально (поезд может реально ехать), но безопаснее, чем доверять застывшему
       // случайному выбросу неопределённо долго.
-      rt.speed = rt.speed*0.85;
+      //
+      // ВСПОМОГАТЕЛЬНАЯ ПОДСКАЗКА ОТ АКСЕЛЕРОМЕТРА (мягкая, не замена GPS, перенесено из
+      // веб-версии piket-web): если он показывает низкое ускорение (поезд явно не тормозит/
+      // разгоняется прямо сейчас) - снижаем скорость МЕДЛЕННЕЕ, есть основания думать, что
+      // реальная скорость близка к последней известной. Если ускорение заметное - снижаем
+      // как раньше, не рискуя держать неактуальное значение именно в момент вероятного
+      // реального изменения скорости.
+      var decay = (rt.accelAvailable && rt.accelMag<1.5) ? 0.95 : 0.85;
+      rt.speed = rt.speed*decay;
     }
     else { $("#gps").className="gps dead"; $("#gpsTxt").textContent=(e&&e.code===1)?"нет доступа":"нет сигнала"; $("#spdSrc").textContent=(e&&e.code===1)?"GPS запрещён (file://)":"жду спутники…"; $("#spdSrc").className="src dr"; } }
 
@@ -1206,6 +1240,7 @@
       // не имеет вообще (там нет такого параметра кэша).
       rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:27000});
     } else { toast("GPS недоступен"); rt.tracking=false; return; }
+    startAccelHelper(); // запасной путь — основной (headless) получает данные через Java, см. onNativeAccel
     reqWake();
     startTicker();
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
@@ -1215,6 +1250,25 @@
     if(!rt.tracking)return;
     var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps) }, timestamp:time };
     onPos(fakePos); };
+  // КРИТИЧНО: вызывается из Java (TrackingService.notifyLocationUnavailable), когда система
+  // явно сообщает "сейчас локация недоступна" (onLocationAvailability). Без этого моста
+  // onErr() (плавное снижение скорости, не застывание на старом значении при потере сигнала)
+  // физически не мог сработать на реальном Android-телефоне через основной путь - раньше
+  // он вызывался только в веб-версии, где браузер сам вызывает onErr через стандартный
+  // geolocation API. Найдено при переносе вспомогательного акселерометра в эту версию.
+  window.onNativeLocationUnavailable=function(){
+    if(!rt.tracking)return;
+    onErr({code:2});
+  };
+  // Получает уже вычисленную в Java величину ускорения (через нативный Android SensorManager -
+  // надёжнее браузерного devicemotion именно в невидимом headless WebView, см. подробности в
+  // TrackingService.initAccelHelper). Пишем в ТЕ ЖЕ переменные rt.accelMag/rt.accelAvailable,
+  // что использует веб-версия piket-web (там источник - браузерный devicemotion) - значит
+  // логика onErr (плавное снижение скорости при потере сигнала) работает одинаково в обоих
+  // случаях, не зависит от того, откуда именно пришли данные об ускорении.
+  window.onNativeAccel=function(mag){
+    rt.accelMag=mag; rt.accelAvailable=true;
+  };
 
   function startSim(){
     if(state.calib==null){
@@ -1248,6 +1302,7 @@
   function stopTrack(){ rt.tracking=false;
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
     if(rt.simTimer){ clearInterval(rt.simTimer); rt.simTimer=null; }
+    stopAccelHelper();
     stopTicker();
     relWake(); rt.speed=0;
     try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){}

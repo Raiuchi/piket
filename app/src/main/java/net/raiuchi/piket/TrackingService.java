@@ -11,6 +11,10 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Handler;
@@ -50,6 +54,9 @@ public class TrackingService extends Service {
 
     private PowerManager.WakeLock wakeLock;
     private FusedLocationProviderClient fusedClient;
+    private SensorManager sensorManager;
+    private Sensor accelSensor;
+    private float accelMag = 0f; // та же логика, что в JS: модуль вектора ускорения, сглаженный
     private LocationCallback locationCallback;
     private long lastFixReceivedAt = 0;
     private long locationUnavailableSince = 0;
@@ -116,6 +123,7 @@ public class TrackingService extends Service {
         initTts();
         initHeadlessWebView();
         startFusedLocation();
+        initAccelHelper();
     }
 
     /** Headless WebView — та же страница, тот же JS-движок, но без экрана. Живёт пока жива служба. */
@@ -311,6 +319,14 @@ public class TrackingService extends Service {
                 // ждать, пока система сама решит прислать новые координаты.
                 if (!availability.isLocationAvailable()) {
                     locationUnavailableSince = System.currentTimeMillis();
+                    // КРИТИЧНО: раньше эта ветка только устанавливала Java-переменную и
+                    // НИКОГДА не сообщала об этом JS-коду внутри headless WebView - значит
+                    // вся защита "плавное снижение скорости при потере сигнала" (функция
+                    // onErr в index.html) физически не могла сработать через основной путь
+                    // на реальном Android-телефоне (она работала только в веб-версии, где
+                    // браузер сам вызывает onErr через стандартный geolocation API).
+                    // Добавлен явный мост в JS, аналогичный onNativeLocation ниже.
+                    notifyLocationUnavailable();
                 } else {
                     locationUnavailableSince = 0;
                 }
@@ -406,6 +422,61 @@ public class TrackingService extends Service {
                         + lat + "," + lon + "," + accuracy + ","
                         + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ");";
                 headlessWeb.evaluateJavascript(js, null);
+            }
+        });
+    }
+
+    /** Сообщает headless JS-коду, что система явно объявила локацию недоступной прямо сейчас
+     *  (см. onLocationAvailability выше). Без этого моста JS-функция onErr() (плавное снижение
+     *  скорости при потере сигнала, не застывание на старом значении) никогда не вызывалась бы
+     *  на реальном Android-телефоне через основной путь - только в веб-версии, где браузер сам
+     *  вызывает её через стандартный geolocation API. */
+    private void notifyLocationUnavailable() {
+        if (headlessWeb == null) return;
+        mainHandler.post(new Runnable() {
+            @Override public void run() {
+                if (headlessWeb == null) return;
+                headlessWeb.evaluateJavascript("if(window.onNativeLocationUnavailable)window.onNativeLocationUnavailable();", null);
+            }
+        });
+    }
+
+    /** Вспомогательный акселерометр — мягкая подсказка JS-коду при потере/глушении GPS, не
+     *  замена GPS (та же идея, что в веб-версии piket-web, но читается напрямую через нативный
+     *  Android SensorManager, а не через браузерный devicemotion — тот может ненадёжно работать
+     *  именно в невидимом headless WebView, который не attached к экрану; SensorManager этой
+     *  проблемы не имеет, он не зависит от WebView вообще). Передаём в JS только общую величину
+     *  (модуль) вектора ускорения без гравитации — простой индикатор "идёт ли явное резкое
+     *  изменение скорости прямо сейчас", не зависящий от того, как телефон лежит в кабине. */
+    private void initAccelHelper() {
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        if (sensorManager == null) return;
+        accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
+        if (accelSensor == null) return; // датчик отсутствует на этом телефоне — просто не используем
+        sensorManager.registerListener(new SensorEventListener() {
+            @Override public void onSensorChanged(SensorEvent event) {
+                float mag = (float) Math.sqrt(event.values[0]*event.values[0]
+                        + event.values[1]*event.values[1] + event.values[2]*event.values[2]);
+                accelMag = accelMag*0.7f + mag*0.3f; // то же сглаживание, что и в JS-версии
+                feedAccelToWebView();
+            }
+            @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+        }, accelSensor, SensorManager.SENSOR_DELAY_NORMAL);
+    }
+
+    private long lastAccelFeedAt = 0;
+    private void feedAccelToWebView() {
+        if (headlessWeb == null) return;
+        // Не дёргаем JS на каждое срабатывание сенсора (может быть десятки раз в секунду) —
+        // достаточно нескольких раз в секунду для нашей цели (мягкая подсказка, не точный замер).
+        long now = System.currentTimeMillis();
+        if (now - lastAccelFeedAt < 200) return;
+        lastAccelFeedAt = now;
+        final float magToSend = accelMag;
+        mainHandler.post(new Runnable() {
+            @Override public void run() {
+                if (headlessWeb == null) return;
+                headlessWeb.evaluateJavascript("if(window.onNativeAccel)window.onNativeAccel(" + magToSend + ");", null);
             }
         });
     }
