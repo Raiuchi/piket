@@ -1181,7 +1181,13 @@
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     if("geolocation"in navigator){
       // Запасной браузерный GPS — для теста вне APK
-      rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:2000,timeout:27000});
+      // КРИТИЧНО (тот же фикс что и в веб-версии piket-web): maximumAge:0 - не разрешаем
+      // браузеру отдавать закэшированную координату/скорость. Эта строка - ЗАПАСНОЙ путь
+      // (используется только если headless-служба по какой-то причине не передаёт координаты
+      // через нативный мост Android) - тот же риск устаревшего кэша скорости применим и
+      // здесь, хотя основной путь (через Java FusedLocationProviderClient) этой проблемы
+      // не имеет вообще (там нет такого параметра кэша).
+      rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:27000});
     } else { toast("GPS недоступен"); rt.tracking=false; return; }
     reqWake();
     startTicker();
