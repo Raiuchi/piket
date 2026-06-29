@@ -357,7 +357,18 @@ public class TrackingService extends Service {
                 long now = System.currentTimeMillis();
                 if (fusedClient != null && locationCallback != null && (now - lastFixReceivedAt) > 15000) {
                     try {
+                        // КРИТИЧНО: найден документированный баг конкретно Samsung One UI 8 /
+                        // Android 16 на серии Galaxy S24 - GPS физически "застывает" через
+                        // несколько минут работы во ВСЕХ приложениях (подтверждено множеством
+                        // независимых пользователей S24/S24+ в сообществе Samsung), и помогает
+                        // ТОЛЬКО полное отключение и включение служб локации (или полный
+                        // перезапуск приложения) - простой переподписки на ТОТ ЖЕ
+                        // FusedLocationProviderClient объект (как было раньше) недостаточно.
+                        // Теперь пересоздаём САМ клиент целиком, не только LocationRequest -
+                        // это ближе к тому, что реально помогает пользователям при ручном
+                        // обходе бага.
                         fusedClient.removeLocationUpdates(locationCallback);
+                        fusedClient = LocationServices.getFusedLocationProviderClient(TrackingService.this);
                         LocationRequest req = new LocationRequest.Builder(2000)
                                 .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
                                 .setMinUpdateIntervalMillis(1000)
