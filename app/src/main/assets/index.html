@@ -90,6 +90,16 @@
   .g-limit.s-red .lv{color:var(--rsig)} .g-limit.s-amber .lv{color:var(--amber)} .g-limit.s-green .lv{color:var(--green)}
   .g-center .src{font-size:10px;color:var(--dim2);margin-top:8px;letter-spacing:.08em}
   .g-center .src.dr{color:var(--amber)}
+  /* Гейдж реагирует на реальную опасность превышения - не просто украшение, а сигнал */
+  .gaugeWrap.gd-warn .g-fg{stroke:var(--amber);filter:drop-shadow(0 0 12px rgba(245,165,36,.65))}
+  .gaugeWrap.gd-warn .g-center .sv{color:var(--amber);text-shadow:0 0 26px rgba(245,165,36,.5)}
+  .gaugeWrap.gd-danger .g-fg{stroke:var(--rsig);filter:drop-shadow(0 0 16px rgba(255,77,79,.85))}
+  .gaugeWrap.gd-danger .g-center .sv{color:var(--rsig);text-shadow:0 0 32px rgba(255,77,79,.65)}
+  .gaugeWrap.gd-danger::after{content:"";position:absolute;inset:-16px;border-radius:50%;z-index:-1;
+    background:radial-gradient(circle,rgba(255,77,79,.32),transparent 70%);animation:gaugeAlarm .8s infinite}
+  .gaugeWrap.gd-warn::after{content:"";position:absolute;inset:-16px;border-radius:50%;z-index:-1;
+    background:radial-gradient(circle,rgba(245,165,36,.22),transparent 70%)}
+  @keyframes gaugeAlarm{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
 
   .odo{display:flex;justify-content:center;margin:6px auto 2px;align-items:flex-end}
   .odo .blk{text-align:center;padding:0 18px}
@@ -178,9 +188,10 @@
   .row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line);gap:12px}
   .row:last-child{border-bottom:none} .row .t{font-size:14.5px} .row .d{font-size:12px;color:var(--dim);margin-top:2px;line-height:1.4}
   .row>div:first-child{flex:1;min-width:0}
-  .sw{width:48px;height:28px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);position:relative;flex:none;transition:.2s}
-  .sw::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:var(--dim);transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
-  .sw.on{background:linear-gradient(180deg,rgba(46,123,245,.35),rgba(46,123,245,.2));border-color:var(--blue)} .sw.on::after{transform:translateX(20px);background:var(--blue-l)}
+  .sw{width:48px;height:28px;border-radius:999px;background:var(--panel2);border:1px solid var(--line);position:relative;flex:none;transition:.25s;box-shadow:inset 0 2px 4px rgba(0,0,0,.3)}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:linear-gradient(180deg,#fff,var(--dim));transition:.25s cubic-bezier(.3,1.3,.5,1);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .sw.on{background:linear-gradient(180deg,#3D8BFF,var(--blue-d));border-color:var(--blue);box-shadow:inset 0 1px 2px rgba(0,0,0,.15),0 0 14px rgba(46,123,245,.55)}
+  .sw.on::after{transform:translateX(20px);background:linear-gradient(180deg,#fff,#DCEBFF)}
   .stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:none}
   .stepper button{width:36px;height:36px;font-size:20px;color:var(--blue-l);background:var(--panel2);flex:none}
   .stepper b{font-family:var(--mono);min-width:56px;text-align:center;font-size:14px}
@@ -327,7 +338,7 @@
       </button>
     </div>
 
-    <div class="gaugeWrap">
+    <div class="gaugeWrap" id="gaugeWrap">
       <svg viewBox="0 0 200 200">
         <defs>
           <linearGradient id="gGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E7BF5"/><stop offset="1" stop-color="#7FC2FF"/></linearGradient>
@@ -1374,6 +1385,25 @@
 
   function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
 
+  // Гейдж не просто крутится - он должен ОРАТЬ, если едешь на пределе или уже превысил
+  // ближайшее ограничение. gd-danger (превысил или в зоне и почти на лимите) - весь спидометр
+  // заливается тревожным красным с пульсацией. gd-warn (подъезжаешь и уже сейчас быстрее, чем
+  // разрешено на подъезде) - жёлтый. Иначе - обычный синий "живой" вид. Использует ТЕ ЖЕ пороги
+  // и ту же цветовую семантику (зелёный/жёлтый/красный), что уже применяется в .signal и .vmax -
+  // не новый язык, а продолжение уже принятого.
+  function gaugeDangerClass(r,inzone,ahead,lead){
+    if(!rt.tracking||!r||r.spd==null)return"gd-ok";
+    var spd=+r.spd, cur=rt.speed;
+    if(inzone){ if(cur>spd)return"gd-danger"; if(cur>spd-8)return"gd-warn"; return"gd-ok"; }
+    if(ahead!=null&&lead!=null&&ahead<=lead){ if(cur>spd)return"gd-warn"; }
+    return"gd-ok";
+  }
+  function updateGaugeDanger(r,inzone,ahead,lead){
+    var cls=gaugeDangerClass(r,inzone,ahead,lead);
+    $("#gaugeWrap").classList.remove("gd-ok","gd-warn","gd-danger");
+    $("#gaugeWrap").classList.add(cls);
+  }
+
   function chipsOf(r){ var c="";
     if(r.dir)c+='<span class="chip c-dir">'+dirLabel(r.dir)+'</span>';
     if(r.peregon&&r.peregon!=="Все участки")c+='<span class="chip c-per">'+escapeHtml(r.peregon)+'</span>';
@@ -1397,14 +1427,15 @@
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=state.ctx.peregon;
     var acwEl=$("#autoCalWarn"); if(acwEl) acwEl.style.display=rt.autoCalib?"block":"none";
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
-    if(state.calib==null){ sig.className="signal"; stEl.textContent="нет калибровки"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null);
+    if(state.calib==null){ sig.className="signal"; stEl.textContent="нет калибровки"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null); updateGaugeDanger(null);
       var cnt=state.restrictions.length;
       content.innerHTML='<div class="sig-empty"><b>'+(cnt?(cnt+' огранич. в списке'):'Откалибруйся по столбу')+'</b>'+(cnt?'Нажми «Калибровка» — пойдёт отсчёт до них.':'Нажми «Калибровка», впиши км столба.')+'</div>'; return; }
     var r=nextRestriction();
-    if(!r){ sig.className="signal clear"; stEl.textContent="путь свободен"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null);
+    if(!r){ sig.className="signal clear"; stEl.textContent="путь свободен"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null); updateGaugeDanger(null);
       content.innerHTML='<div class="sig-empty"><b>Ограничений впереди нет</b>'+(state.restrictions.length?'По текущему участку чисто.':'Добавь ограничения во вкладке «Список».')+'</div>'; return; }
     var lead=r.lead||state.settings.lead,inzone=r._zone,ahead=r._ahead;
     updateLimitBadge(r);
+    updateGaugeDanger(r,inzone,ahead,lead);
     if(inzone){ sig.className="signal danger"; stEl.textContent="в зоне ограничения"; }
     else if(ahead<=lead){ sig.className="signal warn"; stEl.textContent="подъезжаешь"; }
     else { sig.className="signal clear"; stEl.textContent="ограничение впереди"; }
