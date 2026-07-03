@@ -843,7 +843,7 @@
     try{ var m=rt.posM; if(m==null)return; var txt=kmFrom(m)+" км · ПК"+pkFrom(m)+" · "+Math.round(rt.speed)+" км/ч"; if(window.Android&&window.Android.updatePosition)window.Android.updatePosition(txt); }catch(e){}
   }
   function onPos(p){ var c=p.coords,acc=c.accuracy||999;
-    $("#gps").className="gps "+(acc<=25?"live":"weak"); $("#gpsTxt").textContent="±"+Math.round(acc)+" м";
+    $("#gps").className="gps "+(acc<=25?"live":"weak"); $("#gpsTxt").textContent=(acc<=25?"GPS вкл":"GPS слабый");
     var now=p.timestamp||Date.now(),pt={lat:c.latitude,lon:c.longitude,t:now};
     var dt=rt.last?Math.max(0,(now-rt.last.t)/1000):null;
 
