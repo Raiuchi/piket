@@ -191,6 +191,17 @@
   .routeCard svg{flex:none;width:18px;height:18px;color:var(--dim)}
 
   .scrim{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:60;display:none;backdrop-filter:blur(2px)} .scrim.on{display:block}
+  .cfScrim{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:70;display:none;backdrop-filter:blur(3px);align-items:center;justify-content:center;padding:24px}
+  .cfScrim.on{display:flex}
+  .confirmBox{width:100%;max-width:400px;background:linear-gradient(160deg,#101B2B 0%,var(--panel) 100%);border:1px solid var(--line);border-radius:18px;overflow:hidden;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);transform:scale(.92) translateY(8px);opacity:0;transition:transform .22s cubic-bezier(.2,.9,.3,1.2),opacity .18s}
+  .confirmBox.on{transform:scale(1) translateY(0);opacity:1}
+  .cfAccent{height:4px;background:linear-gradient(90deg,var(--red),#ff5a4e)}
+  .confirmBox h3{padding:18px 20px 4px;font-size:17px;font-weight:800;display:flex;align-items:center;gap:9px}
+  .confirmBox h3::before{content:"";width:9px;height:9px;border-radius:999px;background:var(--red);flex:none;box-shadow:0 0 8px rgba(226,35,26,.7)}
+  .confirmBox p{padding:8px 20px 18px;font-size:14px;line-height:1.55;color:var(--steel)}
+  .cfBtns{display:flex;gap:10px;padding:0 16px 16px}
+  .cfBtns .btn{flex:1;padding:13px}
   .sheet{position:fixed;left:0;right:0;bottom:0;z-index:61;background:var(--bg);border-top:1px solid var(--line);border-radius:22px 22px 0 0;max-width:540px;margin:0 auto;padding:8px 16px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;max-height:92dvh;overflow-y:auto}
   .sheet.on{transform:none} .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:8px auto 14px}
   .sheet h3{margin:0 0 16px;font-size:18px;font-weight:800}
@@ -392,6 +403,14 @@
 </nav>
 
 <div class="scrim" id="scrim"></div>
+<div class="cfScrim" id="cfScrim">
+  <div class="confirmBox" id="cfBox">
+    <div class="cfAccent"></div>
+    <h3 id="cfTitle">Подтверди действие</h3>
+    <p id="cfMsg"></p>
+    <div class="cfBtns"><div class="btn" id="cfCancel">Отмена</div><div class="btn primary" id="cfOk">ОК</div></div>
+  </div>
+</div>
 
 <div class="sheet" id="sheetRes">
   <div class="grab"></div>
@@ -1396,6 +1415,31 @@
         '<div class="iright">'+(status?'<span class="status '+sc+'">'+status+'</span>':'<span></span>')+'<button class="del" data-del="'+r.id+'">удалить</button></div></div>'; }).join(""); }
 
   function openSheet(id){ $("#scrim").classList.add("on"); $(id).classList.add("on"); }
+  // Своя красивая модалка подтверждения вместо уродского системного confirm() (тот всегда
+  // рисуется браузером/системой со своим неубираемым видом типа "Подтвердите действие на
+  // file://" - его никак не стилизовать). Возвращает Promise<boolean>, использовать через await.
+  function showConfirm(message,opts){
+    opts=opts||{};
+    return new Promise(function(resolve){
+      $("#cfTitle").textContent=opts.title||"Подтверди действие";
+      $("#cfMsg").textContent=message;
+      $("#cfOk").textContent=opts.okText||"ОК";
+      $("#cfCancel").textContent=opts.cancelText||"Отмена";
+      var scrim=$("#cfScrim"), box=$("#cfBox"), okBtn=$("#cfOk"), cancelBtn=$("#cfCancel");
+      scrim.classList.add("on");
+      requestAnimationFrame(function(){ box.classList.add("on"); });
+      function cleanup(v){
+        box.classList.remove("on");
+        setTimeout(function(){ scrim.classList.remove("on"); },200);
+        okBtn.removeEventListener("click",onOk); cancelBtn.removeEventListener("click",onCancel); scrim.removeEventListener("click",onScrim);
+        resolve(v);
+      }
+      function onOk(){ cleanup(true); }
+      function onCancel(){ cleanup(false); }
+      function onScrim(e){ if(e.target===scrim) cleanup(false); }
+      okBtn.addEventListener("click",onOk); cancelBtn.addEventListener("click",onCancel); scrim.addEventListener("click",onScrim);
+    });
+  }
   function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason","#sheetBgHelp"].forEach(function(s){$(s).classList.remove("on");}); }
   $("#scrim").addEventListener("click",closeSheets);
   function setSeg(sel,val,attr){ document.querySelectorAll(sel+" button").forEach(function(b){ b.classList.toggle("on",b.getAttribute("data-"+attr)===val); }); }
@@ -1466,14 +1510,14 @@
     $("#cDirInfo").textContent=(state.ctx.towards==="obratno"?"⬇ Убывает (выбрано «Обратно»)":"⬆ Растёт (выбрано «Туда»)");
     openSheet("#sheetCal"); }
   $("#calCancel").addEventListener("click",closeSheets); $("#btnCalib").addEventListener("click",openCal);
-  $("#calReset").addEventListener("click",function(){
-    if(!confirm("Сбросить текущую позицию? Это нужно только если едешь НОВЫЙ маршрут, а в приложении осталась позиция с прошлой поездки."))return;
+  $("#calReset").addEventListener("click",async function(){
+    if(!(await showConfirm("Сбросить текущую позицию? Это нужно только если едешь НОВЫЙ маршрут, а в приложении осталась позиция с прошлой поездки.",{okText:"Сбросить"})))return;
     state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; rt.autoCalCand=null; rt.autoCalCount=0;
     rt.peregonCandLabel=null; rt.peregonCandCount=0; rt.awaitingManualCalib=false;
     persist(); closeSheets(); renderTrip(); renderList();
     toast(rt.tracking?"Калибровка сброшена — жду автоопределение или впиши km вручную":"Калибровка сброшена");
   });
-  $("#calSave").addEventListener("click",function(){ var km=parseInt($("#cKm").value,10); if(isNaN(km)){ toast("Впиши километр столба"); return; }
+  $("#calSave").addEventListener("click",async function(){ var km=parseInt($("#cKm").value,10); if(isNaN(km)){ toast("Впиши километр столба"); return; }
     var pk=parseInt($("#cPk").value,10); if(isNaN(pk))pk=1;
     var mm=parseInt($("#cM").value,10); if(isNaN(mm))mm=0; mm=Math.max(0,Math.min(99,mm));
     var enteredM=metersOf(km,pk,mm);
@@ -1485,7 +1529,7 @@
     if(!rt.pendingCalibConfirm && rt.tracking && rt.posM!=null && Math.abs(rt.posM-enteredM)>1000){
       rt.pendingCalibConfirm=true;
       var gpsKm=kmFrom(rt.posM), gpsPk=pkFrom(rt.posM), gpsM=meterInPk(rt.posM);
-      if(!confirm("GPS сейчас видит позицию около "+gpsKm+" км "+gpsPk+" пк ("+Math.round(Math.abs(rt.posM-enteredM)/1000)+" км от того, что ты вписал). Всё равно сохранить твоё число? (Отмена — впишу значение по GPS)")){
+      if(!(await showConfirm("GPS сейчас видит позицию около "+gpsKm+" км "+gpsPk+" пк ("+Math.round(Math.abs(rt.posM-enteredM)/1000)+" км от того, что ты вписал). Всё равно сохранить твоё число?",{okText:"Сохранить моё",cancelText:"Взять по GPS"}))){
         $("#cKm").value=gpsKm; $("#cPk").value=gpsPk; $("#cM").value=gpsM;
         rt.pendingCalibConfirm=false; return;
       }
@@ -1510,7 +1554,7 @@
   $("#leadUp").addEventListener("click",function(){ state.settings.lead=Math.min(8000,state.settings.lead+500); persist(); syncSw(); renderTrip(); });
   $("#leadDn").addEventListener("click",function(){ state.settings.lead=Math.max(300,state.settings.lead-500); persist(); syncSw(); renderTrip(); });
 
-  $("#btnWipe").addEventListener("click",function(){ if(!state.restrictions.length){ toast("Список и так пуст"); return; } if(confirm("Удалить все ограничения?")){ state.restrictions=[]; alertState={}; persist(); renderList(); renderTrip(); toast("Список очищен"); } });
+  $("#btnWipe").addEventListener("click",async function(){ if(!state.restrictions.length){ toast("Список и так пуст"); return; } if(await showConfirm("Удалить все ограничения?",{okText:"Удалить",title:"Очистить список"})){ state.restrictions=[]; alertState={}; persist(); renderList(); renderTrip(); toast("Список очищен"); } });
 
   $("#listBox").addEventListener("click",function(e){ var del=e.target.closest("[data-del]");
     if(del){ var id=del.getAttribute("data-del"); state.restrictions=state.restrictions.filter(function(x){return x.id!==id;}); persist(); renderList(); renderTrip(); toast("Удалено"); return; }
