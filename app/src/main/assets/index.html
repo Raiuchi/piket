@@ -669,7 +669,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -972,10 +972,11 @@
       // ИСКЛЮЧЕНИЕ: если rt.speed<10 (старт трекинга или decay после потери GPS опустил
       // скорость к нулю) — не применяем фильтр, иначе восстановление после потери сигнала
       // занимает до 8 секунд (пока watchdog не спасёт). Потолок 255 всё равно работает.
-      if(rt.speed>=10){
+      if(rt.speed>=10 && !rt.speedRecovery){
         var maxSpeedChange=Math.min(25*Math.max(dt,0.5), 80);
         if(Math.abs(spd-rt.speed)>maxSpeedChange) spd=null;
       }
+      rt.speedRecovery=false;
     }
     // АБСОЛЮТНЫЙ ПОТОЛОК: Сапсан физически не может ехать быстрее ~250 км/ч (конструктивный
     // максимум). Даём запас 255 км/ч. Если GPS выдал что-то выше — это однозначно артефакт
@@ -984,7 +985,14 @@
     // Этот потолок НЕ противоречит фильтру maxSpeedChange выше — он ловит случаи когда dt
     // большой (долгий перерыв) и maxSpeedChange поэтому тоже большой (не успел отфильтровать).
     if(spd!=null && spd>255) spd=null;
-    if(spd!=null) rt.speed=Math.min(255,(spd>5)?( rt.speed?rt.speed*0.6+spd*0.4:spd ):Math.max(0,rt.speed*0.7));
+    if(spd!=null && rt.speed!=null && rt.speed<10 && rt.last!=null) rt.speedRecovery=true;
+    if(spd!=null){
+      if(rt.speedRecovery || (rt.speed!=null && rt.speed<10)){
+        rt.speed=Math.min(255, spd>5 ? spd : Math.max(0,rt.speed*0.7));
+      } else {
+        rt.speed=Math.min(255,(spd>5)?( rt.speed?rt.speed*0.6+spd*0.4:spd ):Math.max(0,rt.speed*0.7));
+      }
+    }
 
     // WATCHDOG: страховка на случай, если скорость застряла на 0 дольше 8 секунд, хотя
     // координаты реально смещаются (доплер недоступен/нестабилен И обычный fallback выше
