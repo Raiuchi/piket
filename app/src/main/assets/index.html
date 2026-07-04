@@ -79,7 +79,6 @@
   .gaugeWrap svg{width:100%;height:100%}
   .g-bezel{fill:none;stroke:url(#bezelGrad);stroke-width:2}
   .g-bezel-groove{fill:none;stroke:#000;stroke-width:5;opacity:.5}
-  .g-redline{fill:none;stroke:url(#redlineGrad);stroke-width:14;stroke-linecap:round;opacity:.55}
   .g-bg{fill:none;stroke:#141F2E;stroke-width:14;stroke-linecap:round}
   .g-ticks{fill:none;stroke:#3E5470;stroke-width:2.5}
   .g-ticks-major{fill:none;stroke:#C7D6E8;stroke-width:3.4;opacity:.85}
@@ -348,13 +347,10 @@
         <defs>
           <linearGradient id="gGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E7BF5"/><stop offset="1" stop-color="#7FC2FF"/></linearGradient>
           <linearGradient id="bezelGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A6182"/><stop offset=".25" stop-color="#DCE6F1"/><stop offset=".5" stop-color="#8FA6C0"/><stop offset=".75" stop-color="#4A6182"/><stop offset="1" stop-color="#232F3E"/></linearGradient>
-          <linearGradient id="redlineGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A8151A"/><stop offset="1" stop-color="#FF5A4E"/></linearGradient>
         </defs>
         <circle class="g-bezel" cx="100" cy="100" r="98"/>
         <circle class="g-bezel-groove" cx="100" cy="100" r="93.5"/>
         <circle class="g-bg" cx="100" cy="100" r="86" pathLength="100" stroke-dasharray="75 100" transform="rotate(135 100 100)"/>
-        <!-- Redline: верхние ~12% шкалы (≈220-250 км/ч) - как на гоночном тахометре, печатная зона под подвижной дугой -->
-        <circle class="g-redline" cx="100" cy="100" r="86" pathLength="100" stroke-dasharray="9 100" stroke-dashoffset="-66" transform="rotate(135 100 100)"/>
         <circle class="g-ticks" cx="100" cy="100" r="95" pathLength="100" stroke-dasharray="0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 32.16" transform="rotate(135 100 100)"/>
         <circle class="g-ticks-major" cx="100" cy="100" r="95" pathLength="100" stroke-dasharray="1 14.84" transform="rotate(135 100 100)"/>
         <circle class="g-fg" id="gaugeFg" cx="100" cy="100" r="86" pathLength="100" stroke-dasharray="0 100" transform="rotate(135 100 100)"/>
@@ -1397,16 +1393,16 @@
   function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
 
   // Гейдж не просто крутится - он должен ОРАТЬ, если едешь на пределе или уже превысил
-  // ближайшее ограничение. gd-danger (превысил или в зоне и почти на лимите) - весь спидометр
-  // заливается тревожным красным с пульсацией. gd-warn (подъезжаешь и уже сейчас быстрее, чем
-  // разрешено на подъезде) - жёлтый. Иначе - обычный синий "живой" вид. Использует ТЕ ЖЕ пороги
-  // и ту же цветовую семантику (зелёный/жёлтый/красный), что уже применяется в .signal и .vmax -
-  // не новый язык, а продолжение уже принятого.
+  // ближайшее ограничение. gd-danger (на лимите или выше) - весь спидометр заливается
+  // тревожным красным с пульсацией. gd-warn (в пределах 5 км/ч ДО лимита, ещё не нарушение,
+  // но уже пора сбрасывать) - жёлтый. По просьбе Владислава - именно "88 при лимите 90 уже
+  // жёлтый, 90 уже красный", не "красный только когда реально превысил" - раньше было cur>spd
+  // (строго больше), стало cur>=spd (на лимите уже красный, не только за ним).
   function gaugeDangerClass(r,inzone,ahead,lead){
     if(!rt.tracking||!r||r.spd==null)return"gd-ok";
     var spd=+r.spd, cur=rt.speed;
-    if(inzone){ if(cur>spd)return"gd-danger"; if(cur>spd-8)return"gd-warn"; return"gd-ok"; }
-    if(ahead!=null&&lead!=null&&ahead<=lead){ if(cur>spd)return"gd-warn"; }
+    if(inzone){ if(cur>=spd)return"gd-danger"; if(cur>=spd-5)return"gd-warn"; return"gd-ok"; }
+    if(ahead!=null&&lead!=null&&ahead<=lead){ if(cur>=spd)return"gd-warn"; }
     return"gd-ok";
   }
   function updateGaugeDanger(r,inzone,ahead,lead){
