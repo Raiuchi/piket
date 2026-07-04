@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # нужно для истории коммитов в release notes
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -39,59 +39,34 @@ jobs:
       - name: Rename APK
         run: mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/piket.apk
 
-      - name: Upload build artifact (every push)
+      # Артефакт только на релизный тег, хранится 7 дней
+      # На обычных пушах не заливаем — они копились бесполезно (79 штук за день)
+      - name: Upload artifact (only on release tag)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v4
         with:
-          name: piket-apk
+          name: piket-apk-${{ github.ref_name }}
           path: app/build/outputs/apk/debug/piket.apk
-
-      - name: Get version info
-        if: startsWith(github.ref, 'refs/tags/v')
-        id: version
-        run: |
-          # Версия из тега
-          VERSION="${{ github.ref_name }}"
-
-          # Берём сообщение последнего коммита (первую строку — заголовок)
-          COMMIT_TITLE=$(git log -1 --pretty=format:"%s")
-
-          # Берём расширенное описание коммита (тело, без первой строки)
-          COMMIT_BODY=$(git log -1 --pretty=format:"%b")
-
-          # Предыдущий тег — для списка изменений между версиями
-          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
-
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "commit_title=$COMMIT_TITLE" >> $GITHUB_OUTPUT
-
-          # Записываем тело коммита в файл (многострочное)
-          echo "$COMMIT_BODY" > /tmp/commit_body.txt
-          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+          retention-days: 7
 
       - name: Build release notes
         if: startsWith(github.ref, 'refs/tags/v')
-        id: notes
         run: |
           VERSION="${{ github.ref_name }}"
-          PREV_TAG="${{ steps.version.outputs.prev_tag }}"
-          COMMIT_TITLE="${{ steps.version.outputs.commit_title }}"
-          COMMIT_BODY=$(cat /tmp/commit_body.txt)
-
-          # Формируем красивый changelog
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
+          COMMIT_TITLE=$(git log -1 --pretty=format:"%s")
+          COMMIT_BODY=$(git log -1 --pretty=format:"%b")
           {
             echo "## 📦 ПИКЕТ $VERSION"
             echo ""
             echo "### Что изменилось"
             echo ""
-            # Заголовок коммита как главное изменение
             echo "**$COMMIT_TITLE**"
             echo ""
-            # Тело коммита если есть
             if [ -n "$COMMIT_BODY" ]; then
               echo "$COMMIT_BODY"
               echo ""
             fi
-            # Список всех коммитов между предыдущим и текущим тегом
             if [ -n "$PREV_TAG" ]; then
               echo "### Все коммиты с $PREV_TAG"
               git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges | head -20
@@ -100,12 +75,10 @@ jobs:
             fi
             echo "---"
             echo "### Установка"
-            echo "Скачай **piket.apk** ниже и установи поверх предыдущей версии. Данные и настройки сохранятся."
+            echo "Скачай **piket.apk** ниже и установи поверх предыдущей версии. Данные сохранятся."
             echo ""
-            echo "> ⚠️ Помощник, не замена АЛСН/КЛУБ-У. Решения принимаются машинистом на основании штатных приборов."
+            echo "> ⚠️ Помощник, не замена АЛСН/КЛУБ-У."
           } > /tmp/release_notes.txt
-
-          cat /tmp/release_notes.txt
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
@@ -115,24 +88,26 @@ jobs:
           files: app/build/outputs/apk/debug/piket.apk
           body_path: /tmp/release_notes.txt
 
-      - name: Cleanup old releases (keep last 5)
+      - name: Cleanup — удаляем старые релизы (оставляем 5) и артефакты
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Получаем все релизы отсортированные по дате (новые первые)
-          RELEASES=$(gh release list --repo ${{ github.repository }} --limit 100 --json tagName,databaseId --jq '.[].tagName')
-
-          # Считаем количество
-          TOTAL=$(echo "$RELEASES" | wc -l)
-          echo "Всего релизов: $TOTAL, оставляем 5, удаляем $((TOTAL - 5))"
-
-          # Удаляем все кроме первых 5
-          echo "$RELEASES" | tail -n +6 | while read TAG; do
-            if [ -n "$TAG" ]; then
-              echo "Удаляю релиз: $TAG"
+          echo "=== Релизы: оставляем 5 ==="
+          gh release list --repo ${{ github.repository }} --limit 100 --json tagName \
+            --jq '.[].tagName' | tail -n +6 | while read TAG; do
+            [ -n "$TAG" ] && echo "Удаляю релиз $TAG" && \
               gh release delete "$TAG" --repo ${{ github.repository }} --yes --cleanup-tag || true
-            fi
           done
 
-          echo "Готово. Осталось релизов: $(gh release list --repo ${{ github.repository }} --limit 100 | wc -l)"
+          echo "=== Артефакты: удаляем все кроме последних 5 ==="
+          gh api repos/${{ github.repository }}/actions/artifacts --paginate \
+            --jq '.artifacts[] | "\(.id) \(.name) \(.created_at)"' | \
+            sort -k3 -r | tail -n +6 | awk '{print $1}' | while read ID; do
+            [ -n "$ID" ] && echo "Удаляю артефакт $ID" && \
+              gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$ID || true
+          done
+
+          echo "=== Итого ==="
+          echo "Релизов осталось: $(gh release list --repo ${{ github.repository }} --limit 100 | wc -l)"
+          echo "Артефактов осталось: $(gh api repos/${{ github.repository }}/actions/artifacts --jq '.total_count')"
