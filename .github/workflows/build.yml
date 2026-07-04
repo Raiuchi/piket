@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # нужно для истории коммитов в release notes
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -43,28 +45,94 @@ jobs:
           name: piket-apk
           path: app/build/outputs/apk/debug/piket.apk
 
-      - name: Create GitHub Release (only on version tag)
+      - name: Get version info
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: version
+        run: |
+          # Версия из тега
+          VERSION="${{ github.ref_name }}"
+
+          # Берём сообщение последнего коммита (первую строку — заголовок)
+          COMMIT_TITLE=$(git log -1 --pretty=format:"%s")
+
+          # Берём расширенное описание коммита (тело, без первой строки)
+          COMMIT_BODY=$(git log -1 --pretty=format:"%b")
+
+          # Предыдущий тег — для списка изменений между версиями
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "commit_title=$COMMIT_TITLE" >> $GITHUB_OUTPUT
+
+          # Записываем тело коммита в файл (многострочное)
+          echo "$COMMIT_BODY" > /tmp/commit_body.txt
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Build release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: notes
+        run: |
+          VERSION="${{ github.ref_name }}"
+          PREV_TAG="${{ steps.version.outputs.prev_tag }}"
+          COMMIT_TITLE="${{ steps.version.outputs.commit_title }}"
+          COMMIT_BODY=$(cat /tmp/commit_body.txt)
+
+          # Формируем красивый changelog
+          {
+            echo "## 📦 ПИКЕТ $VERSION"
+            echo ""
+            echo "### Что изменилось"
+            echo ""
+            # Заголовок коммита как главное изменение
+            echo "**$COMMIT_TITLE**"
+            echo ""
+            # Тело коммита если есть
+            if [ -n "$COMMIT_BODY" ]; then
+              echo "$COMMIT_BODY"
+              echo ""
+            fi
+            # Список всех коммитов между предыдущим и текущим тегом
+            if [ -n "$PREV_TAG" ]; then
+              echo "### Все коммиты с $PREV_TAG"
+              git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges | head -20
+              echo ""
+              echo ""
+            fi
+            echo "---"
+            echo "### Установка"
+            echo "Скачай **piket.apk** ниже и установи поверх предыдущей версии. Данные и настройки сохранятся."
+            echo ""
+            echo "> ⚠️ Помощник, не замена АЛСН/КЛУБ-У. Решения принимаются машинистом на основании штатных приборов."
+          } > /tmp/release_notes.txt
+
+          cat /tmp/release_notes.txt
+
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           name: "ПИКЕТ ${{ github.ref_name }}"
           files: app/build/outputs/apk/debug/piket.apk
-          body: |
-            ## ⚠️ Важно при обновлении с версии v1.0.0
+          body_path: /tmp/release_notes.txt
 
-            Если у тебя уже установлен ПИКЕТ версии **v1.0.0** — Android не даст поставить эту версию поверх старой (поменялся ключ подписи). Нужно один раз:
+      - name: Cleanup old releases (keep last 5)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Получаем все релизы отсортированные по дате (новые первые)
+          RELEASES=$(gh release list --repo ${{ github.repository }} --limit 100 --json tagName,databaseId --jq '.[].tagName')
 
-            1. **Удалить** старое приложение ПИКЕТ с телефона
-            2. Скачать и установить **ПИКЕТ.apk** из этого релиза
+          # Считаем количество
+          TOTAL=$(echo "$RELEASES" | wc -l)
+          echo "Всего релизов: $TOTAL, оставляем 5, удаляем $((TOTAL - 5))"
 
-            Это нужно сделать **только один раз**. Начиная с этой версии у приложения постоянный ключ подписи — все будущие обновления будут ставиться поверх старых, без удаления.
+          # Удаляем все кроме первых 5
+          echo "$RELEASES" | tail -n +6 | while read TAG; do
+            if [ -n "$TAG" ]; then
+              echo "Удаляю релиз: $TAG"
+              gh release delete "$TAG" --repo ${{ github.repository }} --yes --cleanup-tag || true
+            fi
+          done
 
-            Если ПИКЕТ у тебя ещё не стоял — просто скачай и установи как обычно, ничего удалять не нужно.
-
-            ## Что нового
-            - 🔊 Голос — исправлена озвучка ограничений (использует системный движок Android)
-            - 📳 Вибрация — починена (не хватало системного разрешения)
-            - 🔑 Постоянный ключ подписи — обновления больше не требуют удаления
-            - 🎛 Спидометр — насечки на циферблате + индикатор допустимой скорости по ограничению
-            - 🧹 Убрана техническая метка сборки и случайное выделение текста на экране
-          generate_release_notes: true
+          echo "Готово. Осталось релизов: $(gh release list --repo ${{ github.repository }} --limit 100 | wc -l)"
