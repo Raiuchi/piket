@@ -79,10 +79,11 @@
   .gaugeWrap svg{width:100%;height:100%}
   .g-bezel{fill:none;stroke:url(#bezelGrad);stroke-width:2}
   .g-bezel-groove{fill:none;stroke:#000;stroke-width:5;opacity:.5}
-  .g-bg{fill:none;stroke:#141F2E;stroke-width:14;stroke-linecap:round}
+  .g-bg{fill:none;stroke:#141F2E;stroke-width:13;stroke-linecap:round}
   .g-ticks{fill:none;stroke:#3E5470;stroke-width:2.5}
-  .g-ticks-major{fill:none;stroke:#C7D6E8;stroke-width:3.4;opacity:.85}
-  .g-fg{fill:none;stroke:url(#gGrad);stroke-width:14;stroke-linecap:round;transition:stroke-dasharray .35s ease;filter:drop-shadow(0 0 6px rgba(46,123,245,.5))}
+  .g-tickL{fill:none;stroke:#C7D6E8;stroke-width:3;stroke-linecap:round;opacity:.9}
+  .g-label{font-family:var(--mono);font-size:10px;font-weight:800;fill:var(--steel);opacity:.9}
+  .g-fg{fill:none;stroke:url(#gGrad);stroke-width:13;stroke-linecap:round;transition:stroke-dasharray .35s ease;filter:drop-shadow(0 0 6px rgba(46,123,245,.5))}
   .g-sheen{position:absolute;inset:6%;border-radius:50%;pointer-events:none;
     background:linear-gradient(200deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,0) 28%,rgba(255,255,255,0) 72%,rgba(255,255,255,.04) 100%)}
   .g-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -349,11 +350,28 @@
           <linearGradient id="bezelGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A6182"/><stop offset=".25" stop-color="#DCE6F1"/><stop offset=".5" stop-color="#8FA6C0"/><stop offset=".75" stop-color="#4A6182"/><stop offset="1" stop-color="#232F3E"/></linearGradient>
         </defs>
         <circle class="g-bezel" cx="100" cy="100" r="98"/>
-        <circle class="g-bezel-groove" cx="100" cy="100" r="93.5"/>
-        <circle class="g-bg" cx="100" cy="100" r="86" pathLength="100" stroke-dasharray="75 100" transform="rotate(135 100 100)"/>
-        <circle class="g-ticks" cx="100" cy="100" r="95" pathLength="100" stroke-dasharray="0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 32.16" transform="rotate(135 100 100)"/>
-        <circle class="g-ticks-major" cx="100" cy="100" r="95" pathLength="100" stroke-dasharray="1 14.84" transform="rotate(135 100 100)"/>
-        <circle class="g-fg" id="gaugeFg" cx="100" cy="100" r="86" pathLength="100" stroke-dasharray="0 100" transform="rotate(135 100 100)"/>
+        <circle class="g-bezel-groove" cx="100" cy="100" r="95"/>
+        <circle class="g-bg" cx="100" cy="100" r="64" pathLength="100" stroke-dasharray="75 100" transform="rotate(135 100 100)"/>
+        <circle class="g-ticks" cx="100" cy="100" r="76" pathLength="100" stroke-dasharray="0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 6.92 0.5 32.16" transform="rotate(135 100 100)"/>
+        <!-- Крупные деления - 6 штук строго под цифрами 0/50/100/150/200/250 (МАКС=250 км/ч).
+             Общий шаблон - вертикальная линия "вверх" от центра, повёрнутая на нужный угол;
+             угол выведен из ТОЙ ЖЕ геометрии дуги (rotate 135, sweep 270°), что и сама шкала -
+             для каждого значения v: поворот = -135 + (v/250)*270, что даёт: 0→-135° (старт дуги,
+             низ-слева), 125→0° (ровно вверх), 250→135° (конец дуги, низ-справа) - симметрично
+             и совпадает с положением дуги, а не подобрано на глаз. -->
+        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(-135 100 100)"/>
+        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(-81 100 100)"/>
+        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(-27 100 100)"/>
+        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(27 100 100)"/>
+        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(81 100 100)"/>
+        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(135 100 100)"/>
+        <text class="g-label" x="37.1" y="162.9" text-anchor="middle" dominant-baseline="central">0</text>
+        <text class="g-label" x="12.1" y="86.1" text-anchor="middle" dominant-baseline="central">50</text>
+        <text class="g-label" x="59.6" y="20.7" text-anchor="middle" dominant-baseline="central">100</text>
+        <text class="g-label" x="140.4" y="20.7" text-anchor="middle" dominant-baseline="central">150</text>
+        <text class="g-label" x="187.9" y="86.1" text-anchor="middle" dominant-baseline="central">200</text>
+        <text class="g-label" x="162.9" y="162.9" text-anchor="middle" dominant-baseline="central">250</text>
+        <circle class="g-fg" id="gaugeFg" cx="100" cy="100" r="64" pathLength="100" stroke-dasharray="0 100" transform="rotate(135 100 100)"/>
       </svg>
       <div class="g-sheen"></div>
       <div class="g-center">
