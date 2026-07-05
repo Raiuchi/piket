@@ -1134,50 +1134,21 @@
           if(candM!=null && usedWideSearch){
             var diff=Math.abs(candM-drM);
             var manualCalibTime = rt.manualCalibAt || load("sap_manualCalib", 0);
-            var recentManual = manualCalibTime && (now-manualCalibTime)<600000; // 10 минут защиты
+            var recentManual = manualCalibTime && (now-manualCalibTime)<600000;
 
             if(diff<=500){
-              // Маленькая коррекция (<500м) — применяем всегда мгновенно
+              // Маленькая поправка ≤500м — всегда применяем (компенсация одометра)
               rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
               rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
               rt.pendingCount=0; rt.pendingCandM=null; rt.driftSince=null; rt.driftCandM=null;
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
-            } else if(diff<=1500 && !recentManual){
-              // Средняя коррекция (500-1500м) без недавней ручной — требуем 2 подтверждения
-              if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){ rt.pendingCount=(rt.pendingCount||0)+1; }
-              else { rt.pendingCount=1; }
-              rt.pendingCandM=candM;
-              if(rt.pendingCount>=2){
-                rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
-                rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
-                rt.pendingCount=0; rt.pendingCandM=null; rt.driftSince=null; rt.driftCandM=null;
-                $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
-              } else {
-                rt.posM=drM; rt.fixQuality="checking";
-                $("#spdSrc").textContent="GPS — проверяю позицию..."; $("#spdSrc").className="src dr";
-              }
             } else {
-              // Большая коррекция (>1500м) или недавняя ручная калибровка — не трогаем, держим одометр
-              rt.posM=drM; rt.fixQuality="good";
-              var gpsDeltaM=Math.round((candM-drM)/100)*100;
-              if(recentManual){
-                $("#spdSrc").textContent="Ручная калибровка — GPS игнорируется"; $("#spdSrc").className="src dr";
-              } else {
-                // Накапливаем для drift-watchdog (применится через 30с стабильного расхождения)
-                if(rt.driftCandM!=null && Math.abs(candM-rt.driftCandM)<=400){ if(!rt.driftSince)rt.driftSince=now; }
-                else { rt.driftSince=now; }
-                rt.driftCandM=candM;
-                if(rt.driftSince && (now-rt.driftSince)>30000){
-                  // 30с стабильного большого расхождения — доверяем GPS
-                  rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
-                  rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
-                  rt.driftSince=null; rt.driftCandM=null;
-                  $("#spdSrc").textContent="GPS — автоподстройка"; $("#spdSrc").className="src";
-                } else {
-                  var secs=rt.driftSince?Math.round((now-rt.driftSince)/1000):0;
-                  $("#spdSrc").textContent="GPS расходится ("+secs+"с из 30с)"; $("#spdSrc").className="src dr";
-                }
-              }
+              // Расхождение >500м: доверяем одометру, GPS не трогаем.
+              // Большие коррекции от GPS убирают позицию не туда (сдвиг трека-данных).
+              // Одометр (скорость × время) достаточно точен для рейса.
+              rt.posM=drM; rt.fixQuality="good"; rt.driftSince=null; rt.driftCandM=null;
+              var sign=(candM-drM)>0?"+":"";
+              $("#spdSrc").textContent="GPS "+sign+Math.round((candM-drM)/100)/10+"км — одометр"; $("#spdSrc").className="src";
             }
           } else if(candM!=null){
             // Слабый GPS: требуем 2 подтверждения или acc<=30
