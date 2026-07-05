@@ -1082,11 +1082,13 @@
           if(snapAcc>0){
             var tm0=snapToTrack(c.latitude,c.longitude);
             if(tm0!=null){
+              var dir0=(dirDown()?-1:1);
+              var tmCorrected=tm0 - dir0*(rt.odo||0);
               if(acc<=40){
-                state.calib._trackM=tm0; persist();
+                state.calib._trackM=tmCorrected; persist();
               } else {
                 if(rt.trackMCand!=null && Math.abs(tm0-rt.trackMCand)<=300){
-                  state.calib._trackM=tm0; persist(); rt.trackMCand=null;
+                  state.calib._trackM=tmCorrected; persist(); rt.trackMCand=null;
                 } else { rt.trackMCand=tm0; }
               }
             }
