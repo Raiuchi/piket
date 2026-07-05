@@ -1081,17 +1081,20 @@
 
         // Коррекция по GPS — принимаем только если физически правдоподобна И подтверждена дважды подряд
         var candM=null, viaTrack=false, tMfinal=null, usedWideSearch=false;
-        var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
-        var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
-        if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
-          if(tM!=null){ var calibM=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibM+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM;
-            if(acc<=40){ var tMwide=snapToTrack(c.latitude,c.longitude);
-              if(tMwide!=null && Math.abs(tMwide-tM)>1000){
-                var calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-                candM=calibMW+(tMwide-state.calib._trackM); tMfinal=tMwide; usedWideSearch=true;
-              }
-            }
+        var calibM0cur=metersOf(state.calib.km,state.calib.pk,state.calib.m);
+
+        if(acc<=120){
+          var tM=null;
+          if(acc<=40){
+            tM=snapToTrack(c.latitude,c.longitude);
+            usedWideSearch=true;
+          } else {
+            var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
+            var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
+            tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
+          }
+          if(tM!=null){
+            candM=calibM0cur+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM;
           }
         }
 
@@ -1115,7 +1118,7 @@
             candM=calibMW+(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
         }
 
-        // КРИТИЧНО: если candM найден через АВАРИЙНЫЙ широкий поиск (usedWideSearch=true) -
+        // При acc<=40 — широкий поиск, применяем сразу без pendingCount:
         // обычная проверка plausible (maxJump) здесь неприменима по смыслу: расхождение
         // candM-drM ОГРОМНОЕ по определению (это и есть причина, почему сработал аварийный
         // поиск), а maxJump рассчитан на защиту от мелких случайных прыжков GPS-шума, не на
