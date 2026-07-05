@@ -1160,6 +1160,16 @@
               plausible=false;
             }
           }
+          if(acc<=15 && candM!=null){
+            var fastPosDelta=(dirDown()?-1:1)*(candM-drM);
+            var fastOk = !(rt.lastGoodFix!=null && rt.speed>15 && fastPosDelta<-300 && Math.abs(candM-drM)>1000);
+            if(fastOk){
+              rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
+              rt.posM=candM; rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
+              rt.fixQuality="good"; rt.driftSince=null; rt.driftCandM=null;
+              $("#spdSrc").textContent=viaTrack?"GPS + путь ✓ (точный)":"GPS активен"; $("#spdSrc").className="src";
+            }
+          } else {
           if(plausible){
             // Требуем 2 похожих замера подряд (±300м) — один кривой замер больше не сможет всё испортить
             if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){ rt.pendingCount=(rt.pendingCount||0)+1; }
@@ -1219,6 +1229,7 @@
               // переключить перегон, после чего поиск пойдёт по правильному сегменту)
             }
           }
+        } // конец else { (acc>15, стандартный путь с plausible/pendingCount)
         } else {
           rt.posM=drM;
           rt.fixQuality="weak";
