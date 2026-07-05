@@ -1132,10 +1132,12 @@
           }
 
           if(candM!=null && usedWideSearch){
-            // Хороший GPS (acc<=40) или аварийный широкий поиск: применяем сразу
             rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
             rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good"; rt.pendingCount=0; rt.pendingCandM=null; rt.driftSince=null; rt.driftCandM=null;
-            $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
+            // ДИАГНОСТИКА: показываем km от GPS и от отображения — если расходятся, видно сразу
+            var gpsDeltaKm=Math.round((candM-calibM0cur)/1000);
+            var diagStr=(viaTrack?"GPS + путь ✓":"GPS активен")+" [GPS:"+Math.floor(candM/1000)+"км Δ:"+gpsDeltaKm+"км]";
+            $("#spdSrc").textContent=diagStr; $("#spdSrc").className="src";
           } else if(candM!=null){
             // Слабый GPS: требуем 2 подтверждения или acc<=30
             var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
@@ -1234,17 +1236,20 @@
     return {gps:"live", txt:"GPS вкл", src:"GPS — фоновая служба", srcCls:"src live"};
   }
   function mirrorTick(graceMs,gen){
-    if(gen!==rt.mirrorGen) return; // зеркало уже остановлено/перезапущено — этот отложенный вызов устарел, игнорируем
+    if(gen!==rt.mirrorGen) return;
     var snap=readTrackSnapshot();
     var fresh = snap && snap.tracking && (Date.now()-snap.ts)<=5000;
     if(!fresh){
       if(graceMs && graceMs>0){
-        // Даём headless-копии в службе время прогрузиться и сделать первый тик —
-        // не гасим кнопку из-за пустого localStorage в первые секунды после старта.
+        // Показываем статус "запускается" пока ждём первый снэпшот от headless-службы
+        if(graceMs>15000){
+          $("#spdSrc").textContent="GPS запускается..."; $("#spdSrc").className="src dr";
+        } else if(graceMs>8000){
+          $("#spdSrc").textContent="GPS инициализируется..."; $("#spdSrc").className="src dr";
+        }
         setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700),gen); }, 700);
         return;
       }
-      // headless перестал писать снэпшоты (служба остановлена) — выходим из зеркала
       if(gen===rt.mirrorGen){ IS_MIRROR=false; stopTicker();
         $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
         setTrackBtn(false); renderTrip(); renderList(); }
@@ -1284,7 +1289,7 @@
   }
   function startMirror(){ IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
     rt.mirrorGen=(rt.mirrorGen||0)+1;
-    if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(8000,rt.mirrorGen); }
+    if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(20000,rt.mirrorGen); }
   function stopMirror(){
     rt.mirrorGen=(rt.mirrorGen||0)+1; // обесценивает все отложенные вызовы mirrorTick этой сессии
     IS_MIRROR=false; stopTicker(); rt.tracking=false; rt.speed=0;
