@@ -1139,7 +1139,7 @@
             // - >2км: 3 подтверждения (крупные прыжки требуют уверенности)
             // Формула calibM0+(tM-_trackM) автоматически компенсирует сдвиг трека,
             // поэтому при правильно установленном _trackM коррекция всегда верна.
-            var needed = diff<=500 ? 1 : (diff<=2000 ? 2 : 3);
+            var needed = diff>2000 ? 1 : (diff>500 ? 2 : 3);
             if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){
               rt.pendingCount=(rt.pendingCount||0)+1;
             } else {
