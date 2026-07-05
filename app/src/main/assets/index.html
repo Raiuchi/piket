@@ -1120,7 +1120,7 @@
               var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
               tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
             }
-            if(tM!=null){ candM=tM; viaTrack=true; tMfinal=tM; }
+            if(tM!=null){ candM=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; }
           }
 
           // Аварийный широкий поиск после 25с без хорошего фикса
@@ -1128,7 +1128,7 @@
           var sinceAnyGoodOrStart=rt.lastGoodFix!=null?(now-rt.lastGoodFix):(now-rt.trackingSince);
           if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
             var tMwide=snapToTrack(c.latitude,c.longitude);
-            if(tMwide!=null){ candM=tMwide; viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
+            if(tMwide!=null){ candM=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
           }
 
           if(candM!=null && usedWideSearch){
