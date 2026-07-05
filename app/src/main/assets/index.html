@@ -1046,206 +1046,139 @@
     }
 
     if(state.calib!=null){
-      var drM=currentMeters(); // тикер уже плавно ведёт позицию между замерами GPS
+      var drM=currentMeters();
 
-      // Привязка к пути (trackM) ещё не установлена — ставим её только на надёжном сигнале,
-      // подтверждённом дважды подряд (а не на одном, возможно шумном замере). Раньше один
-      // замер с acc<=80 (довольно щедрый порог) сразу фиксировал базовую точку - если этот
-      // первый замер был хоть немного смещён, ВСЯ дальнейшая система наследовала эту ошибку
-      // навсегда (формула candM считается ОТНОСИТЕЛЬНО этой точки), даже при отличном сигнале
-      // на всех последующих замерах. Это и объясняло жалобу "GPS точный, а км/пикет не точен".
-      if(state.calib._trackM==null){
-        if(acc<=40){
-          var tm0=snapToTrack(c.latitude,c.longitude);
-          if(tm0!=null){
-            state.calib._trackM=tm0; persist(); rt.lastGoodFix=now;
+      // ── ШАГ 1: АВТОКАЛИБРОВКА (если калибровки нет совсем) ──────────────────
+      if(state.calib==null && rt.tracking && !IS_MIRROR){
+        if(acc<=35){
+          var autoTM=snapToTrack(c.latitude,c.longitude);
+          if(autoTM==null && state.ctx.peregon!=="Все участки"){
+            var savedPeregon=state.ctx.peregon; state.ctx.peregon="Все участки";
+            autoTM=snapToTrack(c.latitude,c.longitude);
+            state.ctx.peregon=savedPeregon;
+            if(autoTM!=null) state.ctx.peregon="Все участки";
           }
-        } else if(acc<=60){
-          var tm0=snapToTrack(c.latitude,c.longitude);
-          if(tm0!=null){
-            if(rt.trackMCand!=null && Math.abs(tm0-rt.trackMCand)<=300){
-              state.calib._trackM=tm0; persist(); rt.lastGoodFix=now; rt.trackMCand=null;
-            } else { rt.trackMCand=tm0; }
-          }
-        }
-        rt.posM=drM;
-        rt.fixQuality = state.calib._trackM==null?"waiting":"weak";
-        $("#spdSrc").textContent=state.calib._trackM==null?"Жду точный сигнал для привязки":"GPS слабый — счёт по скорости";
-        $("#spdSrc").className="src dr";
-      } else {
-        var calibM0=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-        // КРИТИЧНО: здесь НЕТ dirDown() множителя - TRACK.segs всегда растёт в одну и ту же
-        // физическую сторону (проверено на реальных координатах: СПб=0км, Москва=648км),
-        // независимо от того, в какую сторону едет машинист. dirDown() нужен только для
-        // преобразования odo<->позиция (накопленное расстояние всегда положительно, а
-        // позиция растёт или убывает по направлению) - но НЕ для позиция<->trackM, которые
-        // обе меняются в одну сторону всегда. Раньше здесь был тот же знак, что давало
-        // РАСТУЩИЙ candM при движении Обратно, хотя реальная позиция должна убывать -
-        // именно это вызывало 'счётчик дёргается туда-обратно' при обратном направлении.
-        var expectedTrackM=state.calib._trackM+(drM-calibM0);
-
-        // Коррекция по GPS — принимаем только если физически правдоподобна И подтверждена дважды подряд
-        var candM=null, viaTrack=false, tMfinal=null, usedWideSearch=false;
-        var calibM0cur=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-
-        if(acc<=120){
-          var tM=null;
-          if(acc<=40){
-            tM=snapToTrack(c.latitude,c.longitude);
-            usedWideSearch=true;
-          } else {
-            var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
-            var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
-            tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
-          }
-          if(tM!=null){
-            candM=calibM0cur+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM;
-          }
-        }
-
-        // АВАРИЙНЫЙ ШИРОКИЙ ПОИСК: если обычное окно (растёт со временем, но не более 40км)
-        // долго (>25с) не находит совпадение рядом с ожидаемой позицией - значит счёт и
-        // реальность разошлись на расстояние БОЛЬШЕ самого окна поиска (например, простой
-        // с потухшим трекингом, ручной пропуск большого участка). Тогда ищем по ВСЕЙ длине
-        // выбранного перегона/маршрута, без привязки к ожидаемой позиции - дороже по расчётам,
-        // но без этого приложение никогда не найдёт реальную позицию при большом разрыве.
-        //
-        // КРИТИЧНО: раньше условие требовало rt.lastGoodFix!=null - но если хорошего фикса
-        // не было НИ РАЗУ с самого начала (именно тот случай, ради которого писался этот
-        // аварийный поиск - реальная позиция изначально далеко за пределами обычного окна),
-        // условие "null != null" было всегда false, и аварийный поиск никогда не запускался.
-        // Теперь используем отдельную метку времени, не зависящую от наличия удачных фиксов.
-        if(rt.trackingSince==null) rt.trackingSince=now;
-        var sinceAnyGoodOrStart = rt.lastGoodFix!=null ? (now-rt.lastGoodFix) : (now-rt.trackingSince);
-        if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
-          var tMwide=snapToTrack(c.latitude,c.longitude); // без expectedM/windowM — ищет по всему треку
-          if(tMwide!=null){ var calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibMW+(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
-        }
-
-        // При acc<=40 — широкий поиск, применяем сразу без pendingCount:
-        // обычная проверка plausible (maxJump) здесь неприменима по смыслу: расхождение
-        // candM-drM ОГРОМНОЕ по определению (это и есть причина, почему сработал аварийный
-        // поиск), а maxJump рассчитан на защиту от мелких случайных прыжков GPS-шума, не на
-        // подобные ситуации. Раньше правильно найденная аварийным поиском позиция тут же
-        // отбраковывалась этой же проверкой - порочный круг: поиск находит правильную точку,
-        // а защита от прыжков не даёт её принять именно потому что прыжок большой.
-        if(candM!=null && usedWideSearch){
-          // Раньше здесь была защита от ложного срабатывания на стыке физически близких/
-          // дублирующихся маршрутов (Горы-Павлово) - расхождение, похожее на движение
-          // назад, могло быть либо реальной ошибкой, либо ложной находкой внутри уже
-          // пройденного сегмента. Теперь путаница маршрутов на таких стыках решается
-          // напрямую через известную типовую последовательность (RAILCHAINS), не через
-          // угадывание по GPS-геометрии - защита здесь больше не нужна и только мешала
-          // легитимному исправлению реальной ошибки калибровки после перехода по цепочке
-          // (стресс-тест нашёл: правильная коррекция отбраковывалась как "подозрительная").
-          rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
-          rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good"; rt.pendingCount=0; rt.pendingCandM=null;
-          // НЕ трогаем state.calib._trackM здесь - rt.odo уже пересчитан правильно через
-          // candM и ИСХОДНУЮ калибровку (calib.km/pk/m). _trackM и calib.km/pk/m - это
-          // согласованная пара для формулы expectedTrackM на СЛЕДУЮЩИХ кадрах; обновление
-          // только _trackM без изменения calib.km/pk/m ломает эту согласованность и создаёт
-          // новую систематическую ошибку того же порядка, что и была - именно это произошло
-          // при первой версии этого фикса (нашли стресс-тестом: ошибка росла дальше после
-          // успешного первого срабатывания, вместо того чтобы остаться маленькой).
-          $("#spdSrc").textContent="GPS — найдена позиция"; $("#spdSrc").className="src";
-        } else if(candM!=null){
-          var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
-          var plausible = acc<=40 || Math.abs(candM-drM)<=maxJump;
-          // ЗАЩИТА ОТ ЛОЖНОГО "ОТСКОКА НАЗАД" НА СТЫКЕ МАРШРУТОВ: если поезд реально едет
-          // (скорость заметная) в направлении РОСТА позиции, а кандидат внезапно оказывается
-          // значительно МЕНЬШЕ последней хорошей позиции - это подозрительно. Обычно
-          // случается, когда машинист только что прошёл границу текущего выбранного перегона
-          // и физически уже на следующем участке, а GPS-поиск (ограниченный текущим сегментом)
-          // ошибочно цепляется за случайно близкую точку где-то в УЖЕ ПРОЙДЕННОЙ части пути.
-          // Настоящий откат назад (реверс, ошибка калибровки) тоже возможен - но он либо
-          // подтвердится несколько раз подряд (pendingCount), либо его поймает аварийный
-          // широкий поиск после смены перегона. Здесь просто не даём одному подозрительному
-          // замеру сразу дёрнуть счёт назад во время уверенного движения вперёд.
-          if(plausible && rt.lastGoodFix!=null && rt.speed>15){
-            var posDelta=(dirDown()?-1:1)*(candM-drM);
-            if(posDelta < -300 && Math.abs(candM-drM) > 1000){
-              plausible=false;
+          if(autoTM!=null){
+            if(rt.autoCalCand!=null && Math.abs(autoTM-rt.autoCalCand)<=150){ rt.autoCalCount=(rt.autoCalCount||0)+1; }
+            else { rt.autoCalCount=1; }
+            rt.autoCalCand=autoTM;
+            if(rt.autoCalCount>=4){
+              var acKm=kmFrom(autoTM), acPk=pkFrom(autoTM), acM=meterInPk(autoTM);
+              state.calib={km:acKm,pk:acPk,m:acM,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:autoTM};
+              rt.autoCalib=true; rt.odo=0; persist();
+              toast("Автоопределение: "+acKm+" км "+acPk+" пк — проверь при необходимости");
+              rt.autoCalCand=null; rt.autoCalCount=0;
             }
           }
-          if(acc<=15 && candM!=null){
-            var fastPosDelta=(dirDown()?-1:1)*(candM-drM);
-            var fastOk = !(rt.lastGoodFix!=null && rt.speed>15 && fastPosDelta<-300 && Math.abs(candM-drM)>1000);
-            if(fastOk){
-              rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
-              rt.posM=candM; rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
-              rt.fixQuality="good"; rt.driftSince=null; rt.driftCandM=null;
-              $("#spdSrc").textContent=viaTrack?"GPS + путь ✓ (точный)":"GPS активен"; $("#spdSrc").className="src";
-            }
-          } else {
-          if(plausible){
-            // Требуем 2 похожих замера подряд (±300м) — один кривой замер больше не сможет всё испортить
-            if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){ rt.pendingCount=(rt.pendingCount||0)+1; }
-            else { rt.pendingCount=1; }
-            rt.pendingCandM=candM;
-            rt.driftSince=null; rt.driftCandM=null; // расхождения больше нет — сбрасываем счётчик застоя
-            if(rt.pendingCount>=2 || acc<=30){
-              rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
-              rt.posM=candM;
-              rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null;
-              rt.fixQuality="good";
-              $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
-            } else {
-              rt.posM=drM;
-              rt.fixQuality="checking";
-              $("#spdSrc").textContent="GPS — проверяю…"; $("#spdSrc").className="src dr";
-            }
-          } else {
-            rt.pendingCount=0; rt.pendingCandM=null;
-            rt.posM=drM;
-            rt.fixQuality="weak";
-            $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
-            // АВТОКАЛИБРОВКА ПРИ ЗАТЯНУВШЕМСЯ РАСХОЖДЕНИИ: один кривой замер плавающим
-            // GPS-сигналом мы правильно отбрасываем (maxJump). Но если расхождение
-            // СТАБИЛЬНО держится одного порядка дольше 20 секунд (не разовый скачок,
-            // а систематическое "счёт разъехался с реальностью") — лучше довериться GPS,
-            // чем продолжать копить ошибку до бесконечности.
-            if(rt.driftCandM!=null && Math.abs(candM-rt.driftCandM)<=400){
-              if(rt.driftSince==null) rt.driftSince=now;
-            } else { rt.driftSince=now; }
-            rt.driftCandM=candM;
-            if(rt.driftSince && (now-rt.driftSince)>20000){
-              // ЗАЩИТА ОТ ЛОЖНОГО СРАБАТЫВАНИЯ НА СТЫКЕ МАРШРУТОВ: drift-watchdog предназначен
-              // для случая, когда счёт РЕАЛЬНО отстал/убежал от истинной позиции на одном
-              // и том же маршруте. Но на стыке двух сегментов (где текущий выбранный перегон
-              // физически закончился, а autoDetectPeregon ещё не успел переключить на
-              // следующий) узкий поиск может стабильно (20+ секунд) находить ложную точку
-              // ВНУТРИ уже пройденной части текущего сегмента - неотличимо по виду от
-              // настоящего длительного расхождения. Если движение уверенно идёт вперёд, а
-              // кандидат предполагает заметный шаг НАЗАД - ждём, пока autoDetectPeregon
-              // переключит перегон на правильный сегмент, не принимаем такую "стабильность".
-              var driftDrM = currentMeters();
-              var driftSuspicious = rt.speed>15 && driftDrM!=null &&
-                ((dirDown()?-1:1)*(candM-driftDrM) < -1000);
-              if(!driftSuspicious){
-                rt.odo=(dirDown()?-1:1)*(candM-metersOf(state.calib.km,state.calib.pk,state.calib.m));
-                rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
-                // НЕ трогаем _trackM здесь - см. подробное объяснение у аналогичного фикса
-                // в блоке широкого поиска выше. rt.odo уже пересчитан правильно через candM
-                // и исходную калибровку - трогать _trackM отдельно ломает согласованность пары
-                // _trackM/calib.km-pk-m, создавая новую систематическую ошибку того же порядка.
-                $("#spdSrc").textContent="GPS — автоподстройка"; $("#spdSrc").className="src";
-                rt.driftSince=null; rt.driftCandM=null;
+        } else { rt.autoCalCand=null; rt.autoCalCount=0; }
+      }
+
+      if(state.calib!=null){
+        // ── ШАГ 2: УСТАНОВКА _trackM (привязка км к trackM-координатам трека) ──
+        // _trackM=null после ручной калибровки. Пока null — коррекция отключена.
+        // Устанавливаем с ПЕРВОГО хорошего замера (acc<=40) без ожидания второго.
+        if(state.calib._trackM==null){
+          var snapAcc = acc<=40 ? 40 : (acc<=60 ? 60 : 0);
+          if(snapAcc>0){
+            var tm0=snapToTrack(c.latitude,c.longitude);
+            if(tm0!=null){
+              if(acc<=40){
+                state.calib._trackM=tm0; persist();
+              } else {
+                if(rt.trackMCand!=null && Math.abs(tm0-rt.trackMCand)<=300){
+                  state.calib._trackM=tm0; persist(); rt.trackMCand=null;
+                } else { rt.trackMCand=tm0; }
               }
-              // если driftSuspicious - оставляем driftSince как есть, ждём следующего
-              // кадра (autoDetectPeregon вызывается безусловно ниже, у него будет шанс
-              // переключить перегон, после чего поиск пойдёт по правильному сегменту)
             }
           }
-        } // конец else { (acc>15, стандартный путь с plausible/pendingCount)
-        } else {
-          rt.posM=drM;
-          rt.fixQuality="weak";
-          $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
+          // Если _trackM всё ещё null — используем одометр, ждём следующего замера
+          if(state.calib._trackM==null){
+            rt.posM=drM;
+            rt.fixQuality="waiting";
+            $("#spdSrc").textContent="Жду точный сигнал для привязки"; $("#spdSrc").className="src dr";
+          }
+        }
+
+        // ── ШАГ 3: GPS-КОРРЕКЦИЯ (только если _trackM установлен) ──────────────
+        if(state.calib._trackM!=null){
+          var calibM0=metersOf(state.calib.km,state.calib.pk,state.calib.m);
+          var expectedTrackM=state.calib._trackM+(drM-calibM0);
+
+          var candM=null, viaTrack=false, tMfinal=null, usedWideSearch=false;
+          var calibM0cur=calibM0;
+
+          if(acc<=120){
+            var tM=null;
+            if(acc<=40){
+              // Хороший GPS: полный поиск по треку без ограничения окна
+              tM=snapToTrack(c.latitude,c.longitude);
+              usedWideSearch=true;
+            } else {
+              var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
+              var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
+              tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
+            }
+            if(tM!=null){ candM=calibM0cur+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; }
+          }
+
+          // Аварийный широкий поиск после 25с без хорошего фикса
+          if(rt.trackingSince==null) rt.trackingSince=now;
+          var sinceAnyGoodOrStart=rt.lastGoodFix!=null?(now-rt.lastGoodFix):(now-rt.trackingSince);
+          if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
+            var tMwide=snapToTrack(c.latitude,c.longitude);
+            if(tMwide!=null){ var calibMW=calibM0cur; candM=calibMW+(tMwide-state.calib._trackM); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
+          }
+
+          if(candM!=null && usedWideSearch){
+            // Хороший GPS (acc<=40) или аварийный широкий поиск: применяем сразу
+            rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
+            rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good"; rt.pendingCount=0; rt.pendingCandM=null; rt.driftSince=null; rt.driftCandM=null;
+            $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
+          } else if(candM!=null){
+            // Слабый GPS: требуем 2 подтверждения или acc<=30
+            var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
+            var plausible=acc<=40||Math.abs(candM-drM)<=maxJump;
+            if(plausible && rt.lastGoodFix!=null && rt.speed>15){
+              var posDelta=(dirDown()?-1:1)*(candM-drM);
+              if(posDelta<-300 && Math.abs(candM-drM)>1000) plausible=false;
+            }
+            if(plausible){
+              if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){ rt.pendingCount=(rt.pendingCount||0)+1; }
+              else { rt.pendingCount=1; }
+              rt.pendingCandM=candM; rt.driftSince=null; rt.driftCandM=null;
+              if(rt.pendingCount>=2 || acc<=30){
+                rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
+                rt.posM=candM; rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null; rt.fixQuality="good";
+                $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
+              } else {
+                rt.posM=drM; rt.fixQuality="checking";
+                $("#spdSrc").textContent="GPS — проверяю…"; $("#spdSrc").className="src dr";
+              }
+            } else {
+              rt.pendingCount=0; rt.pendingCandM=null; rt.posM=drM; rt.fixQuality="weak";
+              $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
+              // Drift watchdog: 20с стабильного расхождения → корректируем
+              if(rt.driftCandM!=null && Math.abs(candM-rt.driftCandM)<=400){ if(rt.driftSince==null) rt.driftSince=now; }
+              else { rt.driftSince=now; }
+              rt.driftCandM=candM;
+              if(rt.driftSince && (now-rt.driftSince)>20000){
+                var driftDrM=currentMeters();
+                var driftSuspicious=rt.speed>15 && driftDrM!=null && ((dirDown()?-1:1)*(candM-driftDrM)<-1000);
+                if(!driftSuspicious){
+                  rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
+                  rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
+                  $("#spdSrc").textContent="GPS — автоподстройка"; $("#spdSrc").className="src";
+                  rt.driftSince=null; rt.driftCandM=null;
+                }
+              }
+            }
+          } else {
+            rt.posM=drM; rt.fixQuality="weak";
+            $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
+          }
         }
       }
     }
-
     rt.last=pt;
     autoDetectPeregon(c.latitude, c.longitude, acc);
     updateAndroidNotification();
