@@ -1055,10 +1055,15 @@
       // навсегда (формула candM считается ОТНОСИТЕЛЬНО этой точки), даже при отличном сигнале
       // на всех последующих замерах. Это и объясняло жалобу "GPS точный, а км/пикет не точен".
       if(state.calib._trackM==null){
-        if(acc<=60){
+        if(acc<=40){
           var tm0=snapToTrack(c.latitude,c.longitude);
           if(tm0!=null){
-            if(rt.trackMCand!=null && Math.abs(tm0-rt.trackMCand)<=150){
+            state.calib._trackM=tm0; persist(); rt.lastGoodFix=now;
+          }
+        } else if(acc<=60){
+          var tm0=snapToTrack(c.latitude,c.longitude);
+          if(tm0!=null){
+            if(rt.trackMCand!=null && Math.abs(tm0-rt.trackMCand)<=300){
               state.calib._trackM=tm0; persist(); rt.lastGoodFix=now; rt.trackMCand=null;
             } else { rt.trackMCand=tm0; }
           }
