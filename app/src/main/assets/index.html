@@ -1135,7 +1135,12 @@
             // Защита от GPS-глушения: если пользователь ВРУЧНУЮ откалибровался < 5 минут назад
             // и GPS говорит позицию >2км от текущей — игнорируем. GPS может врать (глушение),
             // пользователь знает где он лучше чем GPS в таком случае.
-            var manualProtect = rt.manualCalibAt && (now-rt.manualCalibAt)<300000 && Math.abs(candM-drM)>2000;
+            var manualProtect = (function(){
+              // В headless-службе rt.manualCalibAt не установлен (ручная калибровка
+              // происходит на видимом экране). Читаем время из localStorage напрямую.
+              var t = rt.manualCalibAt || load("sap_manualCalib", 0);
+              return t && (now-t)<300000 && Math.abs(candM-drM)>2000;
+            })();
             if(manualProtect){
               rt.posM=drM; rt.fixQuality="good";
               var gpsDeltaKm=Math.round((candM-drM)/1000);
@@ -1250,19 +1255,15 @@
     var snap=readTrackSnapshot();
     var fresh = snap && snap.tracking && (Date.now()-snap.ts)<=5000;
     if(!fresh){
-      if(graceMs && graceMs>0){
-        // Показываем статус "запускается" пока ждём первый снэпшот от headless-службы
-        if(graceMs>15000){
-          $("#spdSrc").textContent="GPS запускается..."; $("#spdSrc").className="src dr";
-        } else if(graceMs>8000){
-          $("#spdSrc").textContent="GPS инициализируется..."; $("#spdSrc").className="src dr";
-        }
-        setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700),gen); }, 700);
-        return;
+      // Служба ещё не ответила — ждём, не выходим автоматически.
+      // Показываем статус инициализации. Выход только по явному нажатию Стоп.
+      var elapsed = graceMs > 0 ? (20000-graceMs) : 20000;
+      if(elapsed < 8000){
+        $("#spdSrc").textContent="GPS запускается..."; $("#spdSrc").className="src dr";
+      } else {
+        $("#spdSrc").textContent="GPS инициализируется, подождите..."; $("#spdSrc").className="src dr";
       }
-      if(gen===rt.mirrorGen){ IS_MIRROR=false; stopTicker();
-        $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
-        setTrackBtn(false); renderTrip(); renderList(); }
+      setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700),gen); }, 700);
       return;
     }
     if(gen!==rt.mirrorGen) return;
@@ -1647,7 +1648,8 @@
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false;
     rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist();
-    rt.manualCalibAt=Date.now(); // защита от перезаписи GPS в течение 5 минут
+    rt.manualCalibAt=Date.now();
+    save("sap_manualCalib", rt.manualCalibAt); // headless-служба тоже прочитает
     closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км");
     // Если меняем калибровку во время активной поездки (видимый экран в режиме зеркала,
     // реальный счёт идёт в headless-службе) - сразу командуем службе перечитать калибровку.
