@@ -1132,12 +1132,22 @@
           }
 
           if(candM!=null && usedWideSearch){
-            rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
+            // Защита от GPS-глушения: если пользователь ВРУЧНУЮ откалибровался < 5 минут назад
+            // и GPS говорит позицию >2км от текущей — игнорируем. GPS может врать (глушение),
+            // пользователь знает где он лучше чем GPS в таком случае.
+            var manualProtect = rt.manualCalibAt && (now-rt.manualCalibAt)<300000 && Math.abs(candM-drM)>2000;
+            if(manualProtect){
+              rt.posM=drM; rt.fixQuality="good";
+              var gpsDeltaKm=Math.round((candM-drM)/1000);
+              $("#spdSrc").textContent="GPS расходится на "+gpsDeltaKm+"км (ручная калиб. защищена)"; $("#spdSrc").className="src dr";
+            } else {
             rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good"; rt.pendingCount=0; rt.pendingCandM=null; rt.driftSince=null; rt.driftCandM=null;
             // ДИАГНОСТИКА: показываем km от GPS и от отображения — если расходятся, видно сразу
             var gpsDeltaKm=Math.round((candM-calibM0cur)/1000);
             var diagStr=(viaTrack?"GPS + путь ✓":"GPS активен")+" [GPS:"+Math.floor(candM/1000)+"км Δ:"+gpsDeltaKm+"км]";
+            rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
             $("#spdSrc").textContent=diagStr; $("#spdSrc").className="src";
+            } // конец else (нет manualProtect)
           } else if(candM!=null){
             // Слабый GPS: требуем 2 подтверждения или acc<=30
             var maxJump=Math.max(200,(rt.speed/3.6)*((dt||2)+4)*1.6);
@@ -1621,12 +1631,10 @@
     var pk=parseInt($("#cPk").value,10); if(isNaN(pk))pk=1;
     var mm=parseInt($("#cM").value,10); if(isNaN(mm))mm=0; mm=Math.max(0,Math.min(99,mm));
     var enteredM=metersOf(km,pk,mm);
-    // ПРОВЕРКА: если GPS уже реально работает (rt.posM есть, неважно headless или обычный
-    // режим - posM актуальна в обоих) - сравниваем то, что машинист только что ВВЁЛ, с тем,
-    // что приложение УЖЕ ВЫЧИСЛИЛО по факту GPS прямо сейчас. Это не относится к самому
-    // первому старту (там rt.posM ещё нет, calib==null, GPS только запускается) - там и
-    // нечего сравнивать. Применимо именно к рекалибровке НА ХОДУ, когда GPS уже зелёный.
-    if(!rt.pendingCalibConfirm && rt.tracking && rt.posM!=null && Math.abs(rt.posM-enteredM)>1000){
+    // Диалог только если разница небольшая (1-3км) — возможна опечатка.
+    // Если разница >3км — пользователь явно знает лучше GPS (глушение, потеря сигнала).
+    // В таком случае сохраняем без вопросов.
+    if(!rt.pendingCalibConfirm && rt.tracking && rt.posM!=null && Math.abs(rt.posM-enteredM)>1000 && Math.abs(rt.posM-enteredM)<=3000){
       rt.pendingCalibConfirm=true;
       var gpsKm=kmFrom(rt.posM), gpsPk=pkFrom(rt.posM), gpsM=meterInPk(rt.posM);
       if(!(await showConfirm("GPS сейчас видит позицию около "+gpsKm+" км "+gpsPk+" пк ("+Math.round(Math.abs(rt.posM-enteredM)/1000)+" км от того, что ты вписал). Всё равно сохранить твоё число?",{okText:"Сохранить моё",cancelText:"Взять по GPS"}))){
@@ -1638,7 +1646,9 @@
     var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null};
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false;
-    rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist(); closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км");
+    rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist();
+    rt.manualCalibAt=Date.now(); // защита от перезаписи GPS в течение 5 минут
+    closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км");
     // Если меняем калибровку во время активной поездки (видимый экран в режиме зеркала,
     // реальный счёт идёт в headless-службе) - сразу командуем службе перечитать калибровку.
     // Без этого headless продолжал бы считать со старой калибровкой до Стоп/Старт.
