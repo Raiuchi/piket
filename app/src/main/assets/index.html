@@ -1223,7 +1223,13 @@
     }
     else { $("#gps").className="gps dead"; $("#gpsTxt").textContent=(e&&e.code===1)?"нет доступа":"нет сигнала"; $("#spdSrc").textContent=(e&&e.code===1)?"GPS запрещён (file://)":"жду спутники…"; $("#spdSrc").className="src dr"; } }
 
-  function tickerStep(){ if(state.calib==null)return;
+  function tickerStep(){ if(state.calib==null){
+    // Служба работает, но калибровки нет.
+    // Сохраняем heartbeat-снэпшот чтобы зеркало видело что служба жива.
+    // Без этого: зеркало никогда не получает свежий снэпшот → висит "GPS инициализируется" вечно.
+    if(IS_HEADLESS){ rt.lastTick=Date.now(); saveTrackSnapshot(); }
+    return;
+  }
     var now=Date.now(), dt=(now-(rt.lastTick||now))/1000; rt.lastTick=now;
     if(dt>0&&dt<10) rt.odo+=(rt.speed/3.6)*dt;
     rt.posM=currentMeters(); renderTrip(); evalAlerts();
