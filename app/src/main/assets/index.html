@@ -1085,7 +1085,15 @@
         var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
         if(acc<=120){ var tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
           if(tM!=null){ var calibM=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-            candM=calibM+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; } }
+            candM=calibM+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM;
+            if(acc<=40){ var tMwide=snapToTrack(c.latitude,c.longitude);
+              if(tMwide!=null && Math.abs(tMwide-tM)>1000){
+                var calibMW=metersOf(state.calib.km,state.calib.pk,state.calib.m);
+                candM=calibMW+(tMwide-state.calib._trackM); tMfinal=tMwide; usedWideSearch=true;
+              }
+            }
+          }
+        }
 
         // АВАРИЙНЫЙ ШИРОКИЙ ПОИСК: если обычное окно (растёт со временем, но не более 40км)
         // долго (>25с) не находит совпадение рядом с ожидаемой позицией - значит счёт и
