@@ -1017,7 +1017,11 @@
     // должно быть явное предупреждение, что позиция определена автоматически и её стоит
     // проверить/исправить, точность ниже чем при ручном вводе по факту проезжаемого столба.
     if(state.calib==null && rt.tracking && !IS_MIRROR){
-      if(acc<=20){
+      // БРАУЗЕРНЫЙ ПОРОГ ТОЧНОСТИ: FusedLocation на Android первые минуты часто даёт
+      // 20-30м (особенно после холодного старта или в помещении). С acc<=20 кандидаты
+      // не копились и автокалибровка не срабатывала никогда. Порог 35м безопасен: 4
+      // согласованных замера в 150м надёжно защищают от случайного шума.
+      if(acc<=35){
         var autoTM=snapToTrack(c.latitude,c.longitude);
         if(autoTM==null && state.ctx.peregon!=="Все участки"){
           // Возможно выбран неправильный/устаревший перегон - пробуем честно по всем участкам
@@ -1329,7 +1333,12 @@
 
   function startTrack(){
     if(state.settings.demo){ startSim(); return; }
-    if(state.calib==null){ openCal(); toast("Сначала откалибруйся по столбу"); return; }
+    // Не блокируем старт при отсутствии калибровки — позволяем GPS стартовать и
+    // ждём автокалибровки (4 согласованных замера с acc<=35м). Пока calib==null
+    // интерфейс показывает "нет калибровки" — это нормально, пользователь видит
+    // что приложение ищет позицию. Старое поведение (openCal) было ошибкой:
+    // трекинг не стартовал => onPos не вызывался => автокалибровка никогда не
+    // срабатывала при первом запуске, только после ручного ввода.
     var hasNative=false;
     try{ hasNative=!!(window.Android&&window.Android.startTracking); }catch(e){}
     if(hasNative && !IS_HEADLESS){
@@ -1476,7 +1485,16 @@
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=state.ctx.peregon;
     var acwEl=$("#autoCalWarn"); if(acwEl) acwEl.style.display=rt.autoCalib?"block":"none";
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
-    if(state.calib==null){ sig.className="signal"; stEl.textContent="нет калибровки"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null); updateGaugeDanger(null);
+    if(state.calib==null){ sig.className="signal"; updateLimitBadge(null); updateGaugeDanger(null);
+      if(rt.tracking){
+        stEl.textContent="GPS ищет позицию...";
+        var cnt=rt.autoCalCount||0;
+        content.innerHTML='<div class="sig-empty"><b>Определяю позицию по GPS</b>Подтверждённых замеров: '+cnt+' из 4. Убедись что GPS активен и есть хороший сигнал.<br><br>Или нажми «Калибровка» и введи км столба вручную.</div>';
+      } else {
+        stEl.textContent="нет калибровки";
+        content.innerHTML='<div class="sig-empty"><b>Нажми «Старт»</b>GPS определит позицию автоматически, или введи км столба вручную через «Калибровка».</div>';
+      }
+      distEl.textContent=""; appW.style.display="none";
       var cnt=state.restrictions.length;
       content.innerHTML='<div class="sig-empty"><b>'+(cnt?(cnt+' огранич. в списке'):'Откалибруйся по столбу')+'</b>'+(cnt?'Нажми «Калибровка» — пойдёт отсчёт до них.':'Нажми «Калибровка», впиши км столба.')+'</div>'; return; }
     var r=nextRestriction();
