@@ -1149,7 +1149,8 @@
             if(rt.pendingCount>=needed){
               rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
               rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
-              rt.pendingCount=0; rt.pendingCandM=null; rt.driftSince=null; rt.driftCandM=null;
+              rt.pendingCount=needed; // не сбрасываем в 0 — иначе каждый цикл мигает "уточняю→точная"
+              rt.pendingCandM=candM; rt.driftSince=null; rt.driftCandM=null;
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
             } else {
               rt.posM=drM; rt.fixQuality="checking";
