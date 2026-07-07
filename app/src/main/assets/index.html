@@ -1050,7 +1050,7 @@
 
       // ── ШАГ 1: АВТОКАЛИБРОВКА (если калибровки нет совсем) ──────────────────
       if(state.calib==null && rt.tracking && !IS_MIRROR){
-        if(acc<=35){
+        if(acc<=35 && rt.speed>=10){
           var autoTM=snapToTrack(c.latitude,c.longitude);
           if(autoTM==null && state.ctx.peregon!=="Все участки"){
             var savedPeregon=state.ctx.peregon; state.ctx.peregon="Все участки";
@@ -1082,11 +1082,22 @@
           if(snapAcc>0){
             var tm0=snapToTrack(c.latitude,c.longitude);
             if(tm0!=null){
+              // _trackM устанавливается НАПРЯМУЮ без odo-коррекции.
+              // Ранее использовали tM - dir*odo чтобы "откатить" к точке калибровки,
+              // но odo может содержать фейковые километры от GPS-шума (40-50 км/ч
+              // когда стоишь) — это сдвигало _trackM и давало постоянную ошибку.
+              // Теперь: _trackM = позиция GPS в момент первого хорошего фикса.
+              // Формула candM = calibM0 + (tM - _trackM) компенсирует любой
+              // постоянный сдвиг трек-данных относительно реальных км-столбов.
+              // _trackM с odo-коррекцией: компенсирует движение до первого GPS фикса.
+              // С speed>5 порогом odo накапливает только реальное движение (не GPS шум).
+              var dir0=(dirDown()?-1:1);
+              var tmCorrected=tm0-dir0*(rt.odo||0);
               if(acc<=40){
-                state.calib._trackM=tm0; persist();
+                state.calib._trackM=tmCorrected; persist();
               } else {
                 if(rt.trackMCand!=null && Math.abs(tm0-rt.trackMCand)<=300){
-                  state.calib._trackM=tm0; persist(); rt.trackMCand=null;
+                  state.calib._trackM=tmCorrected; persist(); rt.trackMCand=null;
                 } else { rt.trackMCand=tm0; }
               }
             }
@@ -1109,14 +1120,15 @@
 
           if(acc<=120){
             var tM=null;
-            if(acc<=40){
-              // Хороший GPS: полный поиск по треку без ограничения окна
+            var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
+            // Окно 3-20км: достаточно для коррекции дрейфа, исключает ложные
+            // совпадения с параллельными путями рядом со станцией.
+            var searchWindow=Math.min(20000,Math.max(3000,sinceGood*200));
+            tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
+            if(acc<=40) usedWideSearch=true;
+            // Аварийный fallback при большой потере сигнала
+            if(tM==null && acc<=40 && sinceGood>15){
               tM=snapToTrack(c.latitude,c.longitude);
-              usedWideSearch=true;
-            } else {
-              var sinceGood=rt.lastGoodFix?(now-rt.lastGoodFix)/1000:0;
-              var searchWindow=Math.min(40000,Math.max(5000,sinceGood*75));
-              tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
             }
             if(tM!=null){ candM=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; }
           }
@@ -1133,10 +1145,9 @@
             var diff=Math.abs(candM-drM);
             // Сколько подтверждений нужно в зависимости от размера коррекции:
             // - до 500м: сразу (одиночный кривой замер ±500м маловероятен при acc<=40)
-            // - 500м-2км: 2 подтверждения подряд (фильтруем случайный выброс)
-            // - >2км: 3 подтверждения (крупные прыжки требуют уверенности)
-            // Формула calibM0+(tM-_trackM) автоматически компенсирует сдвиг трека,
-            // поэтому при правильно установленном _trackM коррекция всегда верна.
+            // diff<100м: сразу (обычное odo/GPS расхождение)
+            // diff>1000м: сразу (GPS вернулся после потери — нужна немедленная коррекция)
+            // остальное: 2 подтверждения (фильтруем одиночный кривой замер)
             var needed = (diff<100 || diff>1000) ? 1 : 2;
             if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){
               rt.pendingCount=(rt.pendingCount||0)+1;
