@@ -438,6 +438,11 @@
       <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><div class="t">📋 Справочник скоростей (ОКТ-10 + ОКТ-54 от 29.06.2026)</div></div><div style="opacity:.5;font-size:20px">›</div></div>
     </div>
     <div class="card" style="padding:14px">
+      <button class="lb" id="btnExportRes" style="width:100%;margin-bottom:8px">📤 Экспортировать список ограничений</button>
+      <button class="lb" id="btnImportRes" style="width:100%">📥 Импортировать список ограничений</button>
+      <div class="small" style="margin-top:8px;opacity:.65">Резервная копия на случай смены/потери телефона. Экспорт откроет «Отправить» — сохрани в Telegram/Заметки себе.</div>
+    </div>
+    <div class="card" style="padding:14px">
       <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
     </div>
     <p class="small" style="margin:18px 4px 8px">Работает офлайн, данные на телефоне.<br>Помощник, а не замена АЛСН/КЛУБ и регламенту.</p>
@@ -538,6 +543,15 @@
     <p><b>Vivo:</b><br>Настройки → Батарея → Высокий расход заряда в фоне → включить для ПИКЕТ. Ещё: Настройки → Ещё настройки → Приложения → Автозапуск → включить для ПИКЕТ. Если есть пункт «Спящий режим» — отключи его на время поездки, иначе телефон может «заморозить» приложение, решив, что ты спишь.</p>
     <p><b>OPPO / OnePlus / Realme:</b><br>Настройки → Управление батареей → Автозапуск приложений → включить для ПИКЕТ.</p>
     <p>При первом запуске телефон сам спросит, можно ли приложению работать без ограничения заряда — обязательно нажми «Да» или «Разрешить». На некоторых телефонах этого мало, и нужны ручные шаги выше.</p>
+  </div>
+</div>
+
+<div class="sheet" id="sheetImport"><div class="grab"></div><h3>Импорт списка ограничений</h3>
+  <div style="padding:0 4px 16px">
+    <p class="small" style="text-align:left;margin-bottom:10px">Вставь сюда текст, который получил через «Экспортировать» ранее.</p>
+    <textarea id="importText" placeholder="Вставь сюда экспортированный текст…" style="width:100%;min-height:160px;background:var(--card);border:1px solid var(--line);border-radius:10px;color:var(--fg);padding:10px;font-family:monospace;font-size:12px;box-sizing:border-box"></textarea>
+    <div class="small" style="margin-top:8px;opacity:.65" id="importPreview"></div>
+    <button class="lb" id="btnImportConfirm" style="width:100%;margin-top:12px;background:#1d4ed8;color:#fff;font-weight:600">Импортировать</button>
   </div>
 </div>
 
@@ -1585,7 +1599,7 @@
       okBtn.addEventListener("click",onOk); cancelBtn.addEventListener("click",onCancel); scrim.addEventListener("click",onScrim);
     });
   }
-  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason","#sheetBgHelp"].forEach(function(s){$(s).classList.remove("on");}); }
+  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason","#sheetBgHelp","#sheetImport"].forEach(function(s){$(s).classList.remove("on");}); }
   $("#scrim").addEventListener("click",closeSheets);
   function setSeg(sel,val,attr){ document.querySelectorAll(sel+" button").forEach(function(b){ b.classList.toggle("on",b.getAttribute("data-"+attr)===val); }); }
   function renderChips(rowSel,opts,val,onPick){ var row=$(rowSel);
@@ -1701,6 +1715,67 @@
   $("#leadDn").addEventListener("click",function(){ state.settings.lead=Math.max(300,state.settings.lead-500); persist(); syncSw(); renderTrip(); });
 
   $("#btnWipe").addEventListener("click",async function(){ if(!state.restrictions.length){ toast("Список и так пуст"); return; } if(await showConfirm("Удалить все ограничения?",{okText:"Удалить",title:"Очистить список"})){ state.restrictions=[]; alertState={}; persist(); renderList(); renderTrip(); toast("Список очищен"); } });
+
+  // ЭКСПОРТ/ИМПОРТ: резервная копия списка ограничений на случай смены/потери телефона.
+  // Формат простой (JSON внутри узнаваемой обёртки) - не для чтения человеком, а для
+  // надёжного round-trip обратно в приложение. Экспорт через нативный Android Share Intent
+  // (если APK) или через copy-to-clipboard (веб) - выбрать куда сохранить решает сам человек.
+  function buildExportText(){
+    var d=new Date(), dstr=("0"+d.getDate()).slice(-2)+"."+("0"+(d.getMonth()+1)).slice(-2)+"."+d.getFullYear();
+    var payload={v:1,restrictions:state.restrictions};
+    return "ПИКЕТ — экспорт ограничений ("+dstr+", "+state.restrictions.length+" шт.)\n"+JSON.stringify(payload);
+  }
+  $("#btnExportRes").addEventListener("click",function(){
+    if(!state.restrictions.length){ toast("Список пуст — нечего экспортировать"); return; }
+    var text=buildExportText();
+    try{
+      if(window.Android&&window.Android.shareText){ window.Android.shareText("ПИКЕТ — ограничения",text); return; }
+    }catch(e){}
+    // Веб-фолбэк: копируем в буфер обмена
+    try{
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){ toast("Скопировано в буфер обмена — вставь в заметки или Telegram"); });
+        return;
+      }
+    }catch(e){}
+    // Совсем старый фолбэк: textarea+execCommand
+    try{
+      var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+      toast("Скопировано в буфер обмена");
+    }catch(e){ toast("Не удалось скопировать — попробуй вручную"); }
+  });
+
+  $("#btnImportRes").addEventListener("click",function(){
+    $("#importText").value=""; $("#importPreview").textContent="";
+    openSheet("#sheetImport");
+  });
+  $("#importText").addEventListener("input",function(){
+    var parsed=tryParseImport($("#importText").value);
+    $("#importPreview").textContent = parsed ? ("Найдено ограничений: "+parsed.restrictions.length) : "";
+  });
+  function tryParseImport(text){
+    if(!text||!text.trim())return null;
+    var start=text.indexOf("{"), end=text.lastIndexOf("}");
+    if(start<0||end<0||end<start)return null;
+    try{
+      var obj=JSON.parse(text.slice(start,end+1));
+      if(obj&&Array.isArray(obj.restrictions))return obj;
+    }catch(e){}
+    return null;
+  }
+  $("#btnImportConfirm").addEventListener("click",async function(){
+    var parsed=tryParseImport($("#importText").value);
+    if(!parsed){ toast("Не получилось распознать текст — проверь что скопировал полностью"); return; }
+    var n=parsed.restrictions.length;
+    var msg = state.restrictions.length
+      ? ("Заменить текущий список ("+state.restrictions.length+" шт.) на импортируемый ("+n+" шт.)?")
+      : ("Импортировать "+n+" ограничений?");
+    if(await showConfirm(msg,{okText:"Импортировать",title:"Импорт списка"})){
+      state.restrictions=parsed.restrictions; alertState={}; persist(); renderList(); renderTrip();
+      closeSheets(); toast("Импортировано: "+n+" шт.");
+    }
+  });
 
   $("#listBox").addEventListener("click",function(e){ var del=e.target.closest("[data-del]");
     if(del){ var id=del.getAttribute("data-del"); state.restrictions=state.restrictions.filter(function(x){return x.id!==id;}); persist(); renderList(); renderTrip(); toast("Удалено"); return; }

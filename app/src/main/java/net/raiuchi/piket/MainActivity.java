@@ -429,6 +429,21 @@ public class MainActivity extends Activity {
         }
 
         @android.webkit.JavascriptInterface
+        public void shareText(final String subject, final String text) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        Intent share = new Intent(Intent.ACTION_SEND);
+                        share.setType("text/plain");
+                        share.putExtra(Intent.EXTRA_SUBJECT, subject);
+                        share.putExtra(Intent.EXTRA_TEXT, text);
+                        startActivity(Intent.createChooser(share, "Экспорт списка ограничений"));
+                    } catch (Exception e) {}
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
         public String getAppVersion() {
             return currentVersionName();
         }
