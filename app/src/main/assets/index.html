@@ -268,18 +268,30 @@
   .perItem{width:100%;text-align:left;padding:14px;border-radius:11px;background:var(--panel);border:1px solid var(--line);margin-bottom:8px;font-size:15px;display:flex;align-items:center;justify-content:space-between}
   .perItem.on{border-color:var(--blue);color:var(--blue-l)} .perItem .ck{color:var(--blue-l)}
 
-  .alert{position:fixed;inset:0;z-index:80;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px}
+  .alert{position:fixed;inset:0;z-index:80;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;
+    background:radial-gradient(circle at 50% 38%,rgba(20,28,42,.6),rgba(4,6,11,.98))}
   .alert.on{display:flex}
-  .alert.warn{background:radial-gradient(circle at 50% 38%,rgba(245,165,36,.28),rgba(4,6,11,.97))}
-  .alert.danger{background:radial-gradient(circle at 50% 38%,rgba(255,77,79,.32),rgba(4,6,11,.97));animation:flash .7s infinite}
-  @keyframes flash{0%,100%{filter:brightness(1)}50%{filter:brightness(.7)}}
-  .alert .head{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:16px}
+  .al-ring{position:relative;width:min(72vw,280px);aspect-ratio:1;margin-bottom:10px}
+  .al-ring svg{width:100%;height:100%;position:absolute;inset:0}
+  .al-bezel{fill:none;stroke:url(#alBezelGrad);stroke-width:3}
+  .al-bezel-groove{fill:none;stroke:#000;stroke-width:6;opacity:.5}
+  .al-sheen{position:absolute;inset:6%;border-radius:50%;pointer-events:none;
+    background:linear-gradient(200deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,0) 26%,rgba(255,255,255,0) 74%,rgba(255,255,255,.05) 100%)}
+  .al-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .alert .head{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
   .alert.warn .head{color:var(--amber)} .alert.danger .head{color:var(--rsig)}
-  .alert .big{font-family:var(--mono);font-size:110px;font-weight:800;line-height:.9}
-  .alert.warn .big{color:var(--amber)} .alert.danger .big{color:var(--rsig)}
-  .alert .ulbl{font-size:14px;color:var(--dim);letter-spacing:.14em;margin-top:4px}
-  .alert .det{font-family:var(--mono);font-size:18px;margin-top:26px;color:var(--txt)} .alert .det small{color:var(--dim);font-size:14px}
-  .alert .ack{margin-top:40px;padding:18px 60px;border-radius:14px;font-size:18px;font-weight:800;background:var(--txt);color:var(--bg)}
+  .alert .big{font-family:var(--mono);font-size:92px;font-weight:800;line-height:.9}
+  .alert.warn .big{color:var(--amber);text-shadow:0 0 34px rgba(245,165,36,.55)} .alert.danger .big{color:var(--rsig);text-shadow:0 0 40px rgba(255,77,79,.7)}
+  .alert .ulbl{font-size:13px;color:var(--dim);letter-spacing:.14em;margin-top:4px}
+  .alert.warn .al-ring::after{content:"";position:absolute;inset:-18px;border-radius:50%;z-index:-1;
+    background:radial-gradient(circle,rgba(245,165,36,.28),transparent 70%)}
+  .alert.danger .al-ring::after{content:"";position:absolute;inset:-18px;border-radius:50%;z-index:-1;
+    background:radial-gradient(circle,rgba(255,77,79,.4),transparent 70%);animation:alertAlarm .8s infinite}
+  @keyframes alertAlarm{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
+  .alert .det{font-family:var(--mono);font-size:18px;margin-top:22px;color:var(--txt)} .alert .det small{color:var(--dim);font-size:14px}
+  .alert .ack{margin-top:36px;padding:17px 58px;border-radius:14px;font-size:17px;font-weight:800;letter-spacing:.02em;
+    background:linear-gradient(180deg,#EAF1F8 0%,#C4D2E2 55%,#8FA6C0 100%);color:#0B1220;border:1px solid rgba(255,255,255,.5);
+    box-shadow:0 4px 18px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.6)}
   .alert .ack:active{transform:scale(.96)}
   .night-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);pointer-events:none;z-index:55;display:none}
   .night-overlay.on{display:block}
@@ -556,9 +568,21 @@
 </div>
 
 <div class="alert" id="alert">
-  <div class="head" id="alHead">Внимание</div>
-  <div class="big num" id="alBig">200</div>
-  <div class="ulbl">км/ч</div>
+  <div class="al-ring" id="alRing">
+    <svg viewBox="0 0 200 200">
+      <defs>
+        <linearGradient id="alBezelGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A6182"/><stop offset=".25" stop-color="#DCE6F1"/><stop offset=".5" stop-color="#8FA6C0"/><stop offset=".75" stop-color="#4A6182"/><stop offset="1" stop-color="#232F3E"/></linearGradient>
+      </defs>
+      <circle class="al-bezel" cx="100" cy="100" r="92"/>
+      <circle class="al-bezel-groove" cx="100" cy="100" r="86"/>
+    </svg>
+    <div class="al-sheen"></div>
+    <div class="al-inner">
+      <div class="head" id="alHead">Внимание</div>
+      <div class="big num" id="alBig">200</div>
+      <div class="ulbl">км/ч</div>
+    </div>
+  </div>
   <div class="det" id="alDet"></div>
   <button class="ack" id="alAck">Принял</button>
 </div>

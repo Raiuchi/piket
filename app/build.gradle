@@ -10,8 +10,8 @@ android {
         applicationId "net.raiuchi.piket"
         minSdk 26
         targetSdk 34
-        versionCode 73
-        versionName "1.4.67"
+        versionCode 74
+        versionName "1.4.68"
     }
 
     signingConfigs {
