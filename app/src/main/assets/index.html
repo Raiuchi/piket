@@ -1516,7 +1516,22 @@
       var inzone=rt.posM>=lo-5&&rt.posM<=hi+5,ahead=up?(s-rt.posM):(rt.posM-s);
       if(ahead>lead*1.3)st.a=false; if(rt.posM<lo-50||rt.posM>hi+50)st.z=false;
       if(inzone&&!st.z){ st.z=true; st.a=true; fireAlert("danger",r,0); }
-      else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); } }); }
+      else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); }
+      // ПРЕВЫШЕНИЕ СКОРОСТИ ВНУТРИ ЗОНЫ: разовое предупреждение при входе не спасает,
+      // если машинист разгоняется УЖЕ находясь в зоне ограничения — до сих пор об этом
+      // сигнализировал только цвет гейджа (молча), без звука/голоса. Повторяем каждые 12с
+      // пока скорость держится выше лимита — этого достаточно чтобы точно заметить, и не спамит.
+      if(inzone && r.spd!=null && rt.speed>+r.spd){
+        if(!st.overSpeedAt || (Date.now()-st.overSpeedAt)>12000){
+          st.overSpeedAt=Date.now();
+          fireOverspeedAlert(r);
+        }
+      } else { st.overSpeedAt=null; }
+    }); }
+  function fireOverspeedAlert(r){
+    say("Внимание, превышение скорости! Ограничение "+r.spd+", скорость "+Math.round(rt.speed));
+    beep("danger"); vibe("danger");
+  }
   function fireAlert(kind,r,ahead){ var al=$("#alert"); al.className="alert on "+kind; var loc=r.km+" км "+r.pk+" пк";
     var detHtml=kind==="danger"?(loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':'')):('<small>через</small> '+fmtM(ahead)+' · '+loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':''));
     $("#alHead").textContent=kind==="danger"?"ОГРАНИЧЕНИЕ — ЗОНА":"ВНИМАНИЕ — ОГРАНИЧЕНИЕ"; $("#alBig").textContent=r.spd||"—";
