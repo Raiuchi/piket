@@ -137,7 +137,7 @@
   .sig-loc{font-family:var(--mono);font-size:16px;font-weight:700;margin-bottom:5px}
   .sig-chips{display:flex;flex-wrap:wrap;gap:6px}
   .chip{font-size:11px;color:var(--dim);background:var(--panel2);border:1px solid var(--line);padding:3px 8px;border-radius:6px;white-space:nowrap}
-  .chip.c-dir{color:var(--blue-l)} .chip.c-per{color:var(--steel)}
+  .chip.c-dir{color:var(--blue-l)} .chip.c-per{color:var(--steel)} .chip.c-soon{color:#F5A623;border-color:#F5A623}
   .approach{margin-top:13px;height:6px;border-radius:3px;background:var(--panel2);overflow:hidden}
   .approach>i{display:block;height:100%;width:0;background:var(--amber);transition:width .5s,background .4s}
   .signal.danger .approach>i{background:var(--rsig)}
@@ -1477,7 +1477,12 @@
     if(r.dir)c+='<span class="chip c-dir">'+dirLabel(r.dir)+'</span>';
     if(r.peregon&&r.peregon!=="Все участки")c+='<span class="chip c-per">'+escapeHtml(r.peregon)+'</span>';
     if(r.reason)c+='<span class="chip">'+escapeHtml(r.reason)+'</span>';
-    if(r.to)c+='<span class="chip">до '+fmtDate(r.to)+'</span>'; return c; }
+    if(r.to){
+      var daysLeft=Math.ceil((new Date(r.to)-new Date(todayStr()))/86400000);
+      var soon=daysLeft>=0&&daysLeft<=3;
+      c+='<span class="chip'+(soon?' c-soon':'')+'">до '+fmtDate(r.to)+(soon?(daysLeft===0?' · сегодня!':' · '+daysLeft+'дн'):'')+'</span>';
+    }
+    return c; }
   function locOf(r){ return r.km+" км "+r.pk+" пк"+(r.kmE!=null?(" → "+r.kmE+" км "+r.pkE+" пк"):""); }
 
   function updateLimitBadge(r){ var el=$("#gLimit");
