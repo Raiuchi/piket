@@ -76,12 +76,19 @@
   .board .peregon svg{width:16px;height:16px;color:var(--dim);flex:none;margin-left:auto}
 
   .gaugeWrap{position:relative;width:264px;max-width:75vw;margin:10px auto 4px;aspect-ratio:1}
+  .gaugeWrap::before{content:"";position:absolute;top:8%;right:-14%;width:60%;height:60%;z-index:-2;
+    background:radial-gradient(circle,rgba(255,59,48,.22),transparent 72%);pointer-events:none}
   .gaugeWrap svg{width:100%;height:100%}
   .g-bezel{fill:none;stroke:url(#bezelGrad);stroke-width:2}
   .g-bezel-groove{fill:none;stroke:#000;stroke-width:5;opacity:.5}
   .g-bg{fill:none;stroke:#141F2E;stroke-width:13;stroke-linecap:round}
   .g-ticks{fill:none;stroke:#3E5470;stroke-width:2.5}
   .g-tickL{fill:none;stroke:#C7D6E8;stroke-width:3;stroke-linecap:round;opacity:.9}
+  .g-tickM{fill:none;stroke:#5A7396;stroke-width:1.6;stroke-linecap:round;opacity:.75}
+  .g-tickS{fill:none;stroke:#3E5470;stroke-width:1.1;stroke-linecap:round;opacity:.55}
+  .g-tickM-red{fill:none;stroke:#FF3B30;stroke-width:1.8;stroke-linecap:round;opacity:.9}
+  .g-tickS-red{fill:none;stroke:#FF3B30;stroke-width:1.3;stroke-linecap:round;opacity:.65}
+  .g-redline{fill:none;stroke:#FF3B30;stroke-width:3.5;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(255,59,48,.6))}
   .g-label{font-family:var(--mono);font-size:10px;font-weight:800;fill:var(--steel);opacity:.9}
   .g-fg{fill:none;stroke:url(#gGrad);stroke-width:13;stroke-linecap:round;transition:stroke-dasharray .35s ease;filter:drop-shadow(0 0 6px rgba(46,123,245,.5))}
   .g-sheen{position:absolute;inset:6%;border-radius:50%;pointer-events:none;
@@ -298,6 +305,12 @@
     background:radial-gradient(circle,rgba(255,77,79,.4),transparent 70%);animation:alertAlarm .8s infinite}
   @keyframes alertAlarm{0%,100%{opacity:.75;transform:scale(1)}50%{opacity:1;transform:scale(1.06)}}
   .alert .det{font-family:var(--mono);font-size:18px;margin-top:22px;color:var(--txt)} .alert .det small{color:var(--dim);font-size:14px}
+  .btn-premium{background:linear-gradient(180deg,#EAF1F8 0%,#C4D2E2 55%,#8FA6C0 100%);color:#0B1220;border:1px solid rgba(255,255,255,.5);
+    box-shadow:0 3px 12px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.6);font-weight:700}
+  .btn-premium:active{transform:scale(.97)}
+  .btn-premium-outline{background:rgba(255,255,255,.04);color:var(--txt);border:1.5px solid;
+    border-image:linear-gradient(135deg,#4A6182,#8FA6C0,#4A6182) 1;font-weight:700}
+  .btn-premium-outline:active{transform:scale(.97);background:rgba(255,255,255,.08)}
   .alert .ack{margin-top:36px;padding:17px 58px;border-radius:14px;font-size:17px;font-weight:800;letter-spacing:.02em;
     background:linear-gradient(180deg,#EAF1F8 0%,#C4D2E2 55%,#8FA6C0 100%);color:#0B1220;border:1px solid rgba(255,255,255,.5);
     box-shadow:0 4px 18px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.6)}
@@ -386,6 +399,54 @@
         <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(27 100 100)"/>
         <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(81 100 100)"/>
         <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(135 100 100)"/>
+        <!-- Мелкие деления каждые 5 км/ч (два уровня - через 10 и через 5) для приборного вида -->
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-129.6 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-124.2 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-118.8 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-113.4 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-108.0 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-102.6 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-97.2 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-91.8 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-86.4 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-75.6 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-70.2 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-64.8 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-59.4 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-54.0 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-48.6 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-43.2 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-37.8 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-32.4 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-21.6 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-16.2 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-10.8 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-5.4 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(0.0 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(5.4 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(10.8 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(16.2 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(21.6 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(32.4 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(37.8 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(43.2 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(48.6 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(54.0 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(59.4 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(64.8 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(70.2 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(75.6 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(86.4 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(91.8 100 100)"/>
+        <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(97.2 100 100)"/>
+        <!-- Редлайн-зона 220-250 км/ч в стиле гоночного тахометра -->
+        <line class="g-tickM-red" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(102.6 100 100)"/>
+        <line class="g-tickS-red" x1="100" y1="21" x2="100" y2="26" transform="rotate(108.0 100 100)"/>
+        <line class="g-tickM-red" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(113.4 100 100)"/>
+        <line class="g-tickS-red" x1="100" y1="21" x2="100" y2="26" transform="rotate(118.8 100 100)"/>
+        <line class="g-tickM-red" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(124.2 100 100)"/>
+        <line class="g-tickS-red" x1="100" y1="21" x2="100" y2="26" transform="rotate(129.6 100 100)"/>
+        <path class="g-redline" d="M 180.03,117.89 A 82,82 0 0,1 157.98,157.98" fill="none"/>
         <text class="g-label" x="37.1" y="162.9" text-anchor="middle" dominant-baseline="central">0</text>
         <text class="g-label" x="12.1" y="86.1" text-anchor="middle" dominant-baseline="central">50</text>
         <text class="g-label" x="59.6" y="20.7" text-anchor="middle" dominant-baseline="central">100</text>
@@ -460,8 +521,8 @@
       <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><div class="t">📋 Справочник скоростей (ОКТ-10 + ОКТ-54 от 29.06.2026)</div></div><div style="opacity:.5;font-size:20px">›</div></div>
     </div>
     <div class="card" style="padding:14px">
-      <button class="lb" id="btnExportRes" style="width:100%;margin-bottom:8px">📤 Экспортировать список ограничений</button>
-      <button class="lb" id="btnImportRes" style="width:100%">📥 Импортировать список ограничений</button>
+      <button class="lb btn-premium" id="btnExportRes" style="width:100%;margin-bottom:10px">📤 Экспортировать список ограничений</button>
+      <button class="lb btn-premium-outline" id="btnImportRes" style="width:100%">📥 Импортировать список ограничений</button>
       <div class="small" style="margin-top:8px;opacity:.65">Резервная копия на случай смены/потери телефона. Экспорт откроет «Отправить» — сохрани в Telegram/Заметки себе.</div>
     </div>
     <div class="card" style="padding:14px">
