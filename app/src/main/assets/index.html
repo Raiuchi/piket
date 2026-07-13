@@ -1316,8 +1316,20 @@
             }
             rt.pendingCandM=candM;
             if(rt.pendingCount>=needed){
-              rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
-              rt.posM=candM; rt.lastGoodFix=now; rt.fixQuality="good";
+              var newOdoVal=(dirDown()?-1:1)*(candM-calibM0cur);
+              if(diff<300){
+                // Мелкая коррекция (обычный шум GPS, не реальный дрейф) — сглаживаем
+                // применение вместо резкого "прыжка" на новое значение. Итоговая точность
+                // не хуже (сходится за 2-3 замера благодаря непрерывной коррекции каждый
+                // цикл), но убирает видимое дёргание позиции на экране от каждого мелкого
+                // расхождения GPS. Крупные отклонения (100м-2км и 2км+, диапазоны реального
+                // дрейфа после потери сигнала) применяются полностью и сразу, без сглаживания —
+                // там нужна скорость, не косметика (проверено тестами test_drift_timing_full).
+                rt.odo = rt.odo*0.5 + newOdoVal*0.5;
+              } else {
+                rt.odo = newOdoVal;
+              }
+              rt.posM=currentMeters(); rt.lastGoodFix=now; rt.fixQuality="good";
               rt.pendingCount=needed; // не сбрасываем в 0 — иначе каждый цикл мигает "уточняю→точная"
               rt.pendingCandM=candM; rt.driftSince=null; rt.driftCandM=null;
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
@@ -1495,7 +1507,7 @@
 
   function startTrack(){
     if(state.settings.demo){ startSim(); return; }
-    rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0; rt.zoneWarnedKey=null;
+    rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0; rt.zoneWarnedKey=null; rt.trackingSince=Date.now();
     // Не блокируем старт при отсутствии калибровки — позволяем GPS стартовать и
     // ждём автокалибровки (4 согласованных замера с acc<=35м). Пока calib==null
     // интерфейс показывает "нет калибровки" — это нормально, пользователь видит
@@ -1660,7 +1672,16 @@
     if(state.calib==null){ sig.className="signal"; updateLimitBadge(null); updateGaugeDanger(null);
       if(rt.tracking){
         var cnt=rt.autoCalCount||0;
-        if((rt.autoCalNullStreak||0)>=6){
+        var elapsedSinceStart = rt.trackingSince ? (Date.now()-rt.trackingSince)/1000 : 0;
+        if(elapsedSinceStart>=60){
+          // Прошла минута с момента Старт, а калибровки всё ещё нет - ЛЮБАЯ причина:
+          // стоишь на месте (автоопределение требует движения >10 км/ч - без него
+          // autoCalNullStreak/autoCalWeakStreak вообще не растут, они внутри блока
+          // "if(speed>=10)"), либо далеко от маршрутов, либо совсем нет сигнала.
+          // Не молчим бесконечно "GPS ищет позицию" - явно предлагаем ручной ввод.
+          stEl.textContent="Позиция не найдена";
+          content.innerHTML='<div class="sig-empty"><b>Автоопределение не сработало</b>Прошла минута, а позиция так и не определилась. Если стоишь на месте — для автоопределения нужно ЕХАТЬ (минимум 10 км/ч). Если едешь — GPS далеко от маршрутов приложения.<br><br>Нажми «Калибровка» и введи км столба вручную — быстрее.</div>';
+        } else if((rt.autoCalNullStreak||0)>=6){
           // 6+ секунд подряд хороший сигнал, но координаты не легли ни на один известный
           // путь (даже перебрав все перегоны) - скорее всего далеко от маршрутов приложения
           // или выбран не тот перегон. Явно говорим об этом, а не молчим бесконечно.
@@ -1675,11 +1696,10 @@
         }
       } else {
         stEl.textContent="нет калибровки";
-        content.innerHTML='<div class="sig-empty"><b>Нажми «Старт»</b>GPS определит позицию автоматически, или введи км столба вручную через «Калибровка».</div>';
+        var cnt2=state.restrictions.length;
+        content.innerHTML='<div class="sig-empty"><b>'+(cnt2?(cnt2+' огранич. в списке'):'Откалибруйся по столбу')+'</b>'+(cnt2?'Нажми «Калибровка» — пойдёт отсчёт до них.':'Нажми «Калибровка», впиши км столба.')+'</div>';
       }
-      distEl.textContent=""; appW.style.display="none";
-      var cnt=state.restrictions.length;
-      content.innerHTML='<div class="sig-empty"><b>'+(cnt?(cnt+' огранич. в списке'):'Откалибруйся по столбу')+'</b>'+(cnt?'Нажми «Калибровка» — пойдёт отсчёт до них.':'Нажми «Калибровка», впиши км столба.')+'</div>'; return; }
+      distEl.textContent=""; appW.style.display="none"; return; }
     var r=nextRestriction();
     if(!r){ sig.className="signal clear"; stEl.textContent="путь свободен"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null); updateGaugeDanger(null);
       content.innerHTML='<div class="sig-empty"><b>Ограничений впереди нет</b>'+(state.restrictions.length?'По текущему участку чисто.':'Добавь ограничения во вкладке «Список».')+'</div>'; return; }
