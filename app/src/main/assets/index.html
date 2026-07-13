@@ -86,9 +86,9 @@
   .g-tickL{fill:none;stroke:#C7D6E8;stroke-width:3;stroke-linecap:round;opacity:.9}
   .g-tickM{fill:none;stroke:#5A7396;stroke-width:1.6;stroke-linecap:round;opacity:.75}
   .g-tickS{fill:none;stroke:#3E5470;stroke-width:1.1;stroke-linecap:round;opacity:.55}
-  .g-tickM-red{fill:none;stroke:#FF3B30;stroke-width:1.8;stroke-linecap:round;opacity:.9}
-  .g-tickS-red{fill:none;stroke:#FF3B30;stroke-width:1.3;stroke-linecap:round;opacity:.65}
-  .g-redline{fill:none;stroke:#FF3B30;stroke-width:3.5;stroke-linecap:round;filter:drop-shadow(0 0 4px rgba(255,59,48,.6))}
+  .g-tickM-red{fill:none;stroke:url(#fadeGrad);stroke-width:1.8;stroke-linecap:round;opacity:.9}
+  .g-tickS-red{fill:none;stroke:url(#fadeGrad);stroke-width:1.3;stroke-linecap:round;opacity:.65}
+  .g-redline{fill:none;stroke:url(#fadeGrad);stroke-width:3.5;stroke-linecap:round;filter:drop-shadow(0 0 5px rgba(255,59,48,.5))}
   .g-label{font-family:var(--mono);font-size:10px;font-weight:800;fill:var(--steel);opacity:.9}
   .g-fg{fill:none;stroke:url(#gGrad);stroke-width:13;stroke-linecap:round;transition:stroke-dasharray .35s ease;filter:drop-shadow(0 0 6px rgba(46,123,245,.5))}
   .g-sheen{position:absolute;inset:6%;border-radius:50%;pointer-events:none;
@@ -380,8 +380,67 @@
     <div class="gaugeWrap" id="gaugeWrap">
       <svg viewBox="0 0 200 200">
         <defs>
+          </defs>
+            <path d="M4 7 Q15 4 23 13" stroke="url(#embGrad)" stroke-width="2.3" stroke-linecap="round"/>
+            <path d="M6 11 Q15 9.5 22 16" stroke="url(#embGrad)" stroke-width="2" stroke-linecap="round" opacity=".72"/>
+            <path d="M8.5 15 Q16 14.5 21 19" stroke="url(#embGrad)" stroke-width="1.7" stroke-linecap="round" opacity=".46"/>
+            <line x1="7" y1="22.5" x2="21" y2="22.5" stroke="#7FC2FF" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+          </svg>
+        </div>
+        <div class="t"><b>ПИКЕТ</b><span>контроль ограничений</span></div>
+      </div>
+      <div class="gps" id="gps"><span class="dot"></span><span id="gpsTxt">GPS выкл</span></div>
+    </div>
+    <div class="train">
+      <svg viewBox="0 0 420 80" preserveAspectRatio="xMidYMax meet">
+        <defs>
+          <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2F6FB"/><stop offset="1" stop-color="#C4D2E2"/></linearGradient>
+          <linearGradient id="speed" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2E7BF5" stop-opacity="0"/><stop offset="1" stop-color="#2E7BF5" stop-opacity=".5"/></linearGradient>
+        </defs>
+        <line x1="0" y1="34" x2="70" y2="34" stroke="url(#speed)" stroke-width="3"/>
+        <line x1="0" y1="46" x2="55" y2="46" stroke="url(#speed)" stroke-width="3"/>
+        <line x1="0" y1="58" x2="40" y2="58" stroke="url(#speed)" stroke-width="2"/>
+        <path d="M70 64 L70 30 Q72 18 110 16 L300 16 Q360 17 408 40 Q414 44 408 52 L408 64 Z" fill="url(#body)" stroke="#9FB3C8" stroke-width="1"/>
+        <path d="M300 16 Q360 17 408 40 Q414 44 408 52 L380 52 Q360 30 300 28 Z" fill="#DCE6F1"/>
+        <rect x="92" y="24" width="206" height="9" rx="3" fill="#102A45"/>
+        <path d="M300 24 Q344 25 380 40 L380 33 Q344 21 300 20 Z" fill="#102A45"/>
+        <rect x="70" y="56" width="338" height="5" fill="#E2231A"/>
+        <circle cx="398" cy="48" r="3.4" fill="#FFE9A8"/>
+        <circle cx="120" cy="66" r="8" fill="#1A222E" stroke="#39485A" stroke-width="2"/>
+        <circle cx="160" cy="66" r="8" fill="#1A222E" stroke="#39485A" stroke-width="2"/>
+        <circle cx="300" cy="66" r="8" fill="#1A222E" stroke="#39485A" stroke-width="2"/>
+        <circle cx="340" cy="66" r="8" fill="#1A222E" stroke="#39485A" stroke-width="2"/>
+      </svg>
+      <div class="rails"></div>
+    </div>
+  </div>
+
+  <section class="view on" id="v-trip">
+    <div class="update-banner" id="updateBanner">
+      <span class="ico">🚀</span>
+      <span class="txt">Доступна версия <b id="ubVer"></b> — обновите приложение</span>
+      <button class="ub-dl" id="ubDownload">Скачать</button>
+      <button class="ub-x" id="ubClose">✕</button>
+    </div>
+    <div class="board">
+      <div class="seg" id="dirSeg"><button data-d="tuda" class="on">Туда</button><button data-d="obratno">Обратно</button></div>
+      <button class="peregon" id="peregonBtn">
+        <div style="min-width:0"><div class="lp">перегон</div><div class="pv" id="peregonVal">Все участки</div></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+
+    <div class="gaugeWrap" id="gaugeWrap">
+      <svg viewBox="0 0 200 200">
+        <defs>
           <linearGradient id="gGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E7BF5"/><stop offset="1" stop-color="#7FC2FF"/></linearGradient>
           <linearGradient id="bezelGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A6182"/><stop offset=".25" stop-color="#DCE6F1"/><stop offset=".5" stop-color="#8FA6C0"/><stop offset=".75" stop-color="#4A6182"/><stop offset="1" stop-color="#232F3E"/></linearGradient>
+          <linearGradient id="fadeGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#7C4DFF"/><stop offset=".22" stop-color="#E040FB"/>
+            <stop offset=".45" stop-color="#FF3B57"/><stop offset=".68" stop-color="#FF7A3D"/>
+            <stop offset="1" stop-color="#FFD54A"/>
+            <animateTransform attributeName="gradientTransform" type="rotate" values="0 0.5 0.5;360 0.5 0.5" dur="6s" repeatCount="indefinite"/>
+          </linearGradient>
         </defs>
         <circle class="g-bezel" cx="100" cy="100" r="98"/>
         <circle class="g-bezel-groove" cx="100" cy="100" r="95"/>
