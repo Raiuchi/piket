@@ -1175,14 +1175,18 @@
             var searchWindow=Math.min(20000,Math.max(3000,sinceGood*200));
             tM=snapToTrack(c.latitude,c.longitude,expectedTrackM,searchWindow);
             if(acc<=40) usedWideSearch=true;
-            // Аварийный fallback при большой потере сигнала
-            if(tM==null && acc<=40 && sinceGood>15){
+            // Широкий поиск СРАЗУ (без ожидания 15с простоя), если узкое окно не нашло
+            // совпадение. Раньше ждали 15с прежде чем пробовать без ограничения окна —
+            // при реальном большом дрейфе (после длинной потери сигнала) это давало
+            // до 16 секунд задержки коррекции. Теперь ищем сразу, а защита от одиночного
+            // кривого замера обеспечивается требованием 2 подтверждений ниже (не 1).
+            if(tM==null && acc<=40){
               tM=snapToTrack(c.latitude,c.longitude);
             }
             if(tM!=null){ candM=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(tM-state.calib._trackM); viaTrack=true; tMfinal=tM; }
           }
 
-          // Аварийный широкий поиск после 25с без хорошего фикса
+          // Аварийный широкий поиск после 25с без хорошего фикса (запасной путь для acc>40)
           if(rt.trackingSince==null) rt.trackingSince=now;
           var sinceAnyGoodOrStart=rt.lastGoodFix!=null?(now-rt.lastGoodFix):(now-rt.trackingSince);
           if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
@@ -1197,7 +1201,7 @@
             // diff<100м: сразу (обычное odo/GPS расхождение)
             // diff>1000м: сразу (GPS вернулся после потери — нужна немедленная коррекция)
             // остальное: 2 подтверждения (фильтруем одиночный кривой замер)
-            var needed = (diff<100 || diff>1000) ? 1 : 2;
+            var needed = diff<100 ? 1 : (diff<2000 ? 3 : 2);
             if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){
               rt.pendingCount=(rt.pendingCount||0)+1;
             } else {
