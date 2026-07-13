@@ -278,8 +278,11 @@
   .al-sheen{position:absolute;inset:6%;border-radius:50%;pointer-events:none;
     background:linear-gradient(200deg,rgba(255,255,255,.12) 0%,rgba(255,255,255,0) 26%,rgba(255,255,255,0) 74%,rgba(255,255,255,.05) 100%)}
   .al-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .alert .head{font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--dim);margin-bottom:10px}
-  .alert.warn .head{color:var(--amber)} .alert.danger .head{color:var(--rsig)}
+  .al-badge{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:18px;
+    padding:7px 18px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);
+    max-width:88vw;text-align:center;line-height:1.4}
+  .alert.warn .al-badge{color:var(--amber);border-color:rgba(245,165,36,.4)}
+  .alert.danger .al-badge{color:var(--rsig);border-color:rgba(255,77,79,.4)}
   .alert .big{font-family:var(--mono);font-size:92px;font-weight:800;line-height:.9}
   .alert.warn .big{color:var(--amber);text-shadow:0 0 34px rgba(245,165,36,.55)} .alert.danger .big{color:var(--rsig);text-shadow:0 0 40px rgba(255,77,79,.7)}
   .alert .ulbl{font-size:13px;color:var(--dim);letter-spacing:.14em;margin-top:4px}
@@ -568,6 +571,7 @@
 </div>
 
 <div class="alert" id="alert">
+  <div class="al-badge" id="alHead">Внимание</div>
   <div class="al-ring" id="alRing">
     <svg viewBox="0 0 200 200">
       <defs>
@@ -578,7 +582,6 @@
     </svg>
     <div class="al-sheen"></div>
     <div class="al-inner">
-      <div class="head" id="alHead">Внимание</div>
       <div class="big num" id="alBig">200</div>
       <div class="ulbl">км/ч</div>
     </div>
