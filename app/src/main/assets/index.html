@@ -24,10 +24,10 @@
   html,body{margin:0;padding:0}
   body::before{content:"";position:fixed;inset:-30%;z-index:-1;pointer-events:none;
     background:
-      radial-gradient(900px 550px at 15% 12%,rgba(124,77,255,.14),transparent 60%),
-      radial-gradient(1000px 600px at 88% 18%,rgba(46,123,245,.13),transparent 60%),
-      radial-gradient(850px 520px at 25% 92%,rgba(255,59,87,.11),transparent 60%),
-      radial-gradient(950px 580px at 92% 88%,rgba(255,122,61,.09),transparent 60%);
+      radial-gradient(1000px 620px at 15% 12%,rgba(124,77,255,.30),transparent 70%),
+      radial-gradient(1100px 660px at 88% 18%,rgba(46,123,245,.28),transparent 70%),
+      radial-gradient(950px 580px at 25% 92%,rgba(255,59,87,.24),transparent 70%),
+      radial-gradient(1050px 640px at 92% 88%,rgba(255,122,61,.20),transparent 70%);
     animation:auroraShift 30s ease-in-out infinite;will-change:transform}
   @keyframes auroraShift{
     0%,100%{transform:translate(0,0) scale(1)}
@@ -100,9 +100,8 @@
   .g-tickM-red{fill:none;stroke:url(#fadeGrad);stroke-width:1.8;stroke-linecap:round;opacity:.9}
   .g-tickS-red{fill:none;stroke:url(#fadeGrad);stroke-width:1.3;stroke-linecap:round;opacity:.65}
   .g-redline{fill:none;stroke:url(#fadeGrad);stroke-width:3.5;stroke-linecap:round;filter:drop-shadow(0 0 5px rgba(255,59,48,.5))}
-  .g-label{font-family:var(--mono);font-size:10px;font-weight:800;fill:var(--steel);opacity:.9}
-  .g-tickKey{fill:none;stroke:#5FA0FF;stroke-width:2.2;stroke-linecap:round;opacity:.95;filter:drop-shadow(0 0 3px rgba(95,160,255,.5))}
-  .g-labelKey{font-family:var(--mono);font-size:8px;font-weight:700;fill:#5FA0FF;opacity:.85}
+  .g-label{font-family:var(--mono);font-size:9.5px;font-weight:800;fill:var(--steel);opacity:.95}
+  .g-labelAccent{font-family:var(--mono);font-size:7px;font-weight:700;fill:#5FA0FF;opacity:.9}
   .g-fg{fill:none;stroke:url(#gGrad);stroke-width:13;stroke-linecap:round;transition:stroke-dasharray .35s ease;filter:drop-shadow(0 0 6px rgba(46,123,245,.5))}
   .g-sheen{position:absolute;inset:6%;border-radius:50%;pointer-events:none;
     background:linear-gradient(200deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,0) 28%,rgba(255,255,255,0) 72%,rgba(255,255,255,.04) 100%)}
@@ -466,9 +465,9 @@
              низ-слева), 125→0° (ровно вверх), 250→135° (конец дуги, низ-справа) - симметрично
              и совпадает с положением дуги, а не подобрано на глаз. -->
         <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(-135 100 100)"/>
-        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(-81 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-81 100 100)"/>
         <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(-27 100 100)"/>
-        <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(27 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(27 100 100)"/>
         <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(81 100 100)"/>
         <line class="g-tickL" x1="100" y1="18" x2="100" y2="28" transform="rotate(135 100 100)"/>
         <!-- Мелкие деления каждые 5 км/ч (два уровня - через 10 и через 5) для приборного вида -->
@@ -482,25 +481,25 @@
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-91.8 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-86.4 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-75.6 100 100)"/>
-        <line class="g-tickKey" x1="100" y1="17" x2="100" y2="28" transform="rotate(-70.2 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-70.2 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-64.8 100 100)"/>
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-59.4 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-54.0 100 100)"/>
-        <line class="g-tickKey" x1="100" y1="17" x2="100" y2="28" transform="rotate(-48.6 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-48.6 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-43.2 100 100)"/>
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-37.8 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-32.4 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-21.6 100 100)"/>
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-16.2 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(-10.8 100 100)"/>
-        <line class="g-tickKey" x1="100" y1="17" x2="100" y2="28" transform="rotate(-5.4 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(-5.4 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(0.0 100 100)"/>
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(5.4 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(10.8 100 100)"/>
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(16.2 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(21.6 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(32.4 100 100)"/>
-        <line class="g-tickKey" x1="100" y1="17" x2="100" y2="28" transform="rotate(37.8 100 100)"/>
+        <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(37.8 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(43.2 100 100)"/>
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(48.6 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(54.0 100 100)"/>
@@ -520,16 +519,16 @@
         <line class="g-tickS-red" x1="100" y1="21" x2="100" y2="26" transform="rotate(129.6 100 100)"/>
         <path class="g-redline" d="M 180.03,117.89 A 82,82 0 0,1 157.98,157.98" fill="none"/>
         <text class="g-label" x="37.1" y="162.9" text-anchor="middle" dominant-baseline="central">0</text>
-        <text class="g-label" x="12.1" y="86.1" text-anchor="middle" dominant-baseline="central">50</text>
+        <text class="g-labelAccent" x="16.3" y="69.9" text-anchor="middle" dominant-baseline="central">60</text>
+        <text class="g-labelAccent" x="33.2" y="41.1" text-anchor="middle" dominant-baseline="central">80</text>
         <text class="g-label" x="59.6" y="20.7" text-anchor="middle" dominant-baseline="central">100</text>
-        <text class="g-label" x="140.4" y="20.7" text-anchor="middle" dominant-baseline="central">150</text>
+        <text class="g-labelAccent" x="91.6" y="11.4" text-anchor="middle" dominant-baseline="central">120</text>
+        <text class="g-labelAccent" x="124.8" y="14.5" text-anchor="middle" dominant-baseline="central">140</text>
+        <text class="g-labelAccent" x="154.5" y="29.7" text-anchor="middle" dominant-baseline="central">160</text>
+        <text class="g-labelAccent" x="176.6" y="54.7" text-anchor="middle" dominant-baseline="central">180</text>
         <text class="g-label" x="187.9" y="86.1" text-anchor="middle" dominant-baseline="central">200</text>
+        <text class="g-labelAccent" x="186.9" y="119.4" text-anchor="middle" dominant-baseline="central">220</text>
         <text class="g-label" x="162.9" y="162.9" text-anchor="middle" dominant-baseline="central">250</text>
-        <!-- Подписи часто используемых скоростей (60/80/120/160) - ближе к центру, мельче -->
-        <text class="g-labelKey" x="37.9" y="77.6" text-anchor="middle" dominant-baseline="central">60</text>
-        <text class="g-labelKey" x="50.5" y="56.4" text-anchor="middle" dominant-baseline="central">80</text>
-        <text class="g-labelKey" x="93.8" y="34.3" text-anchor="middle" dominant-baseline="central">120</text>
-        <text class="g-labelKey" x="140.5" y="47.8" text-anchor="middle" dominant-baseline="central">160</text>
         <circle class="g-fg" id="gaugeFg" cx="100" cy="100" r="64" pathLength="100" stroke-dasharray="0 100" transform="rotate(135 100 100)"/>
       </svg>
       <div class="g-sheen"></div>
