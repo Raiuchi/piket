@@ -1276,34 +1276,8 @@
     if(state.calib!=null){
       var drM=currentMeters();
 
-      // ── ШАГ 1: АВТОКАЛИБРОВКА (если калибровки нет совсем) ──────────────────
-      if(state.calib==null && rt.tracking && !IS_MIRROR){
-        if(acc<=35 && rt.speed>=10){
-          var autoTM=snapToTrack(c.latitude,c.longitude);
-          if(autoTM==null && state.ctx.peregon!=="Все участки"){
-            var savedPeregon=state.ctx.peregon; state.ctx.peregon="Все участки";
-            autoTM=snapToTrack(c.latitude,c.longitude);
-            state.ctx.peregon=savedPeregon;
-            if(autoTM!=null) state.ctx.peregon="Все участки";
-          }
-          if(autoTM!=null){
-            if(rt.autoCalCand!=null && Math.abs(autoTM-rt.autoCalCand)<=150){ rt.autoCalCount=(rt.autoCalCount||0)+1; }
-            else { rt.autoCalCount=1; }
-            rt.autoCalCand=autoTM;
-            if(rt.autoCalCount>=4){
-              var acKm=kmFrom(autoTM), acPk=pkFrom(autoTM), acM=meterInPk(autoTM);
-              state.calib={km:acKm,pk:acPk,m:acM,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:autoTM};
-              rt.autoCalib=true; rt.odo=0; persist();
-              toast("Автоопределение: "+acKm+" км "+acPk+" пк — проверь при необходимости");
-              rt.autoCalCand=null; rt.autoCalCount=0;
-            }
-          }
-        } else { rt.autoCalCand=null; rt.autoCalCount=0; }
-      }
-
-      if(state.calib!=null){
-        // ── ШАГ 2: УСТАНОВКА _trackM (привязка км к trackM-координатам трека) ──
-        // _trackM=null после ручной калибровки. Пока null — коррекция отключена.
+      // ── ШАГ 2: УСТАНОВКА _trackM (привязка км к trackM-координатам трека) ──
+      // _trackM=null после ручной калибровки. Пока null — коррекция отключена.
         // Устанавливаем с ПЕРВОГО хорошего замера (acc<=40) без ожидания второго.
         if(state.calib._trackM==null){
           var snapAcc = acc<=40 ? 40 : (acc<=60 ? 60 : 0);
@@ -1503,7 +1477,6 @@
             $("#spdSrc").textContent="GPS слабый — счёт по скорости"; $("#spdSrc").className="src dr";
           }
         }
-      }
     }
     rt.last=pt;
     autoDetectPeregon(c.latitude, c.longitude, acc);
