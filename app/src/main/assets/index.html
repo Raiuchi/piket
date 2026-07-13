@@ -95,6 +95,12 @@
   .g-limit.s-red .lv{color:var(--rsig)} .g-limit.s-amber .lv{color:var(--amber)} .g-limit.s-green .lv{color:var(--green)}
   .g-center .src{font-size:10px;color:var(--dim2);margin-top:8px;letter-spacing:.08em}
   .g-center .src.dr{color:var(--amber)}
+  .conf-dots{display:flex;gap:4px;margin-top:6px}
+  .conf-dots span{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background .3s}
+  .conf-dots.q-good span{background:var(--green)}
+  .conf-dots.q-checking span:nth-child(-n+3){background:var(--amber)}
+  .conf-dots.q-weak span:nth-child(-n+2){background:var(--amber)}
+  .conf-dots.q-waiting span:nth-child(1){background:var(--rsig)}
   /* Гейдж реагирует на реальную опасность превышения - не просто украшение, а сигнал */
   .gaugeWrap.gd-warn .g-fg{stroke:var(--amber);filter:drop-shadow(0 0 12px rgba(245,165,36,.65))}
   .gaugeWrap.gd-warn .g-center .sv{color:var(--amber);text-shadow:0 0 26px rgba(245,165,36,.5)}
@@ -393,6 +399,7 @@
         <div class="sv num" id="spdVal">0</div><div class="su">КМ/Ч</div>
         <div class="g-limit" id="gLimit" style="display:none"><span class="lv num" id="limVal">—</span><span class="lu">доп.</span></div>
         <div class="src" id="spdSrc">GPS не активен</div>
+        <div class="conf-dots" id="confDots"><span></span><span></span><span></span><span></span></div>
       </div>
     </div>
 
@@ -692,6 +699,22 @@
     return isNaN(res2)?null:res2; // последний рубеж — никогда не отдаём NaN наружу
   }
 
+  // То же самое что делает snapToTrack внутри, но возвращает СЕГМЕНТ (массив точек), а не
+  // только trackM — нужен отдельно для проверки курса (bearing), которую делать внутри
+  // snapToTrack means менять его сигнатуру и рисковать все места вызова - безопаснее отдельно.
+  function segmentForHeadingCheck(lat, lon, expectedM, windowM){
+    var WINDOW=windowM||5000;
+    var segIdx = TRACK.labels.indexOf(state.ctx.peregon);
+    if(segIdx>=0) return TRACK.segs[segIdx];
+    var bestDist=Infinity, bestSeg=-1;
+    for(var s=0;s<TRACK.segs.length;s++){
+      var rng=(expectedM!=null)?indexWindow(TRACK.segs[s],expectedM,WINDOW):null;
+      var r=findNearestSegment(lat,lon,TRACK.segs[s], rng?rng.lo:null, rng?rng.hi:null);
+      if(r.dist<bestDist){ bestDist=r.dist; bestSeg=s; }
+    }
+    return bestSeg>=0 ? TRACK.segs[bestSeg] : null;
+  }
+
   var PEREGONS=["Все участки","СпбГл - Москва","Д. Долг - Павлово","Павлово - Горы II путь","Горы - Павлово I путь",
     "Горы - Петрозаводск","Броневая - Луга","Чудово - Новгород","Волховстрой - Чудово","Выборг - Каменногорск","СПбФин - Выборг"];
   var LEADS=[{v:0,t:"в зоне"},{v:500,t:"0.5 км"},{v:1000,t:"1 км"},{v:1500,t:"1.5 км"},{v:2000,t:"2 км"},{v:3000,t:"3 км"},{v:4000,t:"4 км"},{v:5000,t:"5 км"}];
@@ -730,6 +753,32 @@
     la1=a.lat*Math.PI/180,la2=b.lat*Math.PI/180,
     h=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)*Math.sin(dLon/2);
     return 2*R*Math.asin(Math.min(1,Math.sqrt(h))); }
+  // Азимут (курс) от точки a к точке b в градусах 0-360, 0=север, 90=восток
+  function bearing(a,b){
+    var la1=a.lat*Math.PI/180, la2=b.lat*Math.PI/180, dLon=(b.lon-a.lon)*Math.PI/180;
+    var y=Math.sin(dLon)*Math.cos(la2);
+    var x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLon);
+    var brg=Math.atan2(y,x)*180/Math.PI;
+    return (brg+360)%360;
+  }
+  // Разница между двумя азимутами в градусах, всегда 0-180 (кратчайшая дуга)
+  function bearingDiff(a,b){ var d=Math.abs(a-b)%360; return d>180?360-d:d; }
+  // Ожидаемый курс движения ПО ПУТИ в точке trackM конкретного сегмента (для сверки с GPS-курсом).
+  // Поезд может двигаться только вдоль рельс в одну из двух сторон — резкое несовпадение
+  // GPS-курса с направлением пути (>90°, то есть "поперёк" рельс) — верный признак кривого
+  // сигнала (переотражение, глушение), а не аккуратность GPS-приёмника.
+  function expectedTrackBearing(seg,trackM){
+    for(var i=0;i<seg.length-1;i++){
+      if(trackM>=seg[i][2] && trackM<=seg[i+1][2]){
+        return bearing({lat:seg[i][0],lon:seg[i][1]},{lat:seg[i+1][0],lon:seg[i+1][1]});
+      }
+    }
+    if(seg.length>=2){
+      if(trackM<seg[0][2]) return bearing({lat:seg[0][0],lon:seg[0][1]},{lat:seg[1][0],lon:seg[1][1]});
+      var n=seg.length; return bearing({lat:seg[n-2][0],lon:seg[n-2][1]},{lat:seg[n-1][0],lon:seg[n-1][1]});
+    }
+    return null;
+  }
   function escapeHtml(s){ return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
   function fmtDate(s){ if(!s)return""; var p=s.split("-"); return p[2]+"."+p[1]; }
 
@@ -1202,6 +1251,24 @@
             // diff>1000м: сразу (GPS вернулся после потери — нужна немедленная коррекция)
             // остальное: 2 подтверждения (фильтруем одиночный кривой замер)
             var needed = diff<100 ? 1 : (diff<2000 ? 3 : 2);
+            // КУРС ДВИЖЕНИЯ ПРОТИВ ГЛУШЕНИЯ: поезд физически может двигаться только вдоль
+            // рельс в одну из двух сторон. Если GPS-приёмник даёт курс (heading) и он сильно
+            // (>90°, то есть "поперёк" пути) не совпадает с ожидаемым направлением рельс в
+            // этой точке — это явный признак кривого сигнала (переотражение у зданий,
+            // глушение), а не просто шум. Требуем на 1 подтверждение больше для таких замеров.
+            // Работает только если GPS реально дал курс (не все приёмники его дают, особенно
+            // на малой скорости — ниже 20 км/ч курс из Doppler ненадёжен и мы его не проверяем).
+            if(c.heading!=null && !isNaN(c.heading) && rt.speed>20 && tMfinal!=null){
+              var headingSeg=segmentForHeadingCheck(c.latitude,c.longitude,expectedTrackM,searchWindow);
+              if(headingSeg){
+                var expBearing=expectedTrackBearing(headingSeg,tMfinal);
+                if(expBearing!=null){
+                  var wantBearing=dirDown()?(expBearing+180)%360:expBearing;
+                  var hDiff=bearingDiff(c.heading,wantBearing);
+                  if(hDiff>90){ needed+=1; }
+                }
+              }
+            }
             if(rt.pendingCandM!=null && Math.abs(candM-rt.pendingCandM)<=400){
               rt.pendingCount=(rt.pendingCount||0)+1;
             } else {
@@ -1539,6 +1606,10 @@
     if(!IS_MIRROR && m!=null) rt.posM=m;
     $("#oKm").textContent=m==null?"—":kmFrom(m); $("#oPk").textContent=m==null?"—":pkFrom(m); $("#oM").textContent=m==null?"—":meterInPk(m);
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=state.ctx.peregon;
+    var confEl=$("#confDots");
+    if(confEl){
+      confEl.className="conf-dots"+(rt.fixQuality?(" q-"+rt.fixQuality):"");
+    }
     var acwEl=$("#autoCalWarn"); if(acwEl) acwEl.style.display=rt.autoCalib?"block":"none";
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
     if(state.calib==null){ sig.className="signal"; updateLimitBadge(null); updateGaugeDanger(null);
