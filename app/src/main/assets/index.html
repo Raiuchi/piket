@@ -733,7 +733,47 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false};
+  // ═══ ПАМЯТЬ ПРОБЛЕМНЫХ ЗОН GPS ═══
+  // Машинист ездит одними и теми же маршрутами регулярно - в отличие от обычного
+  // навигатора, у нас есть шанс УЧИТЬСЯ: если в конкретном месте маршрута сигнал
+  // регулярно портится (глушение, застройка, выемка), запоминаем это между поездками
+  // и в следующий раз предупреждаем ЗАРАНЕЕ, до того как реально пропадёт сигнал.
+  // Ключ - "перегон_бакет1км", значение - {bad: сколько раз сигнал был плохим тут,
+  // total: сколько раз вообще проезжали}. Данные копятся только по факту поездок,
+  // никаких предположений - если статистики мало (<3 проездов), зону не считаем
+  // проблемной, слишком рано доверять.
+  var ZONE_BUCKET_M = 1000;
+  function zoneKey(peregon, trackM){ return peregon+"_"+Math.floor(trackM/ZONE_BUCKET_M); }
+  function recordZoneQuality(){
+    if(!rt.tracking || rt.posM==null || !state.ctx.peregon || rt.speed<30) return;
+    var now=Date.now();
+    if(rt.lastZoneRecordAt && (now-rt.lastZoneRecordAt)<10000) return; // не чаще раза в 10с
+    rt.lastZoneRecordAt=now;
+    var key=zoneKey(state.ctx.peregon, rt.posM);
+    var stats=load("sap_zoneStats",{});
+    var s=stats[key]||{bad:0,total:0};
+    s.total++;
+    if(rt.fixQuality==="weak"||rt.fixQuality==="waiting"||rt.fixQuality==null) s.bad++;
+    stats[key]=s;
+    save("sap_zoneStats",stats);
+  }
+  function checkZoneWarning(){
+    if(!rt.tracking || rt.posM==null || !state.ctx.peregon) return;
+    var lead=1500; // предупреждаем за 1.5км до зоны
+    var aheadM = dirDown() ? rt.posM-lead : rt.posM+lead;
+    var key=zoneKey(state.ctx.peregon, aheadM);
+    var stats=load("sap_zoneStats",{});
+    var s=stats[key];
+    if(!s || s.total<3) return; // мало статистики - не доверяем ещё
+    var ratio=s.bad/s.total;
+    if(ratio<0.4) return; // не проблемная зона
+    if(rt.zoneWarnedKey===key) return; // уже предупредили про эту зону в этой поездке
+    rt.zoneWarnedKey=key;
+    say("Внимание, впереди зона частого глушения джи-пи-эс. Координаты могут идти по счёту.");
+    toast("⚠️ Зона частого глушения GPS впереди — по опыту прошлых поездок");
+  }
+
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -1351,7 +1391,12 @@
       // реальная скорость близка к последней известной. Если ускорение заметное - снижаем
       // как раньше, не рискуя держать неактуальное значение именно в момент вероятного
       // реального изменения скорости.
-      var decay = (rt.accelAvailable && rt.accelMag<1.5) ? 0.95 : 0.85;
+      var decay;
+      if(!rt.accelAvailable) decay=0.85; // нет датчика - как было по умолчанию
+      else if(rt.accelMag<0.5) decay=0.97;
+      else if(rt.accelMag<1.5) decay=0.92;
+      else if(rt.accelMag<3.0) decay=0.85;
+      else decay=0.70;
       rt.speed = rt.speed*decay;
     }
     else { $("#gps").className="gps dead"; $("#gpsTxt").textContent=(e&&e.code===1)?"нет доступа":"нет сигнала"; $("#spdSrc").textContent=(e&&e.code===1)?"GPS запрещён (file://)":"жду спутники…"; $("#spdSrc").className="src dr"; } }
@@ -1365,7 +1410,7 @@
   }
     var now=Date.now(), dt=(now-(rt.lastTick||now))/1000; rt.lastTick=now;
     if(dt>0&&dt<10&&rt.speed>5) rt.odo+=(rt.speed/3.6)*dt;
-    rt.posM=currentMeters(); renderTrip(); evalAlerts();
+    rt.posM=currentMeters(); renderTrip(); evalAlerts(); recordZoneQuality(); checkZoneWarning();
     if(IS_HEADLESS) saveTrackSnapshot(); }
   function startTicker(){ rt.lastTick=Date.now(); if(rt.tickTimer)clearInterval(rt.tickTimer); rt.tickTimer=setInterval(tickerStep,600); }
   function stopTicker(){ if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } }
@@ -1450,7 +1495,7 @@
 
   function startTrack(){
     if(state.settings.demo){ startSim(); return; }
-    rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0;
+    rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0; rt.zoneWarnedKey=null;
     // Не блокируем старт при отсутствии калибровки — позволяем GPS стартовать и
     // ждём автокалибровки (4 согласованных замера с acc<=35м). Пока calib==null
     // интерфейс показывает "нет калибровки" — это нормально, пользователь видит
