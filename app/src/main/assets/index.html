@@ -710,7 +710,7 @@
   };
   function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -1064,14 +1064,16 @@
       // согласованных замера в 150м надёжно защищают от случайного шума.
       if(acc<=35 && rt.speed>=10){
         var autoTM=snapToTrack(c.latitude,c.longitude);
+        var triedAllRoutes=false;
         if(autoTM==null && state.ctx.peregon!=="Все участки"){
-          // Возможно выбран неправильный/устаревший перегон - пробуем честно по всем участкам
           var savedPeregon=state.ctx.peregon; state.ctx.peregon="Все участки";
           autoTM=snapToTrack(c.latitude,c.longitude);
           state.ctx.peregon=savedPeregon;
-          if(autoTM!=null) state.ctx.peregon="Все участки"; // нашли только так - оставляем "Все участки", autoDetectPeregon сам подберёт точный на следующих кадрах
+          if(autoTM!=null) state.ctx.peregon="Все участки";
+          triedAllRoutes=true;
         }
         if(autoTM!=null){
+          rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0;
           if(rt.autoCalCand!=null && Math.abs(autoTM-rt.autoCalCand)<=150){ rt.autoCalCount=(rt.autoCalCount||0)+1; }
           else { rt.autoCalCount=1; }
           rt.autoCalCand=autoTM;
@@ -1079,11 +1081,17 @@
             var acKm=kmFrom(autoTM), acPk=pkFrom(autoTM), acM=meterInPk(autoTM);
             state.calib={km:acKm,pk:acPk,m:acM,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:autoTM};
             rt.autoCalib=true; rt.odo=0; persist();
-            toast("Автоопределение: "+acKm+" км "+acPk+" пк — проверь и поправь при необходимости");
+            toast("Автоопределение: "+acKm+" км "+acPk+" пк — проверь при необходимости");
             rt.autoCalCand=null; rt.autoCalCount=0;
           }
+        } else {
+          // Хороший сигнал есть, но координаты не легли ни на один известный путь
+          // (даже перебрав "Все участки") — машинист либо реально далеко от известных
+          // маршрутов, либо перепутал перегон. Копим счётчик для диагностики в UI.
+          rt.autoCalNullStreak=(rt.autoCalNullStreak||0)+1;
         }
-      } else { rt.autoCalCand=null; rt.autoCalCount=0; }
+      } else if(rt.speed<10){ rt.autoCalCand=null; rt.autoCalCount=0; rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0; }
+      else { rt.autoCalWeakStreak=(rt.autoCalWeakStreak||0)+1; } // speed>=10 но acc>35 - сигнал слабый
     }
 
     if(state.calib!=null){
@@ -1371,6 +1379,7 @@
 
   function startTrack(){
     if(state.settings.demo){ startSim(); return; }
+    rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0;
     // Не блокируем старт при отсутствии калибровки — позволяем GPS стартовать и
     // ждём автокалибровки (4 согласованных замера с acc<=35м). Пока calib==null
     // интерфейс показывает "нет калибровки" — это нормально, пользователь видит
@@ -1530,9 +1539,20 @@
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
     if(state.calib==null){ sig.className="signal"; updateLimitBadge(null); updateGaugeDanger(null);
       if(rt.tracking){
-        stEl.textContent="GPS ищет позицию...";
         var cnt=rt.autoCalCount||0;
-        content.innerHTML='<div class="sig-empty"><b>Определяю позицию по GPS</b>Подтверждённых замеров: '+cnt+' из 4. Убедись что GPS активен и есть хороший сигнал.<br><br>Или нажми «Калибровка» и введи км столба вручную.</div>';
+        if((rt.autoCalNullStreak||0)>=6){
+          // 6+ секунд подряд хороший сигнал, но координаты не легли ни на один известный
+          // путь (даже перебрав все перегоны) - скорее всего далеко от маршрутов приложения
+          // или выбран не тот перегон. Явно говорим об этом, а не молчим бесконечно.
+          stEl.textContent="Позиция не найдена";
+          content.innerHTML='<div class="sig-empty"><b>Далеко от известных путей</b>GPS ловит хорошо, но координаты не совпадают ни с одним маршрутом в приложении. Проверь выбранный перегон вверху экрана, или введи км столба вручную.<br><br>Нажми «Калибровка» и введи км столба вручную.</div>';
+        } else if((rt.autoCalWeakStreak||0)>=8){
+          stEl.textContent="Сигнал слабый";
+          content.innerHTML='<div class="sig-empty"><b>Жду точный GPS-сигнал</b>Едешь, но точность GPS пока недостаточна для автоопределения. Обычно проходит на открытом месте за несколько секунд.<br><br>Или нажми «Калибровка» и введи км столба вручную — быстрее.</div>';
+        } else {
+          stEl.textContent="GPS ищет позицию...";
+          content.innerHTML='<div class="sig-empty"><b>Определяю позицию по GPS</b>Подтверждённых замеров: '+cnt+' из 4. Убедись что GPS активен и есть хороший сигнал.<br><br>Или нажми «Калибровка» и введи км столба вручную.</div>';
+        }
       } else {
         stEl.textContent="нет калибровки";
         content.innerHTML='<div class="sig-empty"><b>Нажми «Старт»</b>GPS определит позицию автоматически, или введи км столба вручную через «Калибровка».</div>';
@@ -1704,6 +1724,7 @@
   $("#calReset").addEventListener("click",async function(){
     if(!(await showConfirm("Сбросить текущую позицию? Это нужно только если едешь НОВЫЙ маршрут, а в приложении осталась позиция с прошлой поездки.",{okText:"Сбросить"})))return;
     state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; rt.autoCalCand=null; rt.autoCalCount=0;
+    rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0;
     rt.peregonCandLabel=null; rt.peregonCandCount=0; rt.awaitingManualCalib=false;
     persist(); closeSheets(); renderTrip(); renderList();
     toast(rt.tracking?"Калибровка сброшена — жду автоопределение или впиши km вручную":"Калибровка сброшена");
@@ -1932,15 +1953,18 @@
 
   function jumpToOrderFromTrip(){
     var link=ROUTE_LINK[state.ctx.peregon]; if(!link){ toast("Для этого перегона приказа с координатами нет"); return; }
-    var m=currentMeters(); if(m==null){ toast("Сначала откалибруйся"); return; }
-    var km=Math.round(m/1000), up=!dirDown();
+    // Без калибровки km=null - открываем документ по перегону без подсветки строки.
+    // Раньше это полностью блокировалось тостом "Сначала откалибруйся" - неудобно,
+    // если просто хочешь свериться со скоростями перед стартом, ещё не встав у столба.
+    var m=currentMeters();
+    var km=(m!=null)?Math.round(m/1000):null, up=!dirDown();
     var ids = link.pickTrain ? (up?link.idsTuda:link.idsObratno) : [up?link.tuda:link.obratno];
     if(!ids||!ids[0]){ toast("Нет таблицы для этого направления"); return; }
     function openWith(routeId){
       var idx=SPEEDROUTES.findIndex(function(x){return x.id===routeId;}); if(idx<0)return;
       document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on")});
       $("#v-speedref").classList.add("on"); renderSpeedRef(idx,km);
-      startSpeedRefLive(routeId);
+      if(m!=null) startSpeedRefLive(routeId); // живая подсветка только если знаем позицию
       if(link.note)toast(link.note);
     }
     if(ids.length>1){
