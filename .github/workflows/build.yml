@@ -32,6 +32,11 @@ jobs:
       - name: Run repository checks
         run: node tests/release-check.mjs
 
+      - name: Restore signing key
+        env:
+          PIKET_KEYSTORE_B64: ${{ secrets.PIKET_KEYSTORE_B64 }}
+        run: echo "$PIKET_KEYSTORE_B64" | base64 --decode > app/piket-release.keystore
+
       - name: Build debug APK
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         env:
