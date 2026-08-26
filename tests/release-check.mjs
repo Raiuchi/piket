@@ -23,6 +23,8 @@ const manifest = read('app/src/main/AndroidManifest.xml');
 check('fine and coarse location declared', manifest.includes('ACCESS_FINE_LOCATION') && manifest.includes('ACCESS_COARSE_LOCATION'));
 check('location foreground service declared', manifest.includes('FOREGROUND_SERVICE_LOCATION') && manifest.includes('foregroundServiceType="location"'));
 check('service is not exported', /<service[\s\S]*?android:exported="false"/.test(manifest));
+check('premium adaptive launcher art exists', fs.existsSync(new URL('app/src/main/res/drawable-nodpi/ic_launcher_art.png', root)));
+check('APK header icon exists', fs.existsSync(new URL('app/src/main/assets/icons/icon-192.png', root)));
 
 const activity = read('app/src/main/java/net/raiuchi/piket/MainActivity.java');
 check('WebView content access disabled', activity.includes('setAllowContentAccess(false)'));

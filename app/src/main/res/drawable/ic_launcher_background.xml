@@ -9,9 +9,9 @@
                 android:type="radial"
                 android:centerX="38" android:centerY="38"
                 android:gradientRadius="97">
-                <item android:offset="0" android:color="#2A0F14"/>
-                <item android:offset="0.6" android:color="#150810"/>
-                <item android:offset="1" android:color="#08040A"/>
+                <item android:offset="0" android:color="#172330"/>
+                <item android:offset="0.6" android:color="#090E14"/>
+                <item android:offset="1" android:color="#020407"/>
             </gradient>
         </aapt:attr>
     </path>
