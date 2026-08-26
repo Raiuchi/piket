@@ -337,8 +337,14 @@ public class MainActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        // разрешения получены — служба запустится сама при нажатии «Старт» в приложении
         requestIgnoreBatteryOptimizations();
+        if (requestCode != REQUEST_APP_PERMISSIONS || !startTrackingAfterPermission) return;
+        if (hasFineLocationPermission()) {
+            startTrackingService();
+        } else {
+            startTrackingAfterPermission = false;
+            showLocationPermissionRequired();
+        }
     }
 
     /** Нативный Android TTS для этого экрана (демо-режим и т.п., пока экран открыт) */
@@ -416,18 +422,6 @@ public class MainActivity extends Activity {
             startForegroundService(i);
         } else {
             startService(i);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != REQUEST_APP_PERMISSIONS || !startTrackingAfterPermission) return;
-        if (hasFineLocationPermission()) {
-            startTrackingService();
-        } else {
-            startTrackingAfterPermission = false;
-            showLocationPermissionRequired();
         }
     }
 

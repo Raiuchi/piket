@@ -30,6 +30,7 @@ check('WebView cross-file access disabled', activity.includes('setAllowUniversal
 check('web permission requests denied', activity.includes('request.deny()'));
 check('tracking requires fine location', activity.includes('hasFineLocationPermission()'));
 check('tracking resumes after permission grant', activity.includes('startTrackingAfterPermission') && activity.includes('onRequestPermissionsResult'));
+check('permission callback is declared once', (activity.match(/void onRequestPermissionsResult\(/g) || []).length === 1);
 check('external bridge allows only HTTP(S)', activity.includes('"https".equalsIgnoreCase(scheme)'));
 
 const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.java');
