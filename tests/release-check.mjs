@@ -38,7 +38,7 @@ check('notification updates retain content intent', /updateNotificationText[\s\S
 check('accelerometer listener is unregistered', service.includes('unregisterListener(accelListener)'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.83', gradle.includes('versionName "1.4.83"') && gradle.includes('versionCode 89'));
+check('release version is 1.4.84', gradle.includes('versionName "1.4.84"') && gradle.includes('versionCode 90'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
 check('CI restores signing key from secret', workflow.includes('PIKET_KEYSTORE_B64') && workflow.includes('base64 --decode'));

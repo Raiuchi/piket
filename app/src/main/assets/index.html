@@ -334,6 +334,93 @@
     opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;z-index:90}
   .toast.on{opacity:1;transform:translate(-50%,0)}
   .night-overlay.on{display:block}
++
+  /* Premium cockpit visual system — original automotive-inspired design */
+  :root{
+    --bg:#05070A;--bg-rise:#0B0F14;--panel:#11161D;--panel2:#181F28;
+    --line:rgba(214,226,239,.12);--line-soft:rgba(214,226,239,.055);
+    --txt:#F7FAFC;--dim:#9AA8B7;--dim2:#647180;
+    --blue:#35A7FF;--blue-d:#0968B8;--blue-l:#9AD8FF;--steel:#CBD5DF;
+  }
+  html{background:#05070A}
+  body{background:
+    radial-gradient(900px 520px at 50% -12%,rgba(56,137,204,.18),transparent 66%),
+    linear-gradient(180deg,#090D12 0%,#05070A 48%,#07090C 100%)}
+  body::before{inset:0;animation:none;background:
+    linear-gradient(118deg,transparent 0 46%,rgba(255,255,255,.018) 46.3%,transparent 46.6%),
+    repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 1px,transparent 1px 7px);opacity:.72}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+    box-shadow:inset 0 0 120px rgba(0,0,0,.64)}
+  .app{max-width:560px;padding:0 16px}
+  .hero{margin:0 -16px 18px;padding:18px 20px 15px;background:
+    linear-gradient(180deg,rgba(20,28,37,.97),rgba(8,12,17,.94));
+    border-bottom:1px solid rgba(184,207,228,.14);box-shadow:0 18px 44px rgba(0,0,0,.34)}
+  .hero::after{right:-60px;top:-80px;width:320px;height:260px;
+    background:radial-gradient(circle,rgba(64,166,239,.17),transparent 68%)}
+  .hero::before{opacity:.42;background:
+    linear-gradient(116deg,transparent 43%,rgba(80,180,255,.13) 43.4%,transparent 44%),
+    linear-gradient(116deg,transparent 49%,rgba(255,255,255,.055) 49.3%,transparent 49.6%)}
+  .emblem{border-radius:50%;background:radial-gradient(circle at 34% 28%,#223549,#0B1118 68%);
+    border:1px solid rgba(201,224,243,.24);box-shadow:0 8px 26px rgba(0,0,0,.5),inset 0 1px 1px rgba(255,255,255,.18),inset 0 -6px 12px rgba(0,0,0,.4)}
+  .wm .t b{letter-spacing:.15em;text-shadow:0 1px 12px rgba(136,210,255,.18)}
+  .gps{background:linear-gradient(180deg,rgba(28,36,46,.85),rgba(9,13,18,.9));
+    border-color:rgba(200,220,238,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.28)}
+  .train{opacity:.9}.train svg{filter:drop-shadow(0 12px 18px rgba(0,0,0,.55))}
+  .rails{background:linear-gradient(90deg,transparent,#506170 18%,#506170 82%,transparent);box-shadow:0 1px 6px rgba(151,204,241,.14)}
+  .board{gap:11px;margin-bottom:12px}
+  .board .seg,.board .peregon{background:linear-gradient(180deg,rgba(29,37,47,.96),rgba(13,18,24,.96));
+    border-color:rgba(205,222,236,.13);border-radius:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.075),0 8px 22px rgba(0,0,0,.25)}
+  .board .seg button.on{background:linear-gradient(180deg,rgba(69,173,247,.3),rgba(20,91,145,.18));color:#C8EAFF;box-shadow:inset 0 0 18px rgba(79,180,248,.09)}
+
+  .gaugeWrap{width:304px;max-width:86vw;margin:8px auto 2px;filter:drop-shadow(0 22px 28px rgba(0,0,0,.48))}
+  .gaugeWrap::before{inset:-8%;width:auto;height:auto;border-radius:50%;background:
+    radial-gradient(circle,rgba(43,154,232,.15),transparent 63%)}
+  .gaugeWrap svg{position:relative;z-index:2;filter:drop-shadow(0 0 7px rgba(108,191,245,.12))}
+  .g-bezel{stroke-width:2.8;filter:drop-shadow(0 2px 1px rgba(255,255,255,.08))}
+  .g-bezel-groove{stroke:#020304;stroke-width:7;opacity:.9}
+  .g-bg{stroke:#151C24;stroke-width:10;filter:drop-shadow(0 1px 0 rgba(255,255,255,.07))}
+  .g-tickL{stroke:#ECF4FA;stroke-width:2.6}.g-tickM{stroke:#8293A3;opacity:.82}.g-tickS{stroke:#46535F;opacity:.72}
+  .g-label{fill:#E6EDF3;font-size:9px}.g-labelAccent{fill:#8293A3;font-size:6.4px}
+  .g-fg{stroke-width:9;filter:drop-shadow(0 0 8px rgba(53,167,255,.78))}
+  .g-sheen{inset:4.5%;z-index:3;border:1px solid rgba(255,255,255,.055);background:
+    radial-gradient(circle at 36% 25%,rgba(255,255,255,.12),transparent 24%),
+    linear-gradient(155deg,rgba(255,255,255,.07),transparent 30% 70%,rgba(255,255,255,.025));
+    box-shadow:inset 0 0 28px rgba(0,0,0,.7)}
+  .g-center{z-index:6;inset:25% 20% 21%;justify-content:center;border-radius:50%;background:
+    radial-gradient(circle at 50% 42%,rgba(24,33,43,.88),rgba(7,10,14,.97) 68%);
+    box-shadow:inset 0 1px 2px rgba(255,255,255,.11),inset 0 -12px 24px rgba(0,0,0,.55),0 0 0 1px rgba(188,215,235,.08)}
+  .g-center .sv{font-size:61px;font-weight:700;letter-spacing:-.075em;padding-right:.075em;text-shadow:0 0 25px rgba(77,180,250,.25)}
+  .g-center .su{font-size:9px;letter-spacing:.34em;color:#8897A6;margin-top:5px}
+  .g-center .src{font-size:8.5px;margin-top:7px;max-width:128px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .g-limit{margin-top:7px;padding:3px 10px;background:rgba(255,255,255,.035);border-color:rgba(210,225,237,.1)}
+  .g-limit .lv{font-size:13px}.g-limit .lu{font-size:7px}
+  .conf-dots{margin-top:5px}.conf-dots span{width:4px;height:4px}
+  .g-needle{position:absolute;z-index:5;left:calc(50% - 1.5px);top:12%;width:3px;height:38%;
+    transform-origin:50% 100%;transform:rotate(-135deg);transition:transform .35s cubic-bezier(.22,.8,.24,1);
+    border-radius:3px 3px 1px 1px;background:linear-gradient(90deg,#A40E14,#FF5960 48%,#80080D);
+    box-shadow:0 0 8px rgba(255,56,64,.55)}
+  .g-needle::after{content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;
+    background:radial-gradient(circle at 38% 32%,#DCE6EE,#707E89 38%,#111820 43%,#020304 72%);border:1px solid #73818D;box-shadow:0 2px 7px #000}
+  .gaugeWrap.gd-warn .g-needle{background:linear-gradient(90deg,#9A5B00,#FFD15A,#8A4D00);box-shadow:0 0 10px rgba(245,165,36,.8)}
+  .gaugeWrap.gd-danger .g-needle{background:#FF4D4F;box-shadow:0 0 14px rgba(255,77,79,.95)}
+
+  .odo{margin-top:4px;padding:10px 4px 7px;border-radius:18px;background:linear-gradient(180deg,rgba(22,29,37,.72),rgba(8,12,16,.5));border:1px solid rgba(204,222,237,.07)}
+  .odo .v{font-size:43px;font-weight:700;color:#DCE5ED}.odo .v.km{color:#A8DEFF;text-shadow:0 0 18px rgba(53,167,255,.2)}
+  .signal,.card,.item,.hint{background:linear-gradient(155deg,rgba(25,32,41,.96),rgba(11,15,20,.98));border-color:rgba(201,220,235,.12);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 12px 28px rgba(0,0,0,.25)}
+  .signal{border-radius:20px}.card,.item{border-radius:17px}
+  .vmax,.iv{background:radial-gradient(circle at 36% 28%,rgba(255,255,255,.08),rgba(4,6,9,.9) 70%);box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 8px 18px rgba(0,0,0,.35)}
+  .btn,.add-fab{border-radius:16px;background:linear-gradient(180deg,#242D37,#10161D);border-color:rgba(207,224,238,.15);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 18px rgba(0,0,0,.3)}
+  .btn.primary,.add-fab{background:linear-gradient(180deg,#31A9FA 0%,#0B6DB5 52%,#074978 100%);border-color:#3BAEFA;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 10px 24px rgba(16,117,184,.32)}
+  .nav{left:10px;right:10px;bottom:8px;border:1px solid rgba(203,220,233,.13);border-radius:20px;padding:8px 4px calc(8px + env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,rgba(24,31,40,.94),rgba(7,10,14,.97));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 14px 34px rgba(0,0,0,.5)}
+  .nav button.on{color:#A9DDFF;text-shadow:0 0 12px rgba(53,167,255,.38)}
+  .sheet{background:linear-gradient(180deg,#161D25,#080B0F);border-color:rgba(204,223,238,.16);box-shadow:0 -24px 70px rgba(0,0,0,.62)}
+  @media(max-width:380px){.gaugeWrap{width:286px}.g-center .sv{font-size:55px}.odo .v{font-size:39px}}
+  @media(prefers-reduced-motion:reduce){.g-needle,.g-fg{transition:none!important}}
+
 </style>
 </head>
 <body>
@@ -485,6 +572,7 @@
         <circle class="g-fg" id="gaugeFg" cx="100" cy="100" r="64" pathLength="100" stroke-dasharray="0 100" transform="rotate(135 100 100)"/>
       </svg>
       <div class="g-sheen"></div>
+      <div class="g-needle" id="gaugeNeedle" aria-hidden="true"></div>
       <div class="g-center">
         <div class="sv num" id="spdVal">0</div><div class="su">КМ/Ч</div>
         <div class="g-limit" id="gLimit" style="display:none"><span class="lv num" id="limVal">—</span><span class="lu">доп.</span></div>
@@ -1711,7 +1799,7 @@
       var a=up?(s-pos):(pos-s); r._ahead=a; r._zone=false; if(a>0&&a<bestA){ bestA=a; best=r; } });
     return inzone||best; }
 
-  function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
+  function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#gaugeNeedle").style.transform="rotate("+(-135+v/MAXSPD*270).toFixed(2)+"deg)"; $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
 
   // Гейдж не просто крутится - он должен ОРАТЬ, если едешь на пределе или уже превысил
   // ближайшее ограничение. gd-danger (на лимите или выше) - весь спидометр заливается
