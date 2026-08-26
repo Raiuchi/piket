@@ -12,7 +12,7 @@
 [![Скачать APK](https://img.shields.io/badge/⬇️_Скачать_ПИКЕТ_APK-Последняя_версия-2ea44f?style=for-the-badge&logo=android&logoColor=white)](https://github.com/Raiuchi/piket/releases/latest)
 
 ![Build](https://github.com/Raiuchi/piket/actions/workflows/build.yml/badge.svg)
-[![Platform](https://img.shields.io/badge/Android_7.0+-поддерживается-3DDC84?logo=android)](https://github.com/Raiuchi/piket/releases/latest)
+[![Platform](https://img.shields.io/badge/Android_8.0+-поддерживается-3DDC84?logo=android)](https://github.com/Raiuchi/piket/releases/latest)
 [![Offline](https://img.shields.io/badge/режим-офлайн-blue)](https://github.com/Raiuchi/piket/releases/latest)
 [![Web](https://img.shields.io/badge/Веб--версия-iOS_%26_Android-5A67D8)](https://raiuchi.github.io/piket-web/)
 
@@ -51,7 +51,7 @@
 
 Приложение использует нативный **Android FusedLocationProvider** — объединяет спутниковый GPS, данные вышек сотовой сети и WiFi для наилучшей точности в любых условиях.
 
-**Многослойная защита от помех и глушения (стресс-тест 27/27 ✅):**
+**Многослойная защита от помех и глушения (покрыта автоматическими регрессионными тестами):**
 
 | Слой защиты | Что делает |
 |---|---|

@@ -14,6 +14,7 @@ import android.speech.tts.TextToSpeech;
 import android.view.WindowManager;
 import android.webkit.GeolocationPermissions;
 import android.webkit.PermissionRequest;
+import android.webkit.WebResourceRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -39,9 +40,13 @@ import java.util.Locale;
  */
 public class MainActivity extends Activity {
 
+    private static final int REQUEST_APP_PERMISSIONS = 100;
+    private static final String APP_URL = "file:///android_asset/index.html";
+
     private WebView web;
     private TextToSpeech tts;
     private boolean ttsReady = false;
+    private boolean startTrackingAfterPermission = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,27 +64,45 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);           // localStorage — общий со службой (тот же процесс)
         s.setGeolocationEnabled(true);          // запасной браузерный GPS (для теста вне APK, экран открыт)
         s.setAllowFileAccess(true);
+        s.setAllowContentAccess(false);
+        s.setAllowFileAccessFromFileURLs(false);
+        s.setAllowUniversalAccessFromFileURLs(false);
         s.setMediaPlaybackRequiresUserGesture(false); // звук/голос без доп. жеста
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
 
-        web.setWebViewClient(new WebViewClient());
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return openExternalIfNeeded(request.getUrl());
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return openExternalIfNeeded(Uri.parse(url));
+            }
+        });
         web.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onGeolocationPermissionsShowPrompt(String origin,
                     GeolocationPermissions.Callback callback) {
                 // разрешаем геолокацию странице (запасной канал, когда headless-служба не используется)
-                callback.invoke(origin, true, true);
+                boolean localPage = origin != null && origin.startsWith("file://");
+                boolean granted = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                        == PackageManager.PERMISSION_GRANTED;
+                callback.invoke(origin, localPage && granted, false);
             }
 
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                request.grant(request.getResources());
+                // ПИКЕТ не использует WebRTC-камеру/микрофон. Не выдаём странице
+                // новые нативные возможности через общий WebView-механизм.
+                request.deny();
             }
         });
 
         web.addJavascriptInterface(new PiketBridge(), "Android");
         setContentView(web);
-        web.loadUrl("file:///android_asset/index.html");
+        web.loadUrl(APP_URL);
 
         requestNeededPermissions();
         checkForUpdate();
@@ -161,13 +184,41 @@ public class MainActivity extends Activity {
                 != PackageManager.PERMISSION_GRANTED) {
             need.add(android.Manifest.permission.ACCESS_FINE_LOCATION);
         }
+        if (checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) {
+            need.add(android.Manifest.permission.ACCESS_COARSE_LOCATION);
+        }
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
             need.add(android.Manifest.permission.POST_NOTIFICATIONS);
         }
         if (!need.isEmpty()) {
-            requestPermissions(need.toArray(new String[0]), 100);
+            requestPermissions(need.toArray(new String[0]), REQUEST_APP_PERMISSIONS);
+        }
+    }
+
+    private boolean openExternalIfNeeded(Uri uri) {
+        if (uri == null) return true;
+        String value = uri.toString();
+        if (APP_URL.equals(value)) return false;
+        String scheme = uri.getScheme();
+        if ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme)) {
+            try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); } catch (Exception ignored) {}
+        }
+        return true;
+    }
+
+    private boolean hasFineLocationPermission() {
+        return checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void showLocationPermissionRequired() {
+        if (web != null) {
+            web.evaluateJavascript(
+                    "if(window.toast)window.toast('Для запуска контроля разреши точную геолокацию');",
+                    null);
         }
     }
 
@@ -350,11 +401,33 @@ public class MainActivity extends Activity {
     }
 
     private void startTrackingService() {
+        if (!hasFineLocationPermission()) {
+            startTrackingAfterPermission = true;
+            requestPermissions(new String[] {
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+            }, REQUEST_APP_PERMISSIONS);
+            showLocationPermissionRequired();
+            return;
+        }
+        startTrackingAfterPermission = false;
         Intent i = new Intent(this, TrackingService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(i);
         } else {
             startService(i);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_APP_PERMISSIONS || !startTrackingAfterPermission) return;
+        if (hasFineLocationPermission()) {
+            startTrackingService();
+        } else {
+            startTrackingAfterPermission = false;
+            showLocationPermissionRequired();
         }
     }
 
@@ -423,7 +496,10 @@ public class MainActivity extends Activity {
         public void openUrl(final String url) {
             runOnUiThread(new Runnable() {
                 @Override public void run() {
-                    try { startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))); } catch (Exception e) {}
+                    Uri uri = Uri.parse(url);
+                    String scheme = uri.getScheme();
+                    if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) return;
+                    try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); } catch (Exception e) {}
                 }
             });
         }

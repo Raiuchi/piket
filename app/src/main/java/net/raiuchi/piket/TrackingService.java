@@ -58,6 +58,7 @@ public class TrackingService extends Service {
     private boolean networkBackupActive = false;
     private SensorManager sensorManager;
     private Sensor accelSensor;
+    private SensorEventListener accelListener;
     private float accelMag = 0f; // та же логика, что в JS: модуль вектора ускорения, сглаженный
     private LocationCallback locationCallback;
     private long lastFixReceivedAt = 0;
@@ -73,10 +74,15 @@ public class TrackingService extends Service {
     private Handler mainHandler;
 
     public static void updateNotificationText(Context ctx, String text) {
+        Intent open = new Intent(ctx, MainActivity.class);
+        PendingIntent pi = PendingIntent.getActivity(
+                ctx, 0, open,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification notification = new Notification.Builder(ctx, CHANNEL_ID)
                 .setContentTitle("ПИКЕТ · " + text)
                 .setContentText("Контроль ограничений активен")
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentIntent(pi)
                 .setOngoing(true)
                 .build();
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
@@ -516,7 +522,7 @@ public class TrackingService extends Service {
         if (sensorManager == null) return;
         accelSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         if (accelSensor == null) return; // датчик отсутствует на этом телефоне — просто не используем
-        sensorManager.registerListener(new SensorEventListener() {
+        accelListener = new SensorEventListener() {
             @Override public void onSensorChanged(SensorEvent event) {
                 float mag = (float) Math.sqrt(event.values[0]*event.values[0]
                         + event.values[1]*event.values[1] + event.values[2]*event.values[2]);
@@ -524,7 +530,8 @@ public class TrackingService extends Service {
                 feedAccelToWebView();
             }
             @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
-        }, accelSensor, SensorManager.SENSOR_DELAY_NORMAL);
+        };
+        sensorManager.registerListener(accelListener, accelSensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     private long lastAccelFeedAt = 0;
@@ -598,6 +605,10 @@ public class TrackingService extends Service {
         stopNetworkBackup();
         if (fusedClient != null && locationCallback != null) {
             fusedClient.removeLocationUpdates(locationCallback);
+        }
+        if (sensorManager != null && accelListener != null) {
+            sensorManager.unregisterListener(accelListener);
+            accelListener = null;
         }
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
