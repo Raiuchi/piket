@@ -349,8 +349,7 @@
   body::before{inset:0;animation:none;background:
     linear-gradient(118deg,transparent 0 46%,rgba(255,255,255,.018) 46.3%,transparent 46.6%),
     repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 1px,transparent 1px 7px);opacity:.72}
-  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
-    box-shadow:inset 0 0 120px rgba(0,0,0,.64)}
+  body::after{display:none}
   .app{max-width:560px;padding:0 16px}
   .hero{margin:0 -16px 18px;padding:18px 20px 15px;background:
     linear-gradient(180deg,rgba(20,28,37,.97),rgba(8,12,17,.94));
@@ -367,7 +366,10 @@
   .wm .t b{letter-spacing:.15em;text-shadow:0 1px 12px rgba(136,210,255,.18)}
   .gps{background:linear-gradient(180deg,rgba(28,36,46,.85),rgba(9,13,18,.9));
     border-color:rgba(200,220,238,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.28)}
-  .train{opacity:.9}.train svg{filter:drop-shadow(0 12px 18px rgba(0,0,0,.55))}
+  .train{height:92px;opacity:1;overflow:visible}
+  .train>svg{display:none}
+  .train-real{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;
+    filter:drop-shadow(0 13px 13px rgba(0,0,0,.68)) drop-shadow(0 1px 2px rgba(166,216,249,.2))}
   .rails{background:linear-gradient(90deg,transparent,#506170 18%,#506170 82%,transparent);box-shadow:0 1px 6px rgba(151,204,241,.14)}
   .board{gap:11px;margin-bottom:12px}
   .board .seg,.board .peregon{background:linear-gradient(180deg,rgba(29,37,47,.96),rgba(13,18,24,.96));
@@ -417,8 +419,23 @@
   .btn.primary,.add-fab{background:linear-gradient(180deg,#31A9FA 0%,#0B6DB5 52%,#074978 100%);border-color:#3BAEFA;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 10px 24px rgba(16,117,184,.32)}
   .nav{left:10px;right:10px;bottom:8px;border:1px solid rgba(203,220,233,.13);border-radius:20px;padding:8px 4px calc(8px + env(safe-area-inset-bottom));
-    background:linear-gradient(180deg,rgba(24,31,40,.94),rgba(7,10,14,.97));box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 14px 34px rgba(0,0,0,.5)}
-  .nav button.on{color:#A9DDFF;text-shadow:0 0 12px rgba(53,167,255,.38)}
+    background:linear-gradient(180deg,rgba(29,39,50,.98),rgba(10,15,21,.99));box-shadow:inset 0 1px 0 rgba(255,255,255,.11),0 -1px 0 rgba(64,170,245,.22),0 14px 34px rgba(0,0,0,.5)}
+  .nav button{color:#AEC0CF!important;opacity:1!important;font-size:11px;font-weight:720;text-shadow:0 1px 2px #000}
+  .nav button svg{color:#B8CAD8!important;opacity:1!important;filter:drop-shadow(0 1px 2px #000)}
+  .nav button.on{color:#E1F5FF!important;text-shadow:0 0 13px rgba(53,167,255,.7)}
+  .nav button.on svg{color:#69C9FF!important;filter:drop-shadow(0 0 8px rgba(53,167,255,.85))}
+  .speed-ref-entry{padding:0!important;overflow:hidden;border-color:rgba(80,179,244,.24)!important;background:linear-gradient(145deg,rgba(26,38,50,.98),rgba(10,15,21,.98))!important}
+  .speed-ref-entry .row{padding:18px 16px!important;background:radial-gradient(circle at 5% 0,rgba(53,167,255,.13),transparent 45%)}
+  .speed-ref-entry .t{font-weight:720;line-height:1.35;color:#EAF6FF}.speed-ref-entry .ref-kicker{display:block;margin-bottom:5px;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#65C2FF}
+  .routeCard{padding:16px 15px;border-radius:16px;background:linear-gradient(145deg,rgba(27,36,47,.98),rgba(10,15,21,.98));border-color:rgba(190,215,234,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 10px 24px rgba(0,0,0,.25)}
+  .routeCard .rcTrain{border:1px solid rgba(93,194,255,.22);background:linear-gradient(180deg,rgba(45,157,232,.24),rgba(15,85,132,.18));color:#A9E1FF;padding:6px 9px;border-radius:9px}
+  .routeCard .rcName{font-weight:650;color:#EEF7FD}.routeCard svg{color:#68BFF5}
+  .srGroup{padding:12px;border:1px solid rgba(191,216,235,.1);border-radius:18px;background:linear-gradient(155deg,rgba(21,29,38,.74),rgba(7,11,16,.82));box-shadow:inset 0 1px 0 rgba(255,255,255,.045)}
+  .srGroup h3{margin:2px 3px 11px;color:#8FD5FF;letter-spacing:.11em}
+  .srRow{padding:13px 12px;border-radius:13px;background:linear-gradient(145deg,rgba(30,40,51,.94),rgba(13,18,24,.96));border-color:rgba(199,220,237,.11);box-shadow:inset 0 1px 0 rgba(255,255,255,.045)}
+  .srRow .srName{font-size:14px;color:#E8F0F6}.srBadge{border:1px solid rgba(255,255,255,.09);padding:6px 9px;border-radius:9px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+  .srBadge.glp{background:linear-gradient(180deg,rgba(47,157,235,.3),rgba(15,82,132,.28));color:#B7E6FF}.srBadge.bokp{background:linear-gradient(180deg,rgba(245,165,36,.28),rgba(116,70,10,.25));color:#FFD48A}
+  .srRow.srHit{border-color:#62C2FF;background:linear-gradient(145deg,rgba(29,105,157,.42),rgba(13,30,43,.96));box-shadow:0 0 0 1px rgba(98,194,255,.38),0 0 24px rgba(36,151,226,.18)}
   .sheet{background:linear-gradient(180deg,#161D25,#080B0F);border-color:rgba(204,223,238,.16);box-shadow:0 -24px 70px rgba(0,0,0,.62)}
   @media(max-width:380px){.gaugeWrap{width:286px}.g-center .sv{font-size:55px}.odo .v{font-size:39px}}
   @media(prefers-reduced-motion:reduce){.g-needle,.g-fg{transition:none!important}}
@@ -445,6 +462,7 @@
       <div class="gps" id="gps"><span class="dot"></span><span id="gpsTxt">GPS выкл</span></div>
     </div>
     <div class="train">
+      <img class="train-real" src="assets/train-side.png" alt="">
       <svg viewBox="0 0 420 80" preserveAspectRatio="xMidYMax meet">
         <defs>
           <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2F6FB"/><stop offset="1" stop-color="#C4D2E2"/></linearGradient>
@@ -632,17 +650,8 @@
       <div class="row"><div><div class="t">Ночной режим</div><div class="d">Темнее экран — не слепит в кабине ночью.</div></div><div class="sw" id="swNight"></div></div>
       <div class="row"><div><div class="t">Демо-режим</div><div class="d">Симуляция движения для проверки без GPS. Включи и нажми «Старт» — поедет к ближайшему ограничению.</div></div><div class="sw" id="swDemo"></div></div>
     </div>
-    <div class="card" style="padding:14px">
-      <button class="lb" id="btnOpenAutostart" style="width:100%;margin-bottom:8px;background:#1d4ed8;color:#fff;font-weight:600">🔋 Разрешить работать в фоне (важно для поездки)</button>
-      <div class="row" id="btnBgHelp" style="cursor:pointer;border-bottom:none;padding:8px 0"><div><div class="t" style="font-size:13px;opacity:.75">Если после этого всё равно не работает в фоне — что проверить</div></div><div style="opacity:.4;font-size:18px">›</div></div>
-    </div>
-    <div class="card" style="padding:14px">
-      <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><div class="t">📋 Справочник скоростей (ОКТ-10 + ОКТ-54 от 29.06.2026)</div></div><div style="opacity:.5;font-size:20px">›</div></div>
-    </div>
-    <div class="card" style="padding:14px">
-      <button class="lb btn-premium" id="btnExportRes" style="width:100%;margin-bottom:10px">📤 Экспортировать список ограничений</button>
-      <button class="lb btn-premium-outline" id="btnImportRes" style="width:100%">📥 Импортировать список ограничений</button>
-      <div class="small" style="margin-top:8px;opacity:.65">Резервная копия на случай смены/потери телефона. Экспорт откроет «Отправить» — сохрани в Telegram/Заметки себе.</div>
+    <div class="card speed-ref-entry">
+      <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><span class="ref-kicker">Путевой норматив</span><div class="t">Справочник скоростей · ОКТ-10 и ОКТ-54</div><div class="d">Редакция от 29.06.2026</div></div><div style="color:#68BFF5;font-size:24px">›</div></div>
     </div>
     <div class="card" style="padding:14px">
       <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
@@ -2094,67 +2103,6 @@
 
   $("#btnWipe").addEventListener("click",async function(){ if(!state.restrictions.length){ toast("Список и так пуст"); return; } if(await showConfirm("Удалить все ограничения?",{okText:"Удалить",title:"Очистить список"})){ state.restrictions=[]; alertState={}; persist(); renderList(); renderTrip(); toast("Список очищен"); } });
 
-  // ЭКСПОРТ/ИМПОРТ: резервная копия списка ограничений на случай смены/потери телефона.
-  // Формат простой (JSON внутри узнаваемой обёртки) - не для чтения человеком, а для
-  // надёжного round-trip обратно в приложение. Экспорт через нативный Android Share Intent
-  // (если APK) или через copy-to-clipboard (веб) - выбрать куда сохранить решает сам человек.
-  function buildExportText(){
-    var d=new Date(), dstr=("0"+d.getDate()).slice(-2)+"."+("0"+(d.getMonth()+1)).slice(-2)+"."+d.getFullYear();
-    var payload={v:1,restrictions:state.restrictions};
-    return "ПИКЕТ — экспорт ограничений ("+dstr+", "+state.restrictions.length+" шт.)\n"+JSON.stringify(payload);
-  }
-  $("#btnExportRes").addEventListener("click",function(){
-    if(!state.restrictions.length){ toast("Список пуст — нечего экспортировать"); return; }
-    var text=buildExportText();
-    try{
-      if(window.Android&&window.Android.shareText){ window.Android.shareText("ПИКЕТ — ограничения",text); return; }
-    }catch(e){}
-    // Веб-фолбэк: копируем в буфер обмена
-    try{
-      if(navigator.clipboard&&navigator.clipboard.writeText){
-        navigator.clipboard.writeText(text).then(function(){ toast("Скопировано в буфер обмена — вставь в заметки или Telegram"); });
-        return;
-      }
-    }catch(e){}
-    // Совсем старый фолбэк: textarea+execCommand
-    try{
-      var ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
-      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
-      toast("Скопировано в буфер обмена");
-    }catch(e){ toast("Не удалось скопировать — попробуй вручную"); }
-  });
-
-  $("#btnImportRes").addEventListener("click",function(){
-    $("#importText").value=""; $("#importPreview").textContent="";
-    openSheet("#sheetImport");
-  });
-  $("#importText").addEventListener("input",function(){
-    var parsed=tryParseImport($("#importText").value);
-    $("#importPreview").textContent = parsed ? ("Найдено ограничений: "+parsed.restrictions.length) : "";
-  });
-  function tryParseImport(text){
-    if(!text||!text.trim())return null;
-    var start=text.indexOf("{"), end=text.lastIndexOf("}");
-    if(start<0||end<0||end<start)return null;
-    try{
-      var obj=JSON.parse(text.slice(start,end+1));
-      if(obj&&Array.isArray(obj.restrictions))return obj;
-    }catch(e){}
-    return null;
-  }
-  $("#btnImportConfirm").addEventListener("click",async function(){
-    var parsed=tryParseImport($("#importText").value);
-    if(!parsed){ toast("Не получилось распознать текст — проверь что скопировал полностью"); return; }
-    var n=parsed.restrictions.length;
-    var msg = state.restrictions.length
-      ? ("Заменить текущий список ("+state.restrictions.length+" шт.) на импортируемый ("+n+" шт.)?")
-      : ("Импортировать "+n+" ограничений?");
-    if(await showConfirm(msg,{okText:"Импортировать",title:"Импорт списка"})){
-      state.restrictions=parsed.restrictions; alertState={}; persist(); renderList(); renderTrip();
-      closeSheets(); toast("Импортировано: "+n+" шт.");
-    }
-  });
-
   $("#listBox").addEventListener("click",function(e){ var del=e.target.closest("[data-del]");
     if(del){ var id=del.getAttribute("data-del"); state.restrictions=state.restrictions.filter(function(x){return x.id!==id;}); persist(); renderList(); renderTrip(); toast("Удалено"); return; }
     var it=e.target.closest(".item"); if(it){ var r=state.restrictions.find(function(x){return x.id===it.getAttribute("data-id");}); if(r)openRes(r); } });
@@ -2254,15 +2202,6 @@
     },1500);
   }
 
-  $("#btnBgHelp").addEventListener("click",function(){ openSheet("#sheetBgHelp"); });
-  $("#btnOpenAutostart").addEventListener("click",function(){
-    try{
-      if(window.Android&&window.Android.openAutostartSettings){
-        var ok=window.Android.openAutostartSettings();
-        if(!ok) toast("Не нашёл такой экран на этом телефоне — смотри шаги выше");
-      } else toast("Доступно только в приложении на телефоне");
-    }catch(e){ toast("Не получилось открыть — смотри шаги выше"); }
-  });
   $("#btnSpeedRef").addEventListener("click",function(){
     document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on");});
     $("#v-speedlist").classList.add("on"); renderSpeedList(); });

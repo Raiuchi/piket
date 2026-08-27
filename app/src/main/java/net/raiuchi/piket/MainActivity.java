@@ -105,6 +105,7 @@ public class MainActivity extends Activity {
         web.loadUrl(APP_URL);
 
         requestNeededPermissions();
+        requestIgnoreBatteryOptimizations();
         checkForUpdate();
     }
 
