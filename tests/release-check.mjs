@@ -49,6 +49,7 @@ const gradle = read('app/build.gradle');
 check('release version is 1.4.87', gradle.includes('versionName "1.4.87"') && gradle.includes('versionCode 93'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
+check('release notes include generated GPS report', workflow.includes('tail -n +2 GPS_TEST_RESULTS.md'));
 check('CI restores signing key from secret', workflow.includes('PIKET_KEYSTORE_B64') && workflow.includes('base64 --decode'));
 check('signing key is not stored in repository tree', !fs.existsSync(new URL('app/piket-release.keystore', root)));
 

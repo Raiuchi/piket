@@ -94,7 +94,7 @@ jobs:
               echo ""
             fi
             echo "### Результаты GPS-стресс-тестов"
-            tail -n +2 tests/GPS_TEST_RESULTS.md
+          tail -n +2 GPS_TEST_RESULTS.md
             echo ""
             echo "---"
             echo "### Установка"
