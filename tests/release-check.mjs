@@ -18,6 +18,7 @@ check('all embedded JavaScript parses', scripts.every((script, index) => {
 
 const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(match => match[1]);
 check('HTML ids are unique', new Set(ids).size === ids.length);
+check('bottom sheets and dialogs stay above navigation', html.includes('.nav{left:10px;right:10px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:100') && html.includes('.sheet{position:fixed;left:0;right:0;bottom:0;z-index:120') && html.includes('.cfScrim{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:130'));
 
 const manifest = read('app/src/main/AndroidManifest.xml');
 check('fine and coarse location declared', manifest.includes('ACCESS_FINE_LOCATION') && manifest.includes('ACCESS_COARSE_LOCATION'));
@@ -46,7 +47,7 @@ check('spoofing and poor Doppler data are rejected', service.includes('loc.isMoc
 check('multi-constellation GNSS quality is evaluated', service.includes('getConstellationType') && html.includes('constellationDiversity'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.87', gradle.includes('versionName "1.4.87"') && gradle.includes('versionCode 93'));
+check('release version is 1.4.88', gradle.includes('versionName "1.4.88"') && gradle.includes('versionCode 94'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
 check('release notes include generated GPS report', workflow.includes('tail -n +2 GPS_TEST_RESULTS.md'));

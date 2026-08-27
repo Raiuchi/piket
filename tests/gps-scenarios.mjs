@@ -45,6 +45,6 @@ run('Одиночный скачок на другой маршрут не пе�
 const passed=results.filter(x=>x.ok).length;
 for(const r of results)console.log(`${r.ok?'PASS':'FAIL'} ${r.name}${r.error?`: ${r.error}`:''}`);
 console.log(`${passed}/${results.length} GPS scenarios passed`);
-const report=['# GPS stress-test 1.4.87','',`Результат: **${passed}/${results.length} сценариев пройдено**.`,'','Проверено программной имитацией:','',...results.map(r=>`- ${r.ok?'✅':'❌'} ${r.name}${r.error?` — ${r.error}`:''}`),'','Условия: точный сигнал, все встроенные маршруты, устаревший фикс, признаки РЭБ, полная потеря, одиночный скачок и плавное восстановление.','', '> Это программная имитация, а не замена полевой проверке. ПИКЕТ остаётся вспомогательным инструментом.',''].join('\n');
+const report=['# GPS stress-test 1.4.88','',`Результат: **${passed}/${results.length} сценариев пройдено**.`,'','Проверено программной имитацией:','',...results.map(r=>`- ${r.ok?'✅':'❌'} ${r.name}${r.error?` — ${r.error}`:''}`),'','Условия: точный сигнал, все встроенные маршруты, устаревший фикс, признаки РЭБ, полная потеря, одиночный скачок и плавное восстановление.','', '> Это программная имитация, а не замена полевой проверке. ПИКЕТ остаётся вспомогательным инструментом.',''].join('\n');
 if(process.argv.includes('--report'))fs.writeFileSync(new URL('GPS_TEST_RESULTS.md',root),report,'utf8');
 if(passed!==results.length)process.exitCode=1;
