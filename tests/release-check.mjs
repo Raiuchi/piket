@@ -25,6 +25,7 @@ check('location foreground service declared', manifest.includes('FOREGROUND_SERV
 check('service is not exported', /<service[\s\S]*?android:exported="false"/.test(manifest));
 check('premium adaptive launcher art exists', fs.existsSync(new URL('app/src/main/res/drawable-nodpi/ic_launcher_art.png', root)));
 check('APK header icon exists', fs.existsSync(new URL('app/src/main/assets/icons/icon-192.png', root)));
+check('offline premium Manrope fonts exist', fs.existsSync(new URL('app/src/main/assets/assets/fonts/manrope-cyrillic.woff2', root)) && fs.existsSync(new URL('app/src/main/assets/assets/fonts/manrope-latin.woff2', root)));
 
 const activity = read('app/src/main/java/net/raiuchi/piket/MainActivity.java');
 check('WebView content access disabled', activity.includes('setAllowContentAccess(false)'));
@@ -38,9 +39,12 @@ check('external bridge allows only HTTP(S)', activity.includes('"https".equalsIg
 const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.java');
 check('notification updates retain content intent', /updateNotificationText[\s\S]*?setContentIntent\(pi\)/.test(service));
 check('accelerometer listener is unregistered', service.includes('unregisterListener(accelListener)'));
+check('GNSS quality monitor is registered and released', service.includes('registerGnssStatusCallback') && service.includes('unregisterGnssStatusCallback'));
+check('fresh high-frequency locations requested', service.includes('new LocationRequest.Builder(1000)') && service.includes('.setMaxUpdateAgeMillis(0)') && service.includes('.setWaitForAccurateLocation(true)'));
+check('stale fixes and smooth recovery are implemented', html.includes('fixAge>5000') && html.includes('correctionTargetOdo') && html.includes('GPS восстановлен — плавно уточняю позицию'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.85', gradle.includes('versionName "1.4.85"') && gradle.includes('versionCode 91'));
+check('release version is 1.4.86', gradle.includes('versionName "1.4.86"') && gradle.includes('versionCode 92'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
 check('CI restores signing key from secret', workflow.includes('PIKET_KEYSTORE_B64') && workflow.includes('base64 --decode'));

@@ -5,19 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#070B12">
 <title>ПИКЕТ · Сапсан</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700;800&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
+  @font-face{font-family:"Manrope";font-style:normal;font-weight:400 800;font-display:swap;src:url("assets/fonts/manrope-cyrillic.woff2") format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+  @font-face{font-family:"Manrope";font-style:normal;font-weight:400 800;font-display:swap;src:url("assets/fonts/manrope-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
   :root{
     --bg:#04060B; --bg-rise:#0A1220; --panel:#0E1520; --panel2:#141F2E; --line:rgba(255,255,255,.09); --line-soft:rgba(255,255,255,.05);
     --txt:#F3F7FC; --dim:#8CA0B5; --dim2:#57697E;
     --blue:#2E7BF5; --blue-d:#0A4FC4; --blue-l:#7FC2FF; --steel:#B7C7DA; --red:#E2231A; --red-d:#A8151A; --red-l:#FF5A4E;
     --green:#2FBF71; --amber:#F5A524; --rsig:#FF4D4F;
     --gg:rgba(47,191,113,.16); --ga:rgba(245,165,36,.18); --gr:rgba(255,77,79,.20);
-    --mono:"JetBrains Mono",ui-monospace,"SF Mono","Roboto Mono",Menlo,Consolas,monospace;
-    --sans:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    --display:"Unbounded","Manrope",system-ui,sans-serif;
+    --mono:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --sans:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --display:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
   input,textarea{-webkit-user-select:text;user-select:text}
@@ -40,7 +39,7 @@
     color:var(--txt);font-family:var(--sans);min-height:100dvh;overflow-x:hidden;
        -webkit-font-smoothing:antialiased;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
   .app{max-width:540px;margin:0 auto;padding:0 14px}
-  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .num{font-family:var(--sans);font-variant-numeric:tabular-nums;letter-spacing:-.025em}
   button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer}
   input,select{font-family:inherit;color:var(--txt);font-size:16px}
 
@@ -351,7 +350,7 @@
     repeating-linear-gradient(135deg,rgba(255,255,255,.012) 0 1px,transparent 1px 7px);opacity:.72}
   body::after{display:none}
   .app{max-width:560px;padding:0 16px}
-  .hero{margin:0 -16px 18px;padding:18px 20px 15px;background:
+  .hero{margin:0 -16px 18px;padding:18px 20px 18px;background:
     linear-gradient(180deg,rgba(20,28,37,.97),rgba(8,12,17,.94));
     border-bottom:1px solid rgba(184,207,228,.14);box-shadow:0 18px 44px rgba(0,0,0,.34)}
   .hero::after{right:-60px;top:-80px;width:320px;height:260px;
@@ -366,10 +365,7 @@
   .wm .t b{letter-spacing:.15em;text-shadow:0 1px 12px rgba(136,210,255,.18)}
   .gps{background:linear-gradient(180deg,rgba(28,36,46,.85),rgba(9,13,18,.9));
     border-color:rgba(200,220,238,.14);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 5px 16px rgba(0,0,0,.28)}
-  .train{height:92px;opacity:1;overflow:visible}
-  .train>svg{display:none}
-  .train-real{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;
-    filter:drop-shadow(0 13px 13px rgba(0,0,0,.68)) drop-shadow(0 1px 2px rgba(166,216,249,.2))}
+  .train{display:none}
   .rails{background:linear-gradient(90deg,transparent,#506170 18%,#506170 82%,transparent);box-shadow:0 1px 6px rgba(151,204,241,.14)}
   .board{gap:11px;margin-bottom:12px}
   .board .seg,.board .peregon{background:linear-gradient(180deg,rgba(29,37,47,.96),rgba(13,18,24,.96));
@@ -420,9 +416,10 @@
     box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 10px 24px rgba(16,117,184,.32)}
   .nav{left:10px;right:10px;bottom:8px;border:1px solid rgba(203,220,233,.13);border-radius:20px;padding:8px 4px calc(8px + env(safe-area-inset-bottom));
     background:linear-gradient(180deg,rgba(29,39,50,.98),rgba(10,15,21,.99));box-shadow:inset 0 1px 0 rgba(255,255,255,.11),0 -1px 0 rgba(64,170,245,.22),0 14px 34px rgba(0,0,0,.5)}
-  .nav button{color:#AEC0CF!important;opacity:1!important;font-size:11px;font-weight:720;text-shadow:0 1px 2px #000}
-  .nav button svg{color:#B8CAD8!important;opacity:1!important;filter:drop-shadow(0 1px 2px #000)}
-  .nav button.on{color:#E1F5FF!important;text-shadow:0 0 13px rgba(53,167,255,.7)}
+  .nav button{position:relative;z-index:2;margin:0 3px;border:1px solid rgba(205,225,239,.11);border-radius:13px;background:rgba(255,255,255,.045);color:#F3F8FC!important;-webkit-text-fill-color:#F3F8FC!important;opacity:1!important;font-size:12px;font-weight:800;text-shadow:0 0 1px #fff,0 1px 2px #000}
+  .nav button svg{color:#D5E4EF!important;opacity:1!important;filter:drop-shadow(0 1px 2px #000)}
+  .nav button span{display:block;color:#F3F8FC!important;-webkit-text-fill-color:#F3F8FC!important;opacity:1!important;line-height:1.2}
+  .nav button.on{border-color:rgba(93,197,255,.42);background:linear-gradient(180deg,rgba(43,159,231,.3),rgba(12,84,132,.22));color:#FFFFFF!important;-webkit-text-fill-color:#FFFFFF!important;text-shadow:0 0 2px #fff,0 0 13px rgba(53,167,255,.7)}
   .nav button.on svg{color:#69C9FF!important;filter:drop-shadow(0 0 8px rgba(53,167,255,.85))}
   .speed-ref-entry{padding:0!important;overflow:hidden;border-color:rgba(80,179,244,.24)!important;background:linear-gradient(145deg,rgba(26,38,50,.98),rgba(10,15,21,.98))!important}
   .speed-ref-entry .row{padding:18px 16px!important;background:radial-gradient(circle at 5% 0,rgba(53,167,255,.13),transparent 45%)}
@@ -462,7 +459,6 @@
       <div class="gps" id="gps"><span class="dot"></span><span id="gpsTxt">GPS выкл</span></div>
     </div>
     <div class="train">
-      <img class="train-real" src="assets/train-side.png" alt="">
       <svg viewBox="0 0 420 80" preserveAspectRatio="xMidYMax meet">
         <defs>
           <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2F6FB"/><stop offset="1" stop-color="#C4D2E2"/></linearGradient>
@@ -684,9 +680,9 @@
 </div>
 
 <nav class="nav">
-  <button class="on" data-v="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 12 8 8m4 4 4-2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>Поездка</button>
-  <button data-v="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>Список</button>
-  <button data-v="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8 2 2 0 1 1-2.8 2.8 1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5 2 2 0 0 1-4 0 1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3 2 2 0 1 1-2.8-2.8 1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1 2 2 0 0 1 0-4 1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8 2 2 0 1 1 2.8-2.8 1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5 2 2 0 0 1 4 0 1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3 2 2 0 1 1 2.8 2.8 1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1 2 2 0 0 1 0 4 1.6 1.6 0 0 0-1.5 1z"/></svg>Настройки</button>
+  <button class="on" data-v="trip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 12 8 8m4 4 4-2"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg><span>Поездка</span></button>
+  <button data-v="list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg><span>Список</span></button>
+  <button data-v="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8 2 2 0 1 1-2.8 2.8 1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5 2 2 0 0 1-4 0 1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3 2 2 0 1 1-2.8-2.8 1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1 2 2 0 0 1 0-4 1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8 2 2 0 1 1 2.8-2.8 1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5 2 2 0 0 1 4 0 1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3 2 2 0 1 1 2.8 2.8 1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1 2 2 0 0 1 0 4 1.6 1.6 0 0 0-1.5 1z"/></svg><span>Настройки</span></button>
 </nav>
 
 <div class="scrim" id="scrim"></div>
@@ -962,7 +958,7 @@
     toast("⚠️ Зона частого глушения GPS впереди — по опыту прошлых поездок");
   }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting",lastFixAgeMs:0,satellitesUsed:0,averageCn0:0};
   var MAXSPD=250;
   var $=function(s){return document.querySelector(s);};
   function metersOf(km,pk,m){ pk=+pk; if(isNaN(pk)||pk<1)pk=1; if(pk>10)pk=10; m=+m; if(isNaN(m)||m<0)m=0; if(m>99)m=99; return (+km||0)*1000+(pk-1)*100+m; }
@@ -1252,7 +1248,14 @@
     try{ var m=rt.posM; if(m==null)return; var txt=kmFrom(m)+" км · ПК"+pkFrom(m)+" · "+Math.round(rt.speed)+" км/ч"; if(window.Android&&window.Android.updatePosition)window.Android.updatePosition(txt); }catch(e){}
   }
   function onPos(p){ var c=p.coords,acc=c.accuracy||999;
-    $("#gps").className="gps "+(acc<=25?"live":"weak"); $("#gpsTxt").textContent=(acc<=25?"GPS вкл":"GPS слабый");
+    var fixAge=(c.fixAgeMs==null?0:+c.fixAgeMs), sats=+c.satellitesUsed||0, cn0=+c.averageCn0||0;
+    rt.lastFixAgeMs=fixAge; rt.satellitesUsed=sats; rt.averageCn0=cn0;
+    if(fixAge>5000){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; onErr({code:2,stale:true}); return; }
+    var satelliteWeak=(c.gnssTelemetry===true && (sats<4 || cn0<18));
+    var signalGood=acc<=30 && !satelliteWeak;
+    rt.gpsState=signalGood?(rt.lastGoodFix==null?"checking":"precise"):(acc<=70?"degraded":"deadreckoning");
+    $("#gps").className="gps "+(signalGood?"live":(acc<=70?"weak":"dead"));
+    $("#gpsTxt").textContent=signalGood?"GPS точный":(acc<=70?"GPS слабый":"счёт по пути");
     var now=p.timestamp||Date.now(),pt={lat:c.latitude,lon:c.longitude,t:now};
     var dt=rt.last?Math.max(0,(now-rt.last.t)/1000):null;
 
@@ -1484,7 +1487,8 @@
             //   лучше поправить быстро, чем ехать долго с неверной позицией у ограничения.
             //   2 подтверждения (не 1) всё же защищают от одиночного ложного скачка GPS,
             //   который мог бы перекинуть позицию мимо реальной зоны ограничения.
-            var needed = diff<100 ? 1 : (diff<2000 ? 3 : 2);
+            var needed = diff<100 ? 1 : (diff<2000 ? 3 : 4);
+            if(satelliteWeak || fixAge>2000) needed+=2;
             // КУРС ДВИЖЕНИЯ ПРОТИВ ГЛУШЕНИЯ: поезд физически может двигаться только вдоль
             // рельс в одну из двух сторон. Если GPS-приёмник даёт курс (heading) и он сильно
             // (>90°, то есть "поперёк" пути) не совпадает с ожидаемым направлением рельс в
@@ -1521,9 +1525,9 @@
                 // там нужна скорость, не косметика (проверено тестами test_drift_timing_full).
                 rt.odo = rt.odo*0.5 + newOdoVal*0.5;
               } else {
-                rt.odo = newOdoVal;
+                rt.correctionTargetOdo=newOdoVal;
               }
-              rt.posM=currentMeters(); rt.lastGoodFix=now; rt.fixQuality="good";
+              rt.posM=currentMeters(); rt.lastGoodFix=now; rt.fixQuality=(rt.correctionTargetOdo==null?"good":"recovering"); rt.gpsState=rt.fixQuality;
               rt.pendingCount=needed; // не сбрасываем в 0 — иначе каждый цикл мигает "уточняю→точная"
               rt.pendingCandM=candM; rt.driftSince=null; rt.driftCandM=null;
               $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
@@ -1546,8 +1550,9 @@
               else { rt.pendingCount=1; }
               rt.pendingCandM=candM; rt.driftSince=null; rt.driftCandM=null;
               if(rt.pendingCount>=2 || acc<=30){
-                rt.odo=(dirDown()?-1:1)*(candM-calibM0cur);
-                rt.posM=candM; rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null; rt.fixQuality="good";
+                var weakTarget=(dirDown()?-1:1)*(candM-calibM0cur);
+                if(Math.abs(weakTarget-rt.odo)>250) rt.correctionTargetOdo=weakTarget; else rt.odo=rt.odo*0.45+weakTarget*0.55;
+                rt.posM=currentMeters(); rt.lastGoodFix=now; rt.pendingCount=0; rt.pendingCandM=null; rt.fixQuality=(rt.correctionTargetOdo==null?"good":"recovering"); rt.gpsState=rt.fixQuality;
                 $("#spdSrc").textContent=viaTrack?"GPS + путь ✓":"GPS активен"; $("#spdSrc").className="src";
               } else {
                 rt.posM=drM; rt.fixQuality="checking";
@@ -1581,7 +1586,7 @@
     autoDetectPeregon(c.latitude, c.longitude, acc);
     updateAndroidNotification();
     renderTrip(); evalAlerts(); }
-  function onErr(e){ if(rt.last){ $("#spdSrc").textContent="GPS потерян — иду по счёту"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="нет сигнала";
+  function onErr(e){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
       // КРИТИЧНО: при полной потере сигнала скорость раньше оставалась ЗАСТЫВШЕЙ на
       // последнем известном значении - если перед самой потерей был случайный шумовой
       // выброс (GPS даёт скачок скорости в момент ухудшения сигнала перед тем как пропасть
@@ -1616,6 +1621,13 @@
   }
     var now=Date.now(), dt=(now-(rt.lastTick||now))/1000; rt.lastTick=now;
     if(dt>0&&dt<10&&rt.speed>5) rt.odo+=(rt.speed/3.6)*dt;
+    if(rt.correctionTargetOdo!=null && dt>0 && dt<10){
+      var correctionLeft=rt.correctionTargetOdo-rt.odo;
+      var correctionStep=Math.min(Math.abs(correctionLeft),Math.max(25,250*dt));
+      rt.odo+=Math.sign(correctionLeft)*correctionStep;
+      rt.fixQuality="recovering"; rt.gpsState="recovering";
+      if(Math.abs(rt.correctionTargetOdo-rt.odo)<5){ rt.odo=rt.correctionTargetOdo; rt.correctionTargetOdo=null; rt.fixQuality="good"; rt.gpsState="precise"; }
+    }
     rt.posM=currentMeters(); renderTrip(); evalAlerts(); recordZoneQuality(); checkZoneWarning();
     if(IS_HEADLESS) saveTrackSnapshot(); }
   function startTicker(){ rt.lastTick=Date.now(); if(rt.tickTimer)clearInterval(rt.tickTimer); rt.tickTimer=setInterval(tickerStep,600); }
@@ -1635,6 +1647,8 @@
   function readTrackSnapshot(){ return load("sap_snap",null); }
   function fixQualityText(q){
     if(q==="good") return {gps:"live", txt:"GPS вкл", src:"GPS активен — позиция точная", srcCls:"src live"};
+    if(q==="recovering") return {gps:"weak", txt:"GPS восстановлен", src:"GPS восстановлен — плавно уточняю позицию", srcCls:"src dr"};
+    if(q==="deadreckoning") return {gps:"dead", txt:"счёт по пути", src:"GPS недоступен — счёт по скорости вдоль пути", srcCls:"src dr"};
     if(q==="checking") return {gps:"weak", txt:"GPS — проверяю", src:"Сигнал есть, уточняю позицию", srcCls:"src dr"};
     if(q==="weak") return {gps:"dead", txt:"GPS слабый", src:"Сигнал слабый — счёт по скорости", srcCls:"src dr"};
     if(q==="waiting") return {gps:"weak", txt:"GPS — жду сигнал", src:"Жду точный сигнал для привязки", srcCls:"src dr"};
@@ -1738,9 +1752,9 @@
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
 
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
-  window.onNativeLocation=function(lat,lon,acc,speedMps,time){
+  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry){
     if(!rt.tracking)return;
-    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps) }, timestamp:time };
+    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0, gnssTelemetry:gnssTelemetry }, timestamp:time };
     onPos(fakePos); };
   // КРИТИЧНО: вызывается из Java (TrackingService.notifyLocationUnavailable), когда система
   // явно сообщает "сейчас локация недоступна" (onLocationAvailability). Без этого моста
@@ -1985,7 +1999,7 @@
       okBtn.addEventListener("click",onOk); cancelBtn.addEventListener("click",onCancel); scrim.addEventListener("click",onScrim);
     });
   }
-  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason","#sheetBgHelp","#sheetImport"].forEach(function(s){$(s).classList.remove("on");}); }
+  function closeSheets(){ $("#scrim").classList.remove("on"); ["#sheetRes","#sheetCal","#sheetPer","#sheetReason"].forEach(function(s){$(s).classList.remove("on");}); }
   $("#scrim").addEventListener("click",closeSheets);
   function setSeg(sel,val,attr){ document.querySelectorAll(sel+" button").forEach(function(b){ b.classList.toggle("on",b.getAttribute("data-"+attr)===val); }); }
   function renderChips(rowSel,opts,val,onPick){ var row=$(rowSel);
@@ -2082,7 +2096,7 @@
     var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null};
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false;
-    rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; alertState={}; rt.posM=currentMeters(); persist();
+    rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; rt.correctionTargetOdo=null; alertState={}; rt.posM=currentMeters(); persist();
     rt.manualCalibAt=Date.now();
     save("sap_manualCalib", rt.manualCalibAt); // headless-служба тоже прочитает
     closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км");
@@ -2287,7 +2301,7 @@
       var fresh=load("sap_cal",null);
       if(fresh==null) return;
       state.calib=fresh;
-      rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0;
+      rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; rt.correctionTargetOdo=null;
       rt.fixQuality=null; rt.trackingSince=null; rt.awaitingManualCalib=false;
       state.calib._trackM=null; // заново ищем привязку к пути на свежей калибровке
       saveTrackSnapshot();

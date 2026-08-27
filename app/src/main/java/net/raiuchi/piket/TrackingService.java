@@ -16,11 +16,14 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.location.Location;
+import android.location.GnssStatus;
+import android.location.LocationManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
@@ -64,6 +67,11 @@ public class TrackingService extends Service {
     private long lastFixReceivedAt = 0;
     private long locationUnavailableSince = 0;
     private Runnable locationWatchdogRunnable;
+    private LocationManager locationManager;
+    private GnssStatus.Callback gnssStatusCallback;
+    private volatile int gnssSatellitesUsed = 0;
+    private volatile float gnssAverageCn0 = 0f;
+    private volatile boolean gnssTelemetrySeen = false;
 
     private WebView headlessWeb;
     private boolean headlessPageReady = false;
@@ -304,9 +312,12 @@ public class TrackingService extends Service {
 
         fusedClient = LocationServices.getFusedLocationProviderClient(this);
 
-        LocationRequest request = new LocationRequest.Builder(2000)
+        LocationRequest request = new LocationRequest.Builder(1000)
                 .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
-                .setMinUpdateIntervalMillis(1000)
+                .setMinUpdateIntervalMillis(500)
+                .setMaxUpdateAgeMillis(0)
+                .setMaxUpdateDelayMillis(0)
+                .setWaitForAccurateLocation(true)
                 .build();
 
         locationCallback = new LocationCallback() {
@@ -348,6 +359,37 @@ public class TrackingService extends Service {
             // разрешение не выдано — координаты просто не пойдут, без падения приложения
         }
         startLocationWatchdog();
+        startGnssQualityMonitor();
+    }
+
+    /** Отдельно наблюдаем качество спутникового сигнала. Accuracy иногда остаётся
+     * правдоподобной даже в начале помехи; число реально использованных спутников и C/N0
+     * позволяют JS-движку раньше перейти в осторожный режим и не принять ложный скачок. */
+    private void startGnssQualityMonitor() {
+        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager == null || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) return;
+        gnssStatusCallback = new GnssStatus.Callback() {
+            @Override public void onSatelliteStatusChanged(GnssStatus status) {
+                gnssTelemetrySeen = true;
+                int used = 0;
+                float cn0Sum = 0f;
+                for (int i = 0; i < status.getSatelliteCount(); i++) {
+                    if (status.usedInFix(i)) {
+                        used++;
+                        cn0Sum += status.getCn0DbHz(i);
+                    }
+                }
+                gnssSatellitesUsed = used;
+                gnssAverageCn0 = used > 0 ? cn0Sum / used : 0f;
+            }
+            @Override public void onStopped() {
+                gnssSatellitesUsed = 0;
+                gnssAverageCn0 = 0f;
+            }
+        };
+        try { locationManager.registerGnssStatusCallback(gnssStatusCallback, mainHandler); }
+        catch (SecurityException ignored) {}
     }
 
     /** Watchdog: если за последние 15 секунд не пришёл ни один фикс GPS (ни хороший, ни
@@ -394,9 +436,12 @@ public class TrackingService extends Service {
                         // обходе бага.
                         fusedClient.removeLocationUpdates(locationCallback);
                         fusedClient = LocationServices.getFusedLocationProviderClient(TrackingService.this);
-                        LocationRequest req = new LocationRequest.Builder(2000)
+                        LocationRequest req = new LocationRequest.Builder(1000)
                                 .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
-                                .setMinUpdateIntervalMillis(1000)
+                                .setMinUpdateIntervalMillis(500)
+                                .setMaxUpdateAgeMillis(0)
+                                .setMaxUpdateDelayMillis(0)
+                                .setWaitForAccurateLocation(true)
                                 .build();
                         fusedClient.requestLocationUpdates(req, locationCallback, Looper.getMainLooper());
                         lastFixReceivedAt = now; // не дёргаем перезапрос на каждом тике, ждём ещё 15с
@@ -484,12 +529,21 @@ public class TrackingService extends Service {
         final boolean hasSpeed = loc.hasSpeed();
         final float speedMps = hasSpeed ? loc.getSpeed() : 0f;
         final long time = loc.getTime();
+        final long ageMs = Math.max(0L, (SystemClock.elapsedRealtimeNanos()
+                - loc.getElapsedRealtimeNanos()) / 1_000_000L);
+        final boolean hasBearing = loc.hasBearing();
+        final float bearing = hasBearing ? loc.getBearing() : 0f;
+        final int satellitesUsed = gnssSatellitesUsed;
+        final float averageCn0 = gnssAverageCn0;
+        final boolean hasGnssTelemetry = gnssTelemetrySeen;
         mainHandler.post(new Runnable() {
             @Override public void run() {
                 if (headlessWeb == null) return;
                 String js = "if(window.onNativeLocation)window.onNativeLocation("
                         + lat + "," + lon + "," + accuracy + ","
-                        + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ");";
+                        + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ","
+                        + ageMs + "," + (hasBearing ? String.valueOf(bearing) : "null") + ","
+                        + satellitesUsed + "," + averageCn0 + "," + hasGnssTelemetry + ");";
                 headlessWeb.evaluateJavascript(js, null);
             }
         });
@@ -609,6 +663,10 @@ public class TrackingService extends Service {
         if (sensorManager != null && accelListener != null) {
             sensorManager.unregisterListener(accelListener);
             accelListener = null;
+        }
+        if (locationManager != null && gnssStatusCallback != null) {
+            locationManager.unregisterGnssStatusCallback(gnssStatusCallback);
+            gnssStatusCallback = null;
         }
         if (wakeLock != null && wakeLock.isHeld()) {
             wakeLock.release();
