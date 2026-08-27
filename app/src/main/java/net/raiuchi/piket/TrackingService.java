@@ -72,6 +72,7 @@ public class TrackingService extends Service {
     private volatile int gnssSatellitesUsed = 0;
     private volatile float gnssAverageCn0 = 0f;
     private volatile boolean gnssTelemetrySeen = false;
+    private volatile int gnssConstellationDiversity = 0;
 
     private WebView headlessWeb;
     private boolean headlessPageReady = false;
@@ -374,18 +375,25 @@ public class TrackingService extends Service {
                 gnssTelemetrySeen = true;
                 int used = 0;
                 float cn0Sum = 0f;
+                boolean[] constellations = new boolean[8];
                 for (int i = 0; i < status.getSatelliteCount(); i++) {
                     if (status.usedInFix(i)) {
                         used++;
                         cn0Sum += status.getCn0DbHz(i);
+                        int constellation = status.getConstellationType(i);
+                        if (constellation >= 0 && constellation < constellations.length) constellations[constellation] = true;
                     }
                 }
+                int diversity = 0;
+                for (boolean present : constellations) if (present) diversity++;
                 gnssSatellitesUsed = used;
                 gnssAverageCn0 = used > 0 ? cn0Sum / used : 0f;
+                gnssConstellationDiversity = diversity;
             }
             @Override public void onStopped() {
                 gnssSatellitesUsed = 0;
                 gnssAverageCn0 = 0f;
+                gnssConstellationDiversity = 0;
             }
         };
         try { locationManager.registerGnssStatusCallback(gnssStatusCallback, mainHandler); }
@@ -536,6 +544,10 @@ public class TrackingService extends Service {
         final int satellitesUsed = gnssSatellitesUsed;
         final float averageCn0 = gnssAverageCn0;
         final boolean hasGnssTelemetry = gnssTelemetrySeen;
+        final int constellationDiversity = gnssConstellationDiversity;
+        final boolean mockLocation = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                ? loc.isMock() : loc.isFromMockProvider();
+        final float speedAccuracyMps = loc.hasSpeedAccuracy() ? loc.getSpeedAccuracyMetersPerSecond() : -1f;
         mainHandler.post(new Runnable() {
             @Override public void run() {
                 if (headlessWeb == null) return;
@@ -543,7 +555,8 @@ public class TrackingService extends Service {
                         + lat + "," + lon + "," + accuracy + ","
                         + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ","
                         + ageMs + "," + (hasBearing ? String.valueOf(bearing) : "null") + ","
-                        + satellitesUsed + "," + averageCn0 + "," + hasGnssTelemetry + ");";
+                        + satellitesUsed + "," + averageCn0 + "," + hasGnssTelemetry + ","
+                        + constellationDiversity + "," + mockLocation + "," + speedAccuracyMps + ");";
                 headlessWeb.evaluateJavascript(js, null);
             }
         });

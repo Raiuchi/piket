@@ -37,7 +37,7 @@
       radial-gradient(900px 420px at 90% 0%,rgba(226,35,26,.06),transparent 55%),
       var(--bg);
     color:var(--txt);font-family:var(--sans);min-height:100dvh;overflow-x:hidden;
-       -webkit-font-smoothing:antialiased;padding-bottom:calc(78px + env(safe-area-inset-bottom))}
+       -webkit-font-smoothing:antialiased;padding-bottom:calc(100px + env(safe-area-inset-bottom))}
   .app{max-width:540px;margin:0 auto;padding:0 14px}
   .num{font-family:var(--sans);font-variant-numeric:tabular-nums;letter-spacing:-.025em}
   button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer}
@@ -381,7 +381,7 @@
   .g-bg{stroke:#151C24;stroke-width:10;filter:drop-shadow(0 1px 0 rgba(255,255,255,.07))}
   .g-tickL{stroke:#ECF4FA;stroke-width:2.6}.g-tickM{stroke:#8293A3;opacity:.82}.g-tickS{stroke:#46535F;opacity:.72}
   .g-label{fill:#E6EDF3;font-size:9px}.g-labelAccent{fill:#8293A3;font-size:6.4px}
-  .g-fg{stroke-width:9;filter:drop-shadow(0 0 8px rgba(53,167,255,.78))}
+  .g-fg{stroke-width:11;filter:drop-shadow(0 0 7px rgba(53,167,255,.82)) drop-shadow(0 0 2px rgba(184,231,255,.75))}
   .g-sheen{inset:4.5%;z-index:3;border:1px solid rgba(255,255,255,.055);background:
     radial-gradient(circle at 36% 25%,rgba(255,255,255,.12),transparent 24%),
     linear-gradient(155deg,rgba(255,255,255,.07),transparent 30% 70%,rgba(255,255,255,.025));
@@ -395,10 +395,11 @@
   .g-limit{margin-top:7px;padding:3px 10px;background:rgba(255,255,255,.035);border-color:rgba(210,225,237,.1)}
   .g-limit .lv{font-size:13px}.g-limit .lu{font-size:7px}
   .conf-dots{margin-top:5px}.conf-dots span{width:4px;height:4px}
-  .g-needle{position:absolute;z-index:5;left:calc(50% - 1.5px);top:12%;width:3px;height:38%;
+  .g-needle{position:absolute;z-index:5;left:calc(50% - 1.5px);top:18%;width:3px;height:32%;
     transform-origin:50% 100%;transform:rotate(-135deg);transition:transform .35s cubic-bezier(.22,.8,.24,1);
-    border-radius:3px 3px 1px 1px;background:linear-gradient(90deg,#A40E14,#FF5960 48%,#80080D);
-    box-shadow:0 0 8px rgba(255,56,64,.55)}
+    clip-path:polygon(50% 0,100% 13%,72% 100%,28% 100%,0 13%);background:linear-gradient(90deg,#8E151A,#FF5B62 48%,#8B1116);
+    box-shadow:0 0 7px rgba(255,56,64,.7)}
+  .g-needle::before{content:"";position:absolute;left:50%;bottom:-21px;transform:translateX(-50%);width:5px;height:25px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,#4B5660,#D9E2E9 50%,#404A53);box-shadow:0 2px 4px rgba(0,0,0,.7)}
   .g-needle::after{content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;
     background:radial-gradient(circle at 38% 32%,#DCE6EE,#707E89 38%,#111820 43%,#020304 72%);border:1px solid #73818D;box-shadow:0 2px 7px #000}
   .gaugeWrap.gd-warn .g-needle{background:linear-gradient(90deg,#9A5B00,#FFD15A,#8A4D00);box-shadow:0 0 10px rgba(245,165,36,.8)}
@@ -414,8 +415,8 @@
     box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 8px 18px rgba(0,0,0,.3)}
   .btn.primary,.add-fab{background:linear-gradient(180deg,#31A9FA 0%,#0B6DB5 52%,#074978 100%);border-color:#3BAEFA;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 10px 24px rgba(16,117,184,.32)}
-  .nav{left:10px;right:10px;bottom:8px;border:1px solid rgba(203,220,233,.13);border-radius:20px;padding:8px 4px calc(8px + env(safe-area-inset-bottom));
-    background:linear-gradient(180deg,rgba(29,39,50,.98),rgba(10,15,21,.99));box-shadow:inset 0 1px 0 rgba(255,255,255,.11),0 -1px 0 rgba(64,170,245,.22),0 14px 34px rgba(0,0,0,.5)}
+  .nav{left:10px;right:10px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:100;border:1px solid rgba(151,203,238,.28);border-radius:20px;padding:8px 4px;
+    background:#111923;backdrop-filter:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 -1px 0 rgba(64,170,245,.3),0 14px 34px rgba(0,0,0,.65)}
   .nav button{position:relative;z-index:2;margin:0 3px;border:1px solid rgba(205,225,239,.11);border-radius:13px;background:rgba(255,255,255,.045);color:#F3F8FC!important;-webkit-text-fill-color:#F3F8FC!important;opacity:1!important;font-size:12px;font-weight:800;text-shadow:0 0 1px #fff,0 1px 2px #000}
   .nav button svg{color:#D5E4EF!important;opacity:1!important;filter:drop-shadow(0 1px 2px #000)}
   .nav button span{display:block;color:#F3F8FC!important;-webkit-text-fill-color:#F3F8FC!important;opacity:1!important;line-height:1.2}
@@ -1250,8 +1251,9 @@
   function onPos(p){ var c=p.coords,acc=c.accuracy||999;
     var fixAge=(c.fixAgeMs==null?0:+c.fixAgeMs), sats=+c.satellitesUsed||0, cn0=+c.averageCn0||0;
     rt.lastFixAgeMs=fixAge; rt.satellitesUsed=sats; rt.averageCn0=cn0;
-    if(fixAge>5000){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; onErr({code:2,stale:true}); return; }
-    var satelliteWeak=(c.gnssTelemetry===true && (sats<4 || cn0<18));
+    if(c.mockLocation===true || fixAge>5000){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; onErr({code:2,stale:true}); return; }
+    var diversity=+c.constellationDiversity||0;
+    var satelliteWeak=(c.gnssTelemetry===true && (sats<4 || cn0<18 || (diversity<2 && sats<6)));
     var signalGood=acc<=30 && !satelliteWeak;
     rt.gpsState=signalGood?(rt.lastGoodFix==null?"checking":"precise"):(acc<=70?"degraded":"deadreckoning");
     $("#gps").className="gps "+(signalGood?"live":(acc<=70?"weak":"dead"));
@@ -1264,8 +1266,9 @@
     // GPS-обновлений (1-2с) и мог систематически не срабатывать, если доплер-скорость от чипа
     // недоступна (hasSpeed()==false) или нестабильна в кабине поезда — тогда rt.speed застывал
     // на 0, хотя поезд реально едет. Понижен до dt>0.5 — надёжнее подхватывает скорость.
-    var spd=(c.speed!=null&&c.speed>=0)?c.speed*3.6:null;
-    if(spd==null && rt.last && dt>0.5){
+    var poorDoppler=(c.speedAccuracyMps!=null && c.speedAccuracyMps>=0 && c.speedAccuracyMps>8);
+    var spd=(!poorDoppler&&c.speed!=null&&c.speed>=0)?c.speed*3.6:null;
+    if(spd==null && rt.last && dt>0.5 && (!poorDoppler || signalGood)){
       var fbDist=haversine(rt.last,pt);
       // Минимум 15м накопленного смещения — иначе обычное дрожание стоящего GPS-приёмника
       // (5-10м между фиксами) даёт кажущуюся скорость 20-40 км/ч и ложно "оживляет" счётчик,
@@ -1752,9 +1755,9 @@
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
 
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
-  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry){
+  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps){
     if(!rt.tracking)return;
-    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0, gnssTelemetry:gnssTelemetry }, timestamp:time };
+    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0, gnssTelemetry:gnssTelemetry, constellationDiversity:constellationDiversity, mockLocation:mockLocation, speedAccuracyMps:speedAccuracyMps }, timestamp:time };
     onPos(fakePos); };
   // КРИТИЧНО: вызывается из Java (TrackingService.notifyLocationUnavailable), когда система
   // явно сообщает "сейчас локация недоступна" (onLocationAvailability). Без этого моста

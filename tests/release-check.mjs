@@ -42,9 +42,11 @@ check('accelerometer listener is unregistered', service.includes('unregisterList
 check('GNSS quality monitor is registered and released', service.includes('registerGnssStatusCallback') && service.includes('unregisterGnssStatusCallback'));
 check('fresh high-frequency locations requested', service.includes('new LocationRequest.Builder(1000)') && service.includes('.setMaxUpdateAgeMillis(0)') && service.includes('.setWaitForAccurateLocation(true)'));
 check('stale fixes and smooth recovery are implemented', html.includes('fixAge>5000') && html.includes('correctionTargetOdo') && html.includes('GPS восстановлен — плавно уточняю позицию'));
+check('spoofing and poor Doppler data are rejected', service.includes('loc.isMock()') && service.includes('getSpeedAccuracyMetersPerSecond') && html.includes('mockLocation===true') && html.includes('poorDoppler'));
+check('multi-constellation GNSS quality is evaluated', service.includes('getConstellationType') && html.includes('constellationDiversity'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.86', gradle.includes('versionName "1.4.86"') && gradle.includes('versionCode 92'));
+check('release version is 1.4.87', gradle.includes('versionName "1.4.87"') && gradle.includes('versionCode 93'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
 check('CI restores signing key from secret', workflow.includes('PIKET_KEYSTORE_B64') && workflow.includes('base64 --decode'));

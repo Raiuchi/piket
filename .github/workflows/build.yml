@@ -30,7 +30,9 @@ jobs:
           gradle-version: '8.7'
 
       - name: Run repository checks
-        run: node tests/release-check.mjs
+        run: |
+          node tests/release-check.mjs
+          node tests/gps-scenarios.mjs --report
 
       - name: Restore signing key
         env:
@@ -91,6 +93,9 @@ jobs:
               echo ""
               echo ""
             fi
+            echo "### Результаты GPS-стресс-тестов"
+            tail -n +2 tests/GPS_TEST_RESULTS.md
+            echo ""
             echo "---"
             echo "### Установка"
             echo "Скачай **piket.apk** ниже и установи поверх предыдущей версии. Данные сохранятся."
