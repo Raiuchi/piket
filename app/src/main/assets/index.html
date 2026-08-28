@@ -326,13 +326,11 @@
     background:linear-gradient(180deg,#EAF1F8 0%,#C4D2E2 55%,#8FA6C0 100%);color:#0B1220;border:1px solid rgba(255,255,255,.5);
     box-shadow:0 4px 18px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.6)}
   .alert .ack:active{transform:scale(.96)}
-  .night-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);pointer-events:none;z-index:55;display:none}
   .toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translate(-50%,20px);
     background:rgba(20,28,42,.96);color:var(--txt);padding:12px 20px;border-radius:12px;font-size:14px;
     font-weight:600;max-width:88vw;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5);border:1px solid var(--line);
     opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;z-index:90}
   .toast.on{opacity:1;transform:translate(-50%,0)}
-  .night-overlay.on{display:block}
 +
   /* Premium cockpit visual system — original automotive-inspired design */
   :root{
@@ -644,7 +642,6 @@
       <div class="row"><div><div class="t">Звуковой сигнал</div></div><div class="sw on" id="swSound"></div></div>
       <div class="row"><div><div class="t">Вибрация</div></div><div class="sw on" id="swVibe"></div></div>
       <div class="row"><div><div class="t">Не гасить экран</div><div class="d">Держит экран включённым в поездке.</div></div><div class="sw on" id="swWake"></div></div>
-      <div class="row"><div><div class="t">Ночной режим</div><div class="d">Темнее экран — не слепит в кабине ночью.</div></div><div class="sw" id="swNight"></div></div>
       <div class="row"><div><div class="t">Демо-режим</div><div class="d">Симуляция движения для проверки без GPS. Включи и нажми «Старт» — поедет к ближайшему ограничению.</div></div><div class="sw" id="swDemo"></div></div>
     </div>
     <div class="card speed-ref-entry">
@@ -653,7 +650,7 @@
     <div class="card" style="padding:14px">
       <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
     </div>
-    <p class="small" style="margin:18px 4px 8px">Работает офлайн, данные на телефоне.<br>Помощник, а не замена АЛСН/КЛУБ и регламенту.</p>
+    <p class="small" style="margin:18px 4px 8px">Работает офлайн, данные на телефоне.</p>
     <p class="small" id="appVerLine" style="margin:0 4px 8px;opacity:.6"></p>
   </section>
 
@@ -726,7 +723,7 @@
   <h3>Калибровка по столбу</h3>
   <p class="small" style="text-align:left;margin:-6px 0 16px">Проезжая столб, впиши его номер. Пикет обычно 1 (у столба). Направление — растёт или убывает километраж по ходу.</p>
   <div class="f"><label>Я сейчас на — км, пикет и метр</label>
-    <div class="quad"><input id="cKm" class="num" inputmode="numeric" placeholder="напр. 1"><input id="cPk" class="num" inputmode="numeric" placeholder="1"><input id="cM" class="num" inputmode="numeric" placeholder="0"><span class="unit">км·пк·м</span></div>
+    <div class="quad"><input id="cKm" class="num" inputmode="numeric" placeholder="напр. 1"><input id="cPk" class="num" inputmode="numeric" placeholder="напр. 1"><input id="cM" class="num" inputmode="numeric" placeholder="напр. 0"><span class="unit">км·пк·м</span></div>
     <p class="small" style="text-align:left;margin:6px 2px 0">Метр внутри пикета — если стоишь не точно у столба, а где-то посередине (например, на станции). Не знаешь точно — оставь 0.</p>
   </div>
   <div class="f"><label>Километраж по ходу</label>
@@ -784,7 +781,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-<div class="night-overlay" id="nightOverlay"></div>
 
 <script>
 "use strict";
@@ -904,7 +900,7 @@
   var PEREGONS=["Все участки","СпбГл - Москва","Д. Долг - Павлово","Павлово - Горы II путь","Горы - Павлово I путь",
     "Горы - Петрозаводск","Броневая - Луга","Чудово - Новгород","Волховстрой - Чудово","Выборг - Каменногорск","СПбФин - Выборг"];
   var LEADS=[{v:0,t:"в зоне"},{v:500,t:"0.5 км"},{v:1000,t:"1 км"},{v:1500,t:"1.5 км"},{v:2000,t:"2 км"},{v:3000,t:"3 км"},{v:4000,t:"4 км"},{v:5000,t:"5 км"}];
-  var REASONS=["— без причины —","Ремонт пути","Путевые работы","Состояние пути","Барьерное место","Опустить токоприёмник","Поднять токоприёмник","Выключить ток","Контактная сеть","Работа машин","Искусственное сооружение","Мост","Тоннель","Стрелочный перевод","Переезд","Пучина","Выплеск","Просадка пути","Особая бдительность","Дефект рельса"];
+  var REASONS=["— без причины —","Ремонт пути","Путевые работы","Неисправность пути","Дефект рельса","Неисправность стрелочного перевода","Пучина / выплеск / просадка пути","Неисправность искусственного сооружения","Неисправность переездной сигнализации","Неисправность контактной сети","Работы на контактной сети","Подготовиться к опусканию токоприёмника","Опустить токоприёмник","Поднять токоприёмник","Отключить ток","Включить ток","Неисправность средств СЦБ и связи","Неисправность путевых устройств АЛС","Работа путевых машин","Погрузка / выгрузка на соседнем пути","Негабаритный груз","Подвижной состав с ограниченной скоростью","Работа съёмных подвижных единиц","Особая бдительность / особые условия"];
 
   var LS_OK=true; try{localStorage.setItem("_t","1");localStorage.removeItem("_t");}catch(e){LS_OK=false;}
   var mem={};
@@ -2062,13 +2058,13 @@
     if(editId){ var i=state.restrictions.findIndex(function(x){return x.id===editId;}); if(i>=0)state.restrictions[i]=r; } else state.restrictions.push(r);
     persist(); closeSheets(); renderList(); renderTrip(); toast(editId?"Сохранено":"Ограничение добавлено"); });
 
-  function openCal(){ var m=currentMeters();
+  function openCal(){
     // Показываем ТЕКУЩУЮ вычисленную позицию (если она есть) - именно её машинист хочет
     // подправить по факту проезжаемого столба. Раньше тут показывалось застывшее значение
     // прошлой калибровки, даже если поезд уже далеко уехал от того места.
-    $("#cKm").value=m!=null?kmFrom(m):(state.calib?state.calib.km:"");
-    $("#cPk").value=m!=null?pkFrom(m):(state.calib?state.calib.pk:1);
-    $("#cM").value=m!=null?meterInPk(m):(state.calib?(state.calib.m||0):0);
+    $("#cKm").value="";
+    $("#cPk").value="";
+    $("#cM").value="";
     $("#cDirInfo").textContent=(state.ctx.towards==="obratno"?"⬇ Убывает (выбрано «Обратно»)":"⬆ Растёт (выбрано «Туда»)");
     openSheet("#sheetCal"); }
   $("#calCancel").addEventListener("click",closeSheets); $("#btnCalib").addEventListener("click",openCal);
@@ -2112,9 +2108,9 @@
   function nudge(d){ if(state.calib==null){ toast("Сначала калибровка"); return; } rt.odo+=d*100*(dirDown()?-1:1); rt.posM=currentMeters(); renderTrip(); renderList(); }
   $("#pkPlus").addEventListener("click",function(){ nudge(1); }); $("#pkMinus").addEventListener("click",function(){ nudge(-1); });
 
-  function syncSw(){ [["#swVoice","voice"],["#swSound","sound"],["#swVibe","vibe"],["#swWake","wake"],["#swDemo","demo"],["#swNight","night"]].forEach(function(p){ $(p[0]).classList.toggle("on",!!state.settings[p[1]]); }); $("#leadVal").textContent=fmtLead(state.settings.lead); $("#nightOverlay").classList.toggle("on",!!state.settings.night); }
+  function syncSw(){ [["#swVoice","voice"],["#swSound","sound"],["#swVibe","vibe"],["#swWake","wake"],["#swDemo","demo"]].forEach(function(p){ $(p[0]).classList.toggle("on",!!state.settings[p[1]]); }); $("#leadVal").textContent=fmtLead(state.settings.lead); }
   function swBind(sel,key){ $(sel).addEventListener("click",function(){ state.settings[key]=!state.settings[key]; persist(); syncSw(); if(key==="demo"&&rt.tracking)stopTrack(); }); }
-  swBind("#swVoice","voice"); swBind("#swSound","sound"); swBind("#swVibe","vibe"); swBind("#swWake","wake"); swBind("#swDemo","demo"); swBind("#swNight","night");
+  swBind("#swVoice","voice"); swBind("#swSound","sound"); swBind("#swVibe","vibe"); swBind("#swWake","wake"); swBind("#swDemo","demo");
   $("#leadUp").addEventListener("click",function(){ state.settings.lead=Math.min(8000,state.settings.lead+500); persist(); syncSw(); renderTrip(); });
   $("#leadDn").addEventListener("click",function(){ state.settings.lead=Math.max(300,state.settings.lead-500); persist(); syncSw(); renderTrip(); });
 

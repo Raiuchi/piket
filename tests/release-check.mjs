@@ -19,6 +19,9 @@ check('all embedded JavaScript parses', scripts.every((script, index) => {
 const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(match => match[1]);
 check('HTML ids are unique', new Set(ids).size === ids.length);
 check('bottom sheets and dialogs stay above navigation', html.includes('.nav{left:10px;right:10px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:100') && html.includes('.sheet{position:fixed;left:0;right:0;bottom:0;z-index:120') && html.includes('.cfScrim{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:130'));
+check('night mode and in-app replacement disclaimer are removed', !html.includes('Ночной режим') && !html.includes('nightOverlay') && !html.includes('Помощник, а не замена'));
+check('calibration fields use examples instead of preset-looking values', html.includes('id="cKm" class="num" inputmode="numeric" placeholder="напр. 1"') && html.includes('id="cPk" class="num" inputmode="numeric" placeholder="напр. 1"') && html.includes('id="cM" class="num" inputmode="numeric" placeholder="напр. 0"') && html.includes('$("#cKm").value="";') && html.includes('$("#cPk").value="";') && html.includes('$("#cM").value="";'));
+check('DU-61 practical reasons and power commands are present', ['Неисправность пути','Дефект рельса','Опустить токоприёмник','Поднять токоприёмник','Отключить ток','Включить ток','Неисправность средств СЦБ и связи','Негабаритный груз'].every(x => html.includes(x)));
 
 const manifest = read('app/src/main/AndroidManifest.xml');
 check('fine and coarse location declared', manifest.includes('ACCESS_FINE_LOCATION') && manifest.includes('ACCESS_COARSE_LOCATION'));
@@ -47,7 +50,7 @@ check('spoofing and poor Doppler data are rejected', service.includes('loc.isMoc
 check('multi-constellation GNSS quality is evaluated', service.includes('getConstellationType') && html.includes('constellationDiversity'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.88', gradle.includes('versionName "1.4.88"') && gradle.includes('versionCode 94'));
+check('release version is 1.4.89', gradle.includes('versionName "1.4.89"') && gradle.includes('versionCode 95'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
 check('release notes include generated GPS report', workflow.includes('tail -n +2 GPS_TEST_RESULTS.md'));
