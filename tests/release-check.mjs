@@ -30,6 +30,8 @@ check('location foreground service declared', manifest.includes('FOREGROUND_SERV
 check('service is not exported', /<service[\s\S]*?android:exported="false"/.test(manifest));
 check('premium adaptive launcher art exists', fs.existsSync(new URL('app/src/main/res/drawable-nodpi/ic_launcher_art.png', root)));
 check('APK header icon exists', fs.existsSync(new URL('app/src/main/assets/icons/icon-192.png', root)));
+check('animated signal emblem is bundled and used', fs.existsSync(new URL('app/src/main/assets/icons/piket-signal.gif', root)) && html.includes('url("icons/piket-signal.gif")'));
+check('bottom navigation uses crisp text and icons', html.includes('text-shadow:none!important') && html.includes('filter:none!important;shape-rendering:geometricPrecision'));
 check('offline premium Manrope fonts exist', fs.existsSync(new URL('app/src/main/assets/assets/fonts/manrope-cyrillic.woff2', root)) && fs.existsSync(new URL('app/src/main/assets/assets/fonts/manrope-latin.woff2', root)));
 
 const activity = read('app/src/main/java/net/raiuchi/piket/MainActivity.java');
@@ -61,7 +63,7 @@ check('spoofing and poor Doppler data are rejected', service.includes('loc.isMoc
 check('multi-constellation GNSS quality is evaluated', service.includes('getConstellationType') && html.includes('constellationDiversity'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.90', gradle.includes('versionName "1.4.90"') && gradle.includes('versionCode 96'));
+check('release version is 1.4.91', gradle.includes('versionName "1.4.91"') && gradle.includes('versionCode 97'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
 check('release notes include generated GPS report', workflow.includes('tail -n +2 GPS_TEST_RESULTS.md'));
