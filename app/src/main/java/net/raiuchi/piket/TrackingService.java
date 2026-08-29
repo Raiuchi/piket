@@ -65,6 +65,7 @@ public class TrackingService extends Service {
     private float accelMag = 0f; // та же логика, что в JS: модуль вектора ускорения, сглаженный
     private LocationCallback locationCallback;
     private long lastFixReceivedAt = 0;
+    private long lastFusedRestartAt = 0;
     private long locationUnavailableSince = 0;
     private Runnable locationWatchdogRunnable;
     private LocationManager locationManager;
@@ -318,7 +319,11 @@ public class TrackingService extends Service {
                 .setMinUpdateIntervalMillis(500)
                 .setMaxUpdateAgeMillis(0)
                 .setMaxUpdateDelayMillis(0)
-                .setWaitForAccurateLocation(true)
+                // Не заставляем Play Services молчать до "идеального" фикса. В кабине,
+                // под контактной сетью и при помехах accuracy может быть хуже, но такие
+                // координаты всё равно нужны JS-движку: он сам оценивает accuracy, GNSS,
+                // Doppler и правдоподобие и при необходимости оставляет счёт по пути.
+                .setWaitForAccurateLocation(false)
                 .build();
 
         locationCallback = new LocationCallback() {
@@ -327,7 +332,11 @@ public class TrackingService extends Service {
                 if (result == null) return;
                 Location loc = result.getLastLocation();
                 if (loc == null) return;
-                lastFixReceivedAt = System.currentTimeMillis();
+                // Watchdog должен считать восстановлением только действительно свежий
+                // системный фикс. Устаревшая кэшированная или mock-точка всё равно
+                // передаётся в JS для диагностики и там отбрасывается, но больше не
+                // останавливает восстановление GPS-подписки и резервного канала.
+                if (isFreshRealFix(loc)) lastFixReceivedAt = System.currentTimeMillis();
                 feedLocationToWebView(loc);
             }
 
@@ -430,7 +439,8 @@ public class TrackingService extends Service {
                     stopNetworkBackup();
                 }
 
-                if (fusedClient != null && locationCallback != null && sinceGoodFix > 15000) {
+                if (fusedClient != null && locationCallback != null && sinceGoodFix > 15000
+                        && now - lastFusedRestartAt > 15000) {
                     try {
                         // КРИТИЧНО: найден документированный баг конкретно Samsung One UI 8 /
                         // Android 16 на серии Galaxy S24 - GPS физически "застывает" через
@@ -449,10 +459,15 @@ public class TrackingService extends Service {
                                 .setMinUpdateIntervalMillis(500)
                                 .setMaxUpdateAgeMillis(0)
                                 .setMaxUpdateDelayMillis(0)
-                                .setWaitForAccurateLocation(true)
+                                .setWaitForAccurateLocation(false)
                                 .build();
                         fusedClient.requestLocationUpdates(req, locationCallback, Looper.getMainLooper());
-                        lastFixReceivedAt = now; // не дёргаем перезапрос на каждом тике, ждём ещё 15с
+                        // ВАЖНО: не трогаем lastFixReceivedAt. Раньше переподписка сама
+                        // считалась новым фиксом, хотя координаты ещё не пришли. На следующем
+                        // тике резервный канал выключался как будто GPS восстановился, затем
+                        // всё повторялось. Отдельный таймер ограничивает частоту рестартов,
+                        // а резерв остаётся включённым до настоящего fused-фикса.
+                        lastFusedRestartAt = now;
                     } catch (SecurityException ignored) {}
                 }
                 mainHandler.postDelayed(this, 5000);
@@ -529,6 +544,14 @@ public class TrackingService extends Service {
     }
 
     /** Передаём координату прямо в headless WebView — работает независимо от Activity и экрана */
+    private boolean isFreshRealFix(Location loc) {
+        long ageMs = Math.max(0L, (SystemClock.elapsedRealtimeNanos()
+                - loc.getElapsedRealtimeNanos()) / 1_000_000L);
+        boolean mock = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                ? loc.isMock() : loc.isFromMockProvider();
+        return ageMs <= 5000L && !mock;
+    }
+
     private void feedLocationToWebView(Location loc) {
         if (headlessWeb == null) return;
         final double lat = loc.getLatitude();

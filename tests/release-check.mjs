@@ -19,6 +19,7 @@ check('all embedded JavaScript parses', scripts.every((script, index) => {
 const ids = [...html.matchAll(/\bid=["']([^"']+)["']/g)].map(match => match[1]);
 check('HTML ids are unique', new Set(ids).size === ids.length);
 check('bottom sheets and dialogs stay above navigation', html.includes('.nav{left:10px;right:10px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:100') && html.includes('.sheet{position:fixed;left:0;right:0;bottom:0;z-index:120') && html.includes('.cfScrim{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:130'));
+check('closed bottom sheets cannot cast shadows over navigation', html.includes('.sheet:not(.on){visibility:hidden!important;box-shadow:none!important}'));
 check('night mode and in-app replacement disclaimer are removed', !html.includes('Ночной режим') && !html.includes('nightOverlay') && !html.includes('Помощник, а не замена'));
 check('calibration fields use examples instead of preset-looking values', html.includes('id="cKm" class="num" inputmode="numeric" placeholder="напр. 1"') && html.includes('id="cPk" class="num" inputmode="numeric" placeholder="напр. 1"') && html.includes('id="cM" class="num" inputmode="numeric" placeholder="напр. 0"') && html.includes('$("#cKm").value="";') && html.includes('$("#cPk").value="";') && html.includes('$("#cM").value="";'));
 check('DU-61 practical reasons and power commands are present', ['Неисправность пути','Дефект рельса','Опустить токоприёмник','Поднять токоприёмник','Отключить ток','Включить ток','Неисправность средств СЦБ и связи','Негабаритный груз'].every(x => html.includes(x)));
@@ -44,13 +45,23 @@ const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.java')
 check('notification updates retain content intent', /updateNotificationText[\s\S]*?setContentIntent\(pi\)/.test(service));
 check('accelerometer listener is unregistered', service.includes('unregisterListener(accelListener)'));
 check('GNSS quality monitor is registered and released', service.includes('registerGnssStatusCallback') && service.includes('unregisterGnssStatusCallback'));
-check('fresh high-frequency locations requested', service.includes('new LocationRequest.Builder(1000)') && service.includes('.setMaxUpdateAgeMillis(0)') && service.includes('.setWaitForAccurateLocation(true)'));
+check('fresh high-frequency locations requested without suppressing degraded fixes', service.includes('new LocationRequest.Builder(1000)') && service.includes('.setMaxUpdateAgeMillis(0)') && service.includes('.setWaitForAccurateLocation(false)'));
+check('watchdog keeps backup alive until a fresh real fused fix', service.includes('lastFusedRestartAt') && service.includes('now - lastFusedRestartAt > 15000') && !service.includes('lastFixReceivedAt = now;') && service.includes('if (isFreshRealFix(loc)) lastFixReceivedAt') && service.includes('ageMs <= 5000L && !mock'));
+check('official kilometer offset is learned and isolated per route', html.includes('sap_routeOffsets') && html.includes('function routeOfficialOffset') && html.includes('function learnRouteOffset') && html.includes('officialTrackM(autoTM,state.ctx.peregon)'));
+check('spline snapping continuously refines sub-segment position', html.includes('for(var refine=0;refine<10;refine++)') && html.includes('var refined=(left+right)/2'));
 check('stale fixes and smooth recovery are implemented', html.includes('fixAge>5000') && html.includes('correctionTargetOdo') && html.includes('GPS восстановлен — плавно уточняю позицию'));
+check('official chainage is separated from physical track', html.includes('var CHAINAGE =') && html.includes('function baseOfficialTrackM') && html.includes('official<=0 || Math.abs(official-physical)>3000'));
+check('moving recovery follows confirmed physical GPS target', html.includes('targetTrackM=state.calib._trackM+(dirDown()?-1:1)*rt.correctionTargetOdo') && html.includes('plausibilityDiff=Math.abs(tMfinal-targetTrackM)') && html.includes('rt.correctionTargetOdo=newOdoVal'));
+check('GPS jitter is filtered along the moving track without coordinate lag', html.includes('function stableAlongTrackCandidate') && html.includes('rt.gpsResiduals.length>5'));
+check('dead-reckoning speed decay is based on elapsed time, not callback count', html.includes('decayPerSecond') && html.includes('Math.pow(decayPerSecond,lossDt)'));
+check('train dynamics reject impossible acceleration and confirm speed recovery', html.includes('maxSpeedChange=Math.min(12*Math.max(dt,0.5)+5, 45)') && html.includes('rt.speedCandCount<2'));
+check('confirmed large position recovery is immediate', html.includes('diff>=50 && signalGood && !satelliteWeak') && html.includes('rt.odo=newOdoVal; rt.correctionTargetOdo=null'));
+check('PIKET RS premium red theme is present', html.includes('PIKET RS · единая спортивная премиум-тема') && html.includes('#F02D3A'));
 check('spoofing and poor Doppler data are rejected', service.includes('loc.isMock()') && service.includes('getSpeedAccuracyMetersPerSecond') && html.includes('mockLocation===true') && html.includes('poorDoppler'));
 check('multi-constellation GNSS quality is evaluated', service.includes('getConstellationType') && html.includes('constellationDiversity'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.89', gradle.includes('versionName "1.4.89"') && gradle.includes('versionCode 95'));
+check('release version is 1.4.90', gradle.includes('versionName "1.4.90"') && gradle.includes('versionCode 96'));
 const workflow = read('.github/workflows/build.yml');
 check('release tags build release APK', workflow.includes('gradle assembleRelease') && workflow.includes('app-release.apk'));
 check('release notes include generated GPS report', workflow.includes('tail -n +2 GPS_TEST_RESULTS.md'));
