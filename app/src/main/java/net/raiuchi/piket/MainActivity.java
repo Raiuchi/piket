@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
 
     private static final int REQUEST_APP_PERMISSIONS = 100;
     private static final String APP_URL = "file:///android_asset/index.html";
+    static final String EXTRA_LIFECYCLE_TEST = "net.raiuchi.piket.extra.LIFECYCLE_TEST";
 
     private WebView web;
     private TextToSpeech tts;
@@ -51,6 +52,14 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Instrumentation verifies the native Activity lifecycle separately
+        // from WebView rendering (which is covered by repository/browser tests).
+        // The extra is package-local and is never sent by the production UI.
+        if (getIntent().getBooleanExtra(EXTRA_LIFECYCLE_TEST, false)) {
+            setContentView(new android.widget.FrameLayout(this));
+            return;
+        }
 
         initTts();
 

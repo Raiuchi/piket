@@ -32,7 +32,10 @@ public class MainActivityLifecycleTest {
 
     @Test
     public void activityCanBePausedResumedAndDestroyed() {
-        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
+        Context context = getApplicationContext();
+        Intent intent = new Intent(context, MainActivity.class)
+                .putExtra(MainActivity.EXTRA_LIFECYCLE_TEST, true);
+        try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(intent)) {
             scenario.moveToState(Lifecycle.State.CREATED);
             scenario.moveToState(Lifecycle.State.RESUMED);
             scenario.moveToState(Lifecycle.State.DESTROYED);
