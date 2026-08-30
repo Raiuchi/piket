@@ -76,7 +76,7 @@ check('restriction trigger distance is audited', source.includes('sap_triggerAud
 check('running time calculator is guarded against impossible plans', source.includes('Перегонное время хода') && source.includes('План недостижим безопасно') && core.includes('requiredAverageKmh'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.95', gradle.includes('versionName "1.4.95"') && gradle.includes('versionCode 101'));
+check('release version is 1.4.96', gradle.includes('versionName "1.4.96"') && gradle.includes('versionCode 102'));
 const workflow = read('.github/workflows/build.yml');
 check('Gradle Wrapper is complete', fs.existsSync(new URL('gradlew',root)) && fs.existsSync(new URL('gradlew.bat',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.jar',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.properties',root)));
 check('release tags build release APK', workflow.includes('./gradlew assembleRelease') && workflow.includes('app-release.apk'));
