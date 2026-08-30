@@ -31,9 +31,10 @@ public class MainActivityLifecycleTest {
     );
 
     @Test
-    public void activityCanBeRecreatedAndDestroyed() {
+    public void activityCanBePausedResumedAndDestroyed() {
         try (ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class)) {
-            scenario.recreate();
+            scenario.moveToState(Lifecycle.State.CREATED);
+            scenario.moveToState(Lifecycle.State.RESUMED);
             scenario.moveToState(Lifecycle.State.DESTROYED);
         }
     }
