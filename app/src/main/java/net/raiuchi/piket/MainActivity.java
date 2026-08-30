@@ -583,7 +583,17 @@ public class MainActivity extends Activity {
             tts = null;
         }
         if (web != null) {
-            ((android.view.ViewGroup) web.getParent()).removeView(web);
+            // WebView may already be detached while ActivityScenario/Android is
+            // recreating the Activity.  Tear it down defensively so a rotation
+            // or process restoration cannot crash the outgoing Activity.
+            android.view.ViewParent parent = web.getParent();
+            if (parent instanceof android.view.ViewGroup) {
+                ((android.view.ViewGroup) parent).removeView(web);
+            }
+            web.stopLoading();
+            web.setWebChromeClient(null);
+            web.setWebViewClient(null);
+            web.removeAllViews();
             web.destroy();
             web = null;
         }

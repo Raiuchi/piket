@@ -6,7 +6,7 @@
 
 **Километр · пикет · метр · скорость · предупреждения**
 
-[![Скачать APK](https://img.shields.io/badge/📲_СКАЧАТЬ-APK_1.4.93-D91D2B?style=for-the-badge)](https://github.com/Raiuchi/piket/releases/latest)
+[![Скачать APK](https://img.shields.io/badge/📲_СКАЧАТЬ-APK_1.4.94-D91D2B?style=for-the-badge)](https://github.com/Raiuchi/piket/releases/latest)
 [![Открыть Web](https://img.shields.io/badge/🌐_ОТКРЫТЬ-WEB_ВЕРСИЮ-2563EB?style=for-the-badge)](https://raiuchi.github.io/piket-web/)
 
 **Android 8.0+ · работает офлайн · данные остаются на телефоне**
@@ -68,7 +68,7 @@
 
 APK использует Android foreground service и продолжает отслеживание при свёрнутом приложении и погашенном экране. Для стабильной работы отключи ограничение батареи для ПИКЕТА и разреши постоянный доступ к геолокации в настройках телефона.
 
-## ✅ Проверки версии 1.4.93
+## ✅ Проверки версии 1.4.94
 
 | Контур | Результат |
 |---|:---:|
