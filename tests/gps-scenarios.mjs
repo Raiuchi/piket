@@ -3,7 +3,8 @@ import vm from 'node:vm';
 
 const root = new URL('../', import.meta.url);
 const html = fs.readFileSync(new URL('app/src/main/assets/index.html', root), 'utf8');
-let code = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
+const core = fs.readFileSync(new URL('app/src/main/assets/assets/piket-core.js', root), 'utf8');
+let code = core + '\n' + [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
 const close = code.lastIndexOf('})();');
 code = code.slice(0, close) + 'window.__gpsTest={TRACK,CHAINAGE,state,rt,onPos,onErr,tickerStep,metersOf,currentMeters,currentTrackMeters,officialToTrackM,restrictionTrackRange,nextRestriction,stableAlongTrackCandidate,routeOfficialOffset,baseOfficialTrackM,officialTrackM,learnRouteOffset,splinePoint,snapToTrack};' + code.slice(close);
 
@@ -182,6 +183,6 @@ run('Автокалибровка применяет изученную попр
 const passed=results.filter(x=>x.ok).length;
 for(const r of results)console.log(`${r.ok?'PASS':'FAIL'} ${r.name}${r.error?`: ${r.error}`:''}`);
 console.log(`${passed}/${results.length} GPS scenarios passed`);
-const report=['# GPS stress-test 1.4.91','',`Результат: **${passed}/${results.length} сценариев пройдено**.`,'',`Покрытие: **${e.TRACK.segs.length}/${e.TRACK.segs.length} маршрутов**, оба направления, все опорные точки геометрии.`,'','Проверено программной имитацией:','',...results.map(r=>`- ${r.ok?'✅':'❌'} ${r.name}${r.error?` — ${r.error}`:''}`),'','Условия: чистый сигнал по всей геометрии, оба направления, индивидуальная привязка официального километража к GPS-оси, низкий C/N0, потеря спутников и разнообразия созвездий, плохая точность, плохой Doppler, устаревшие и mock-фиксы, полная потеря, скачок на чужой маршрут и восстановление.','', '> Это программная имитация, а не замена полевой проверке. ПИКЕТ остаётся вспомогательным инструментом.',''].join('\n');
+const report=['# GPS stress-test 1.4.92','',`Результат: **${passed}/${results.length} сценариев пройдено**.`,'',`Покрытие: **${e.TRACK.segs.length}/${e.TRACK.segs.length} маршрутов**, оба направления, все опорные точки геометрии.`,'','Проверено программной имитацией:','',...results.map(r=>`- ${r.ok?'✅':'❌'} ${r.name}${r.error?` — ${r.error}`:''}`),'','Условия: чистый сигнал по всей геометрии, оба направления, индивидуальная привязка официального километража к GPS-оси, низкий C/N0, потеря спутников и разнообразия созвездий, плохая точность, плохой Doppler, устаревшие и mock-фиксы, полная потеря, скачок на чужой маршрут и восстановление.','', '> Это программная имитация, а не замена полевой проверке. ПИКЕТ остаётся вспомогательным инструментом.',''].join('\n');
 if(process.argv.includes('--report'))fs.writeFileSync(new URL('GPS_TEST_RESULTS.md',root),report,'utf8');
 if(passed!==results.length)process.exitCode=1;

@@ -52,9 +52,6 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // держим экран включённым во время поездки, если приложение открыто на экране
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-
         initTts();
 
         web = new WebView(this);
@@ -455,6 +452,16 @@ public class MainActivity extends Activity {
     }
 
     class PiketBridge {
+        @android.webkit.JavascriptInterface
+        public void setKeepScreen(final boolean enabled) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    if (enabled) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                }
+            });
+        }
+
         @android.webkit.JavascriptInterface
         public void updatePosition(final String text) {
             // во время активного трекинга уведомление уже обновляет сама служба (headless-движок);

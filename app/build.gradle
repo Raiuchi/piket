@@ -10,8 +10,9 @@ android {
         applicationId "net.raiuchi.piket"
         minSdk 26
         targetSdk 34
-        versionCode 97
-        versionName "1.4.91"
+        versionCode 98
+        versionName "1.4.92"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -37,7 +38,7 @@ android {
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.piket
+            // Standard debug key keeps local/emulator tests independent from release secrets.
         }
         release {
             minifyEnabled false
@@ -53,4 +54,7 @@ android {
 
 dependencies {
     implementation 'com.google.android.gms:play-services-location:21.3.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+    androidTestImplementation 'androidx.test:rules:1.6.1'
 }

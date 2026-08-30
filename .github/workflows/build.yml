@@ -14,27 +14,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Run repository checks
         run: |
           node tests/release-check.mjs
+          node tests/android-lifecycle.mjs
+          node tests/reliability-scenarios.mjs
           node tests/gps-scenarios.mjs --report
 
       - name: Restore signing key
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           PIKET_KEYSTORE_B64: ${{ secrets.PIKET_KEYSTORE_B64 }}
         run: echo "$PIKET_KEYSTORE_B64" | base64 --decode > app/piket-release.keystore
@@ -45,7 +46,7 @@ jobs:
           PIKET_KEYSTORE_PASSWORD: ${{ secrets.PIKET_KEYSTORE_PASSWORD }}
           PIKET_KEY_ALIAS: ${{ secrets.PIKET_KEY_ALIAS }}
           PIKET_KEY_PASSWORD: ${{ secrets.PIKET_KEY_PASSWORD }}
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Build signed release APK
         if: startsWith(github.ref, 'refs/tags/v')
@@ -53,7 +54,7 @@ jobs:
           PIKET_KEYSTORE_PASSWORD: ${{ secrets.PIKET_KEYSTORE_PASSWORD }}
           PIKET_KEY_ALIAS: ${{ secrets.PIKET_KEY_ALIAS }}
           PIKET_KEY_PASSWORD: ${{ secrets.PIKET_KEY_PASSWORD }}
-        run: gradle assembleRelease --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Prepare release APK
         if: startsWith(github.ref, 'refs/tags/v')
@@ -134,3 +135,29 @@ jobs:
           echo "=== Итого ==="
           echo "Релизов осталось: $(gh release list --repo ${{ github.repository }} --limit 100 | wc -l)"
           echo "Артефактов осталось: $(gh api repos/${{ github.repository }}/actions/artifacts --jq '.total_count')"
+
+  instrumentation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v6
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run Android lifecycle tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
