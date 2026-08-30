@@ -59,6 +59,8 @@ check('dead-reckoning speed decay is based on elapsed time, not callback count',
 check('train dynamics reject impossible acceleration and confirm speed recovery', html.includes('maxSpeedChange=Math.min(12*Math.max(dt,0.5)+5, 45)') && html.includes('rt.speedCandCount<2'));
 check('confirmed large position recovery is immediate', html.includes('diff>=50 && signalGood && !satelliteWeak') && html.includes('rt.odo=newOdoVal; rt.correctionTargetOdo=null'));
 check('PIKET RS premium red theme is present', html.includes('PIKET RS · единая спортивная премиум-тема') && html.includes('#F02D3A'));
+check('speed reference uses red main and yellow side track palette', html.includes('🔴 Гл.п — главный путь · 🟡 Бок.п — боковой путь') && html.includes('.srBadge.glp{background:linear-gradient(180deg,rgba(240,45,58,.30)') && html.includes('.srBadge.bokp{background:linear-gradient(180deg,rgba(245,183,36,.28)') && !html.includes('rgba(47,157,235,.3)'));
+check('restriction acknowledgement uses premium red styling', html.includes('background:linear-gradient(180deg,#f42b43 0%,#c8102e 58%,#8d071e 100%)'));
 check('spoofing and poor Doppler data are rejected', service.includes('loc.isMock()') && service.includes('getSpeedAccuracyMetersPerSecond') && html.includes('mockLocation===true') && html.includes('poorDoppler'));
 check('multi-constellation GNSS quality is evaluated', service.includes('getConstellationType') && html.includes('constellationDiversity'));
 
