@@ -10,8 +10,8 @@ android {
         applicationId "net.raiuchi.piket"
         minSdk 26
         targetSdk 34
-        versionCode 102
-        versionName "1.4.96"
+        versionCode 103
+        versionName "1.4.97"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 

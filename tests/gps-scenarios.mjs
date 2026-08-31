@@ -6,7 +6,7 @@ const html = fs.readFileSync(new URL('app/src/main/assets/index.html', root), 'u
 const core = fs.readFileSync(new URL('app/src/main/assets/assets/piket-core.js', root), 'utf8');
 let code = core + '\n' + [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
 const close = code.lastIndexOf('})();');
-code = code.slice(0, close) + 'window.__gpsTest={TRACK,CHAINAGE,state,rt,onPos,onErr,tickerStep,metersOf,currentMeters,currentTrackMeters,officialToTrackM,restrictionTrackRange,nextRestriction,stableAlongTrackCandidate,routeOfficialOffset,baseOfficialTrackM,officialTrackM,learnRouteOffset,splinePoint,snapToTrack};' + code.slice(close);
+code = code.slice(0, close) + 'window.__gpsTest={TRACK,CHAINAGE,state,rt,onPos,onErr,tickerStep,startTrack,metersOf,currentMeters,currentTrackMeters,officialToTrackM,restrictionTrackRange,nextRestriction,stableAlongTrackCandidate,routeOfficialOffset,baseOfficialTrackM,officialTrackM,learnRouteOffset,splinePoint,snapToTrack};' + code.slice(close);
 
 function element(){
   const classes=new Set();
@@ -27,7 +27,7 @@ function reset(routeIndex=0,direction='tuda'){
   const seg=e.TRACK.segs[routeIndex],p=direction==='tuda'?seg[0]:seg[seg.length-1];
   e.state.ctx.peregon=e.TRACK.labels[routeIndex];e.state.ctx.towards=direction;
   const official=e.officialTrackM(p[2],e.TRACK.labels[routeIndex]);
-  e.state.calib={km:Math.floor(official/1000),pk:Math.floor((official%1000)/100)+1,m:Math.floor(official%100),_trackM:p[2]};
+  e.state.calib={km:Math.floor(official/1000),pk:Math.floor((official%1000)/100)+1,m:Math.floor(official%100),_trackM:p[2],_manual:true};
   Object.assign(e.rt,{tracking:true,last:null,lastGoodFix:null,odo:0,speed:80,posM:official,pendingCandM:null,pendingCount:0,correctionTargetOdo:null,fixQuality:null,gpsState:'waiting',trackingSince:Date.now(),gpsResiduals:[],gpsResidualAt:0,signalLostAt:0,lastLossDecayAt:0});
   return seg;
 }
@@ -153,6 +153,8 @@ run('Частые callback потери GPS не останавливают сч
 run('Медианный фильтр подавляет одиночный шум без временного запаздывания',()=>{reset();const now=Date.now(),expected=100000;for(const residual of [18,22,160,20,19])e.stableAlongTrackCandidate(expected+residual,expected,now,8,true);const filtered=e.stableAlongTrackCandidate(expected+21,expected,now,8,true);assert(Math.abs(filtered-(expected+20))<=2,'медиана не подавила выброс: '+(filtered-expected))});
 run('Невозможный разгон 0→100 км/ч за 2 секунды отбрасывается',()=>{const seg=reset();const base=Date.now();e.rt.speed=0;e.onPos(fix(seg[0],base,{speed:0}));e.onPos(fix(seg[0],base+2000,{speed:100/3.6}));assert(e.rt.speed<20,'невозможный разгон принят: '+e.rt.speed)});
 run('Скорость после РЭБ восстанавливается только двумя согласованными Doppler-замерами',()=>{const seg=reset();const base=Date.now();e.rt.speed=0;e.rt.signalLostAt=base-30000;e.rt.last={lat:seg[0][0],lon:seg[0][1],t:base-1000};e.onPos(fix(seg[0],base,{speed:100/3.6}));assert(e.rt.speed<20,'первый замер после РЭБ принят без подтверждения');e.onPos(fix(seg[0],base+1000,{speed:101/3.6}));assert(e.rt.speed>80&&e.rt.speed<120,'согласованная скорость не восстановлена: '+e.rt.speed)});
+run('Стоянка подавляет стабильную ложную скорость 203 км/ч',()=>{const seg=reset(),base=Date.now();e.rt.speed=203;e.rt.stationaryAnchor=null;e.rt.stationarySince=0;for(let n=0;n<=11;n++)e.onPos(fix(seg[0],base+n*1000,{speed:203/3.6,accuracy:7}));assert(e.rt.speed<1,'ложная скорость на неподвижных координатах осталась: '+e.rt.speed)});
+run('Старт без ручной калибровки заблокирован',()=>{e.state.calib=null;e.rt.tracking=false;e.startTrack();assert(e.rt.tracking===false,'поездка запущена без калибровки');assert(e.state.calib===null,'приложение создало автоматическую калибровку')});
 run('Подтверждённая крупная GPS-поправка применяется сразу для ограничений',()=>{const seg=reset(),label=e.state.ctx.peregon,start=seg[0][2],actual=Math.min(seg.at(-1)[2],start+4000),base=Date.now();e.rt.odo=1000;e.rt.posM=e.currentMeters();e.rt.lastGoodFix=base-180000;e.rt.speed=80;for(let n=0;n<6;n++)e.onPos(fix(pointAtM(seg,actual),base+n*1000));assert(e.rt.correctionTargetOdo==null,'крупная подтверждённая поправка оставлена плавной');assert(Math.abs(e.currentMeters()-e.officialTrackM(actual,label))<50,'позиция не исправлена сразу')});
 run('Официальная ось полностью совпадает с listPoints.txt во всех опорных точках',()=>{
   for(let si=0;si<e.TRACK.segs.length;si++){
@@ -183,6 +185,6 @@ run('Автокалибровка применяет изученную попр
 const passed=results.filter(x=>x.ok).length;
 for(const r of results)console.log(`${r.ok?'PASS':'FAIL'} ${r.name}${r.error?`: ${r.error}`:''}`);
 console.log(`${passed}/${results.length} GPS scenarios passed`);
-const report=['# GPS stress-test 1.4.94','',`Результат: **${passed}/${results.length} сценариев пройдено**.`,'',`Покрытие: **${e.TRACK.segs.length}/${e.TRACK.segs.length} маршрутов**, оба направления, все опорные точки геометрии.`,'','Проверено программной имитацией:','',...results.map(r=>`- ${r.ok?'✅':'❌'} ${r.name}${r.error?` — ${r.error}`:''}`),'','Условия: чистый сигнал по всей геометрии, оба направления, индивидуальная привязка официального километража к GPS-оси, низкий C/N0, потеря спутников и разнообразия созвездий, плохая точность, плохой Doppler, устаревшие и mock-фиксы, полная потеря, скачок на чужой маршрут и восстановление.','', '> Это программная имитация, а не замена полевой проверке. ПИКЕТ остаётся вспомогательным инструментом.',''].join('\n');
+const report=['# GPS stress-test 1.4.97','',`Результат: **${passed}/${results.length} сценариев пройдено**.`,'',`Покрытие: **${e.TRACK.segs.length}/${e.TRACK.segs.length} маршрутов**, оба направления, все опорные точки геометрии.`,'','Проверено программной имитацией:','',...results.map(r=>`- ${r.ok?'✅':'❌'} ${r.name}${r.error?` — ${r.error}`:''}`),'','Условия: обязательная ручная стартовая калибровка, чистый и слабый сигнал, стоянка с ложной скоростью 203 км/ч, низкий C/N0, потеря спутников и разнообразия созвездий, плохой Doppler, устаревшие и mock-фиксы, полная потеря, переходы километровой оси и автоматическая коррекция после РЭБ.','', '> Это программная имитация, а не замена полевой проверке. ПИКЕТ остаётся вспомогательным инструментом.',''].join('\n');
 if(process.argv.includes('--report'))fs.writeFileSync(new URL('GPS_TEST_RESULTS.md',root),report,'utf8');
 if(passed!==results.length)process.exitCode=1;

@@ -63,6 +63,10 @@ check('moving recovery follows confirmed physical GPS target', source.includes('
 check('GPS jitter is filtered along the moving track without coordinate lag', source.includes('function stableAlongTrackCandidate') && source.includes('rt.gpsResiduals.length>5'));
 check('dead-reckoning speed decay is based on elapsed time, not callback count', source.includes('decayPerSecond') && source.includes('Math.pow(decayPerSecond,lossDt)'));
 check('train dynamics reject impossible acceleration and confirm speed recovery', source.includes('maxSpeedChange=Math.min(12*Math.max(dt,0.5)+5, 45)') && source.includes('rt.speedCandCount<2'));
+check('stationary coordinates suppress false high Doppler speed', source.includes('stationaryAge>=10 && stationaryDist<=25') && source.includes('rt.speed=0'));
+check('learned jammer zones never speak or toast repeatedly', source.includes('rt.zoneHintCooldownUntil=Date.now()+600000') && source.includes('частая зона помех') && !source.includes('Внимание, впереди зона частого глушения'));
+check('trip start requires an explicit manual calibration', source.includes('state.calib==null || state.calib._manual!==true') && source.includes('Сначала обязательная калибровка') && source.includes('_manual:true'));
+check('startup auto-calibration is disabled while en-route GPS correction remains', source.includes('if(false && state.calib==null && rt.tracking') && source.includes('rt.odo=newOdoVal; rt.correctionTargetOdo=null'));
 check('confirmed large position recovery is immediate', source.includes('diff>=50 && signalGood && !satelliteWeak') && source.includes('rt.odo=newOdoVal; rt.correctionTargetOdo=null'));
 check('PIKET RS premium red theme is present', source.includes('PIKET RS · единая спортивная премиум-тема') && source.includes('#F02D3A'));
 check('speed reference uses red main and yellow side track palette', source.includes('🔴 Гл.п — главный путь · 🟡 Бок.п — боковой путь') && source.includes('.srBadge.glp{background:linear-gradient(180deg,rgba(240,45,58,.30)') && source.includes('.srBadge.bokp{background:linear-gradient(180deg,rgba(245,183,36,.28)') && !source.includes('rgba(47,157,235,.3)'));
@@ -76,7 +80,7 @@ check('restriction trigger distance is audited', source.includes('sap_triggerAud
 check('running time calculator is guarded against impossible plans', source.includes('Перегонное время хода') && source.includes('План недостижим безопасно') && core.includes('requiredAverageKmh'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.96', gradle.includes('versionName "1.4.96"') && gradle.includes('versionCode 102'));
+check('release version is 1.4.97', gradle.includes('versionName "1.4.97"') && gradle.includes('versionCode 103'));
 const workflow = read('.github/workflows/build.yml');
 check('Gradle Wrapper is complete', fs.existsSync(new URL('gradlew',root)) && fs.existsSync(new URL('gradlew.bat',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.jar',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.properties',root)));
 check('release tags build release APK', workflow.includes('./gradlew assembleRelease') && workflow.includes('app-release.apk'));
