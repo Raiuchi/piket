@@ -41,6 +41,13 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.Priority;
 
 import java.util.Locale;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Фоновая служба трекинга. Держит СВОЙ собственный headless WebView (без экрана) —
@@ -54,6 +61,8 @@ public class TrackingService extends Service {
 
     private static final String CHANNEL_ID = "piket_tracking";
     public static final String ACTION_RECALIBRATE = "net.raiuchi.piket.ACTION_RECALIBRATE";
+    public static final String ACTION_CONFIGURE_NATIVE = "net.raiuchi.piket.ACTION_CONFIGURE_NATIVE";
+    public static final String EXTRA_NATIVE_CONFIG = "net.raiuchi.piket.extra.NATIVE_CONFIG";
 
     private PowerManager.WakeLock wakeLock;
     private FusedLocationProviderClient fusedClient;
@@ -74,6 +83,10 @@ public class TrackingService extends Service {
     private volatile float gnssAverageCn0 = 0f;
     private volatile boolean gnssTelemetrySeen = false;
     private volatile int gnssConstellationDiversity = 0;
+    private final NativeMotionFilter nativeMotionFilter = new NativeMotionFilter();
+    private NativeRouteEngine nativeRouteEngine;
+    private NativeTripEngine nativeTripEngine;
+    private volatile String nativeRouteLabel = "Все участки";
 
     private WebView headlessWeb;
     private boolean headlessPageReady = false;
@@ -82,6 +95,7 @@ public class TrackingService extends Service {
     private boolean ttsReady = false;
     private Vibrator vibrator;
     private Handler mainHandler;
+    private Runnable nativeTripTicker;
 
     public static void updateNotificationText(Context ctx, String text) {
         Intent open = new Intent(ctx, MainActivity.class);
@@ -103,6 +117,14 @@ public class TrackingService extends Service {
     public void onCreate() {
         super.onCreate();
         mainHandler = new Handler(Looper.getMainLooper());
+        try {
+            nativeRouteEngine = NativeRouteEngine.Companion.fromCoreJs(readAsset("assets/piket-core.js"));
+            nativeTripEngine = new NativeTripEngine(nativeRouteEngine);
+            restoreNativeTripState();
+            startNativeTripTicker();
+        } catch (Exception ignored) {
+            nativeRouteEngine = null; // JS остаётся рабочим источником истины.
+        }
 
         createChannel();
 
@@ -178,6 +200,16 @@ public class TrackingService extends Service {
 
     /** Тот же мост, что раньше был у MainActivity — теперь живёт здесь, в службе */
     public class PiketBridge {
+        @JavascriptInterface
+        public void setNativeRouteContext(String routeLabel) {
+            nativeRouteLabel = routeLabel != null ? routeLabel : "Все участки";
+        }
+
+        @JavascriptInterface
+        public void configureNativeTrip(String json) {
+            applyNativeTripConfig(json);
+        }
+
         @JavascriptInterface
         public void updatePosition(final String text) {
             updateNotificationText(TrackingService.this, text);
@@ -348,6 +380,8 @@ public class TrackingService extends Service {
                 // ждать, пока система сама решит прислать новые координаты.
                 if (!availability.isLocationAvailable()) {
                     locationUnavailableSince = System.currentTimeMillis();
+                    nativeMotionFilter.markSignalUnavailable();
+                    if (nativeTripEngine != null) nativeTripEngine.markSignalUnavailable();
                     // КРИТИЧНО: раньше эта ветка только устанавливала Java-переменную и
                     // НИКОГДА не сообщала об этом JS-коду внутри headless WebView - значит
                     // вся защита "плавное снижение скорости при потере сигнала" (функция
@@ -558,7 +592,6 @@ public class TrackingService extends Service {
         final double lon = loc.getLongitude();
         final float accuracy = loc.hasAccuracy() ? loc.getAccuracy() : 999f;
         final boolean hasSpeed = loc.hasSpeed();
-        final float speedMps = hasSpeed ? loc.getSpeed() : 0f;
         final long time = loc.getTime();
         final long ageMs = Math.max(0L, (SystemClock.elapsedRealtimeNanos()
                 - loc.getElapsedRealtimeNanos()) / 1_000_000L);
@@ -571,18 +604,122 @@ public class TrackingService extends Service {
         final boolean mockLocation = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                 ? loc.isMock() : loc.isFromMockProvider();
         final float speedAccuracyMps = loc.hasSpeedAccuracy() ? loc.getSpeedAccuracyMetersPerSecond() : -1f;
+        NativeMotionFilter.Result nativeResult = nativeMotionFilter.process(new NativeMotionFilter.Fix(
+                lat, lon, loc.getElapsedRealtimeNanos() / 1_000_000L, ageMs, accuracy,
+                hasSpeed ? loc.getSpeed() : null,
+                loc.hasSpeedAccuracy() ? speedAccuracyMps : null,
+                mockLocation, satellitesUsed, averageCn0, hasGnssTelemetry));
+        final Float nativeSpeedMps = nativeResult.getFilteredSpeedMps();
+        final String nativeQuality = nativeResult.getQuality();
+        final String nativeReason = nativeResult.getReason();
+        NativeRouteEngine.Snap shadowSnap = nativeRouteEngine != null
+                ? nativeRouteEngine.snap(nativeRouteLabel, lat, lon) : null;
+        final Double nativePhysicalM = shadowSnap != null ? shadowSnap.getPhysicalM() : null;
+        final Double nativeOfficialM = shadowSnap != null ? shadowSnap.getOfficialM() : null;
+        final Double nativeRouteDistanceM = shadowSnap != null ? shadowSnap.getDistanceM() : null;
+        NativeTripEngine.Output nativeTrip = nativeTripEngine != null
+                ? nativeTripEngine.update(new NativeTripEngine.Input(
+                    loc.getElapsedRealtimeNanos() / 1_000_000L, nativeSpeedMps,
+                    nativeResult.getAccepted(), shadowSnap)) : null;
+        if (nativeTripEngine != null) persistNativeTripState(nativeTripEngine.save());
+        final Double nativeTripPhysicalM = nativeTrip != null ? nativeTrip.getPhysicalM() : null;
+        final Double nativeTripOfficialM = nativeTrip != null ? nativeTrip.getOfficialM() : null;
+        final boolean nativeTripRecovering = nativeTrip != null && nativeTrip.getRecovering();
+        final String nativeTripSource = nativeTrip != null ? nativeTrip.getSource() : "unavailable";
+        final String nativeAlertId = nativeTrip != null ? nativeTrip.getAlertId() : null;
+        final Double nativeAlertDistanceM = nativeTrip != null ? nativeTrip.getAlertDistanceM() : null;
+        final boolean nativeAlertInZone = nativeTrip != null && nativeTrip.getAlertInZone();
         mainHandler.post(new Runnable() {
             @Override public void run() {
                 if (headlessWeb == null) return;
                 String js = "if(window.onNativeLocation)window.onNativeLocation("
                         + lat + "," + lon + "," + accuracy + ","
-                        + (hasSpeed ? String.valueOf(speedMps) : "null") + "," + time + ","
+                        + (nativeSpeedMps != null ? String.valueOf(nativeSpeedMps) : "null") + "," + time + ","
                         + ageMs + "," + (hasBearing ? String.valueOf(bearing) : "null") + ","
                         + satellitesUsed + "," + averageCn0 + "," + hasGnssTelemetry + ","
-                        + constellationDiversity + "," + mockLocation + "," + speedAccuracyMps + ");";
+                        + constellationDiversity + "," + mockLocation + "," + speedAccuracyMps + ",\""
+                        + nativeQuality + "\",\"" + nativeReason + "\","
+                        + (nativePhysicalM != null ? nativePhysicalM : "null") + ","
+                        + (nativeOfficialM != null ? nativeOfficialM : "null") + ","
+                        + (nativeRouteDistanceM != null ? nativeRouteDistanceM : "null") + ","
+                        + (nativeTripPhysicalM != null ? nativeTripPhysicalM : "null") + ","
+                        + (nativeTripOfficialM != null ? nativeTripOfficialM : "null") + ","
+                        + nativeTripRecovering + ",\"" + nativeTripSource + "\","
+                        + (nativeAlertId != null ? JSONObject.quote(nativeAlertId) : "null") + ","
+                        + (nativeAlertDistanceM != null ? nativeAlertDistanceM : "null") + ","
+                        + nativeAlertInZone + ");";
                 headlessWeb.evaluateJavascript(js, null);
             }
         });
+    }
+
+    private String readAsset(String path) throws Exception {
+        try (InputStream input = getAssets().open(path);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            return output.toString(StandardCharsets.UTF_8.name());
+        }
+    }
+
+    private void persistNativeTripState(NativeTripEngine.SavedState state) {
+        try {
+            JSONObject json = new JSONObject();
+            json.put("active", state.getActive()); json.put("route", state.getRoute());
+            json.put("direction", state.getDirection()); json.put("manualOfficialM", state.getManualOfficialM());
+            if (state.getPhysicalM() != null) json.put("physicalM", state.getPhysicalM());
+            json.put("offsetM", state.getOffsetM()); json.put("speedMps", state.getSpeedMps());
+            getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("trip", json.toString()).apply();
+        } catch (Exception ignored) { }
+    }
+
+    private void applyNativeTripConfig(String raw) {
+        try {
+            JSONObject root = new JSONObject(raw);
+            nativeRouteLabel = root.optString("route", "Все участки");
+            List<NativeTripEngine.Restriction> parsed = new ArrayList<>();
+            JSONArray items = root.optJSONArray("restrictions");
+            if (items != null) for (int i = 0; i < items.length(); i++) {
+                JSONObject item = items.optJSONObject(i);
+                if (item == null) continue;
+                double start = item.optDouble("km", 0) * 1000.0 + item.optDouble("pk", 0) * 100.0 + item.optDouble("m", 0);
+                double end = item.has("kmE") ? item.optDouble("kmE", 0) * 1000.0
+                        + item.optDouble("pkE", 0) * 100.0 + item.optDouble("mE", 0) : start;
+                parsed.add(new NativeTripEngine.Restriction(item.optString("id", String.valueOf(i)),
+                        item.optString("peregon", "Все участки"), item.optString("dir", "both"),
+                        start, end, item.optDouble("lead", root.optDouble("lead", 3000))));
+            }
+            if (nativeTripEngine != null) nativeTripEngine.configure(nativeRouteLabel,
+                    root.optString("direction", "tuda"), root.optDouble("manualOfficialM", 0),
+                    root.optBoolean("active", false), parsed);
+        } catch (Exception ignored) { }
+    }
+
+    private void restoreNativeTripState() {
+        try {
+            String raw = getSharedPreferences("piket_native", MODE_PRIVATE).getString("trip", null);
+            if (raw == null || nativeTripEngine == null) return;
+            JSONObject json = new JSONObject(raw);
+            nativeTripEngine.restore(new NativeTripEngine.SavedState(json.optBoolean("active", false),
+                    json.optString("route", "Все участки"), json.optString("direction", "tuda"),
+                    json.optDouble("manualOfficialM", 0), json.has("physicalM") ? json.getDouble("physicalM") : null,
+                    json.optDouble("offsetM", 0), (float) json.optDouble("speedMps", 0), 0L));
+        } catch (Exception ignored) { }
+    }
+
+    private void startNativeTripTicker() {
+        nativeTripTicker = new Runnable() {
+            @Override public void run() {
+                if (nativeTripEngine != null) {
+                    NativeTripEngine.Output output = nativeTripEngine.update(new NativeTripEngine.Input(
+                            SystemClock.elapsedRealtime(), null, false, null));
+                    if (output.getActive()) persistNativeTripState(nativeTripEngine.save());
+                }
+                if (mainHandler != null) mainHandler.postDelayed(this, 1000L);
+            }
+        };
+        mainHandler.postDelayed(nativeTripTicker, 1000L);
     }
 
     /** Сообщает headless JS-коду, что система явно объявила локацию недоступной прямо сейчас
@@ -670,7 +807,9 @@ public class TrackingService extends Service {
         // км/пикет/метр прямо во время поездки, не нажимая «Стоп»). Полный forceHeadlessStart()
         // здесь не подходит - он сбросил бы звук/тикер/wake lock без необходимости, когда
         // трекинг и так уже активен. Нужна только лёгкая перечитка калибровки.
-        if (intent != null && ACTION_RECALIBRATE.equals(intent.getAction())) {
+        if (intent != null && ACTION_CONFIGURE_NATIVE.equals(intent.getAction())) {
+            applyNativeTripConfig(intent.getStringExtra(EXTRA_NATIVE_CONFIG));
+        } else if (intent != null && ACTION_RECALIBRATE.equals(intent.getAction())) {
             forceHeadlessRecalibrate();
         } else {
             forceHeadlessStart();
@@ -688,6 +827,10 @@ public class TrackingService extends Service {
 
     @Override
     public void onDestroy() {
+        if (nativeTripTicker != null) {
+            mainHandler.removeCallbacks(nativeTripTicker);
+            nativeTripTicker = null;
+        }
         if (locationWatchdogRunnable != null) {
             mainHandler.removeCallbacks(locationWatchdogRunnable);
             locationWatchdogRunnable = null;

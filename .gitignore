@@ -11,4 +11,5 @@ captures/
 *.aab
 *.keystore
 *.jks
+.tools/
 *.p12

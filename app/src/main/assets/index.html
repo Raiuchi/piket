@@ -1046,7 +1046,17 @@
     calib: load("sap_cal",null),
     ctx: Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}))
   };
-  function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); }
+  function syncNativeRouteContext(){
+    try{
+      if(IS_HEADLESS&&window.Android&&window.Android.setNativeRouteContext)window.Android.setNativeRouteContext(state.ctx.peregon||"Все участки");
+      if(window.Android&&window.Android.configureNativeTrip){
+        var manual=state.calib?metersOf(state.calib.km,state.calib.pk,state.calib.m):0;
+        var nativeRestrictions=(state.restrictions||[]).map(function(r){return Object.assign({},r,{id:r.id||((r.km||0)+"_"+(r.pk||0))});});
+        window.Android.configureNativeTrip(JSON.stringify({route:state.ctx.peregon||"Все участки",direction:state.ctx.towards||"tuda",manualOfficialM:manual,active:!!rt.tracking,lead:state.settings.lead||3000,restrictions:nativeRestrictions}));
+      }
+    }catch(e){}
+  }
+  function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); syncNativeRouteContext(); }
 
   // ═══ ПАМЯТЬ ПРОБЛЕМНЫХ ЗОН GPS ═══
   // Машинист ездит одними и теми же маршрутами регулярно - в отличие от обычного
@@ -1166,6 +1176,26 @@
     var limit=Math.max(20,Math.min(120,(+accuracy||30)*2));
     median=Math.max(-limit,Math.min(limit,median));
     return expectedTrackM+median;
+  }
+  function validatedNativeTrackM(jsTrackM,coords){
+    var nativeM=+(coords&&coords.nativeTripPhysicalM);
+    if(!isFinite(nativeM)||!isFinite(jsTrackM)){rt.nativeTrusted=false;return jsTrackM;}
+    var diff=Math.abs(nativeM-jsTrackM);
+    if(diff>50){
+      rt.nativeAgreement=0;
+      rt.nativeTrusted=false;
+      if(!rt.nativeMismatchAt||Date.now()-rt.nativeMismatchAt>10000){
+        rt.nativeMismatchAt=Date.now();
+        var audit=load("sap_native_compare",[]);
+        audit.push({at:Date.now(),peregon:state.ctx.peregon,js:Math.round(jsTrackM),native:Math.round(nativeM),diff:Math.round(diff),source:coords.nativeTripSource||"native"});
+        if(audit.length>100)audit=audit.slice(-100); save("sap_native_compare",audit);
+      }
+      return jsTrackM; // расхождение фиксируем, но источник молча не меняем
+    }
+    rt.nativeAgreement=(rt.nativeAgreement||0)+1;
+    if(rt.nativeAgreement>=3 && coords.nativeTripRecovering!==true && (+coords.nativeRouteDistanceM||999)<=120){rt.nativeTrusted=true;return nativeM;}
+    rt.nativeTrusted=false;
+    return jsTrackM;
   }
   // Ожидаемый курс движения ПО ПУТИ в точке trackM конкретного сегмента (для сверки с GPS-курсом).
   // Поезд может двигаться только вдоль рельс в одну из двух сторон — резкое несовпадение
@@ -1739,7 +1769,7 @@
             if(tM==null && acc<=40){
               tM=snapToTrack(c.latitude,c.longitude);
             }
-            if(tM!=null){ tM=stableAlongTrackCandidate(tM,expectedTrackM,now,acc,signalGood); candM=officialTrackM(tM,state.ctx.peregon); viaTrack=true; tMfinal=tM; }
+            if(tM!=null){ tM=stableAlongTrackCandidate(tM,expectedTrackM,now,acc,signalGood); tM=validatedNativeTrackM(tM,c); candM=officialTrackM(tM,state.ctx.peregon); viaTrack=true; tMfinal=tM; }
           }
 
           // Аварийный широкий поиск после 25с без хорошего фикса (запасной путь для acc>40)
@@ -1747,7 +1777,7 @@
           var sinceAnyGoodOrStart=rt.lastGoodFix!=null?(now-rt.lastGoodFix):(now-rt.trackingSince);
           if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
             var tMwide=snapToTrack(c.latitude,c.longitude);
-            if(tMwide!=null){ tMwide=stableAlongTrackCandidate(tMwide,expectedTrackM,now,acc,signalGood); candM=officialTrackM(tMwide,state.ctx.peregon); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
+            if(tMwide!=null){ tMwide=stableAlongTrackCandidate(tMwide,expectedTrackM,now,acc,signalGood); tMwide=validatedNativeTrackM(tMwide,c); candM=officialTrackM(tMwide,state.ctx.peregon); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
           }
 
           if(candM!=null && usedWideSearch){
@@ -2078,9 +2108,10 @@
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
 
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
-  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps){
+  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone){
     if(!rt.tracking)return;
-    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0, gnssTelemetry:gnssTelemetry, constellationDiversity:constellationDiversity, mockLocation:mockLocation, speedAccuracyMps:speedAccuracyMps }, timestamp:time };
+    rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
+    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0, gnssTelemetry:gnssTelemetry, constellationDiversity:constellationDiversity, mockLocation:mockLocation, speedAccuracyMps:speedAccuracyMps, nativeQuality:nativeQuality, nativeReason:nativeReason, nativePhysicalM:nativePhysicalM, nativeOfficialM:nativeOfficialM, nativeRouteDistanceM:nativeRouteDistanceM, nativeTripPhysicalM:nativeTripPhysicalM, nativeTripOfficialM:nativeTripOfficialM, nativeTripRecovering:nativeTripRecovering, nativeTripSource:nativeTripSource, nativeAlertId:nativeAlertId, nativeAlertDistanceM:nativeAlertDistanceM, nativeAlertInZone:nativeAlertInZone }, timestamp:time };
     onPos(fakePos); };
   // КРИТИЧНО: вызывается из Java (TrackingService.notifyLocationUnavailable), когда система
   // явно сообщает "сейчас локация недоступна" (onLocationAvailability). Без этого моста
@@ -2288,6 +2319,10 @@
       var lead=r.lead||state.settings.lead,tr=trackPos!=null?restrictionTrackRange(r,trackPos):null,s=tr?tr.start:metersOf(r.km,r.pk),e=tr?tr.end:((r.kmE!=null)?metersOf(r.kmE,r.pkE):s),lo=Math.min(s,e),hi=Math.max(s,e),up=!dirDown();
       var key=r.id||(r.km+"_"+r.pk),st=alertState[key]||(alertState[key]={a:false,z:false});
       var inzone=pos>=lo-5&&pos<=hi+5,ahead=up?(s-pos):(pos-s);
+      if(rt.nativeTrusted){
+        if(String(rt.nativeAlertId)!==String(key))return;
+        ahead=+rt.nativeAlertDistanceM||0; inzone=rt.nativeAlertInZone===true;
+      }
       if(ahead>lead*1.3)st.a=false; if(pos<lo-50||pos>hi+50)st.z=false;
       if(inzone&&!st.z){ st.z=true; st.a=true; fireAlert("danger",r,0); }
       else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); }
@@ -2646,7 +2681,9 @@
       state.settings=Object.assign({lead:3000,voice:true,sound:true,vibe:true,wake:true,demo:false}, load("sap_set",{}));
       state.calib=load("sap_cal",null);
       state.ctx=Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}));
+      syncNativeRouteContext();
       rt.tracking=true; rt.last=null; rt.speed=0; rt.odo=0; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0;
+      syncNativeRouteContext();
       rt.lastGoodFix=null; rt.fixQuality=null; rt.trackingSince=null; rt.awaitingManualCalib=false;
       if(state.calib) state.calib._trackM=null; // заново ищем привязку к пути на свежей калибровке
       reqWake(); startTicker(); saveTrackSnapshot();

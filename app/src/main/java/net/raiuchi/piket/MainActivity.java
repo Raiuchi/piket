@@ -447,6 +447,14 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void configureNativeTrackingService(String json) {
+        if (!isTrackingServiceRunning()) return;
+        Intent i = new Intent(this, TrackingService.class);
+        i.setAction(TrackingService.ACTION_CONFIGURE_NATIVE);
+        i.putExtra(TrackingService.EXTRA_NATIVE_CONFIG, json);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(i); else startService(i);
+    }
+
     private boolean isTrackingServiceRunning() {
         android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
         if (am == null) return false;
@@ -461,6 +469,12 @@ public class MainActivity extends Activity {
     }
 
     class PiketBridge {
+        @android.webkit.JavascriptInterface
+        public void configureNativeTrip(final String json) {
+            runOnUiThread(new Runnable() {
+                @Override public void run() { configureNativeTrackingService(json); }
+            });
+        }
         @android.webkit.JavascriptInterface
         public void setKeepScreen(final boolean enabled) {
             runOnUiThread(new Runnable() {

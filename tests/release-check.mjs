@@ -51,6 +51,9 @@ check('permission callback is declared once', (activity.match(/void onRequestPer
 check('external bridge allows only HTTP(S)', activity.includes('"https".equalsIgnoreCase(scheme)'));
 
 const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.java');
+const nativeMotion = read('app/src/main/java/net/raiuchi/piket/NativeMotionFilter.kt');
+const nativeRoute = read('app/src/main/java/net/raiuchi/piket/NativeRouteEngine.kt');
+const nativeTrip = read('app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt');
 check('notification updates retain content intent', /updateNotificationText[\s\S]*?setContentIntent\(pi\)/.test(service));
 check('accelerometer listener is unregistered', service.includes('unregisterListener(accelListener)'));
 check('GNSS quality monitor is registered and released', service.includes('registerGnssStatusCallback') && service.includes('unregisterGnssStatusCallback'));
@@ -74,6 +77,15 @@ check('speed reference uses red main and yellow side track palette', source.incl
 check('restriction acknowledgement uses premium red styling', source.includes('background:linear-gradient(180deg,#f42b43 0%,#c8102e 58%,#8d071e 100%)'));
 check('spoofing and poor Doppler data are rejected', service.includes('loc.isMock()') && service.includes('getSpeedAccuracyMetersPerSecond') && source.includes('mockLocation===true') && source.includes('poorDoppler'));
 check('multi-constellation GNSS quality is evaluated', service.includes('getConstellationType') && source.includes('constellationDiversity'));
+check('native Kotlin motion filter runs before WebView', service.includes('NativeMotionFilter') && service.includes('nativeMotionFilter.process') && nativeMotion.includes('class NativeMotionFilter'));
+check('native route shadow engine preserves official discontinuities', nativeRoute.includes('class NativeRouteEngine') && nativeRoute.includes('abs(official - physical) > 3_000.0') && nativeRoute.includes('physicalM >= b - 1.0') && service.includes('nativeRouteEngine.snap'));
+check('native route follows active JS context through an explicit bridge', source.includes('syncNativeRouteContext') && service.includes('setNativeRouteContext') && source.includes('nativeRouteDistanceM'));
+check('native trip survives signal loss and process recreation', nativeTrip.includes('class NativeTripEngine') && nativeTrip.includes('markSignalUnavailable') && service.includes('persistNativeTripState') && service.includes('restoreNativeTripState'));
+check('native dead reckoning keeps ticking without GPS callbacks', service.includes('startNativeTripTicker') && service.includes('SystemClock.elapsedRealtime(), null, false, null') && nativeTrip.includes('0.997.pow(dt)'));
+check('native restrictions use physical route distance across kilometer changes', nativeTrip.includes('physicalMeters') && nativeTrip.includes('nextRestriction') && service.includes('configureNativeTrip'));
+check('Kotlin becomes position source only after three fixes within 50 meters', source.includes('diff>50') && source.includes('rt.nativeAgreement>=3') && source.includes('sap_native_compare'));
+check('trusted native restriction controls warning and zone entry', source.includes('rt.nativeTrusted') && source.includes('rt.nativeAlertId') && source.includes('rt.nativeAlertInZone') && nativeTrip.includes('AlertCandidate'));
+check('restriction edits reach native service during an active trip', activity.includes('configureNativeTrackingService') && service.includes('ACTION_CONFIGURE_NATIVE') && service.includes('applyNativeTripConfig'));
 check('position confidence has four explicit states', core.includes('label:"точная"') && core.includes('label:"расчётная"') && core.includes('label:"восстанавливается"') && core.includes('label:"нужна сверка"'));
 check('wrong direction requires repeated heading mismatch', source.includes('directionMismatchCount>=3') && source.includes('Проверь выбранное направление движения'));
 check('unacknowledged restrictions repeat without constant spam', source.includes('Date.now()-(rt.alertRepeatAt||0)>20000') && source.includes('Ограничение не подтверждено'));
@@ -93,11 +105,13 @@ check('Volkhov internal junction uses its real 124.4 km boundary', source.includ
 check('cab and train changes wait for a stop', source.includes('(chainNext.cabChange||chainNext.trainChange)&&rt.speed>5') && source.includes('Чудово: смена кабины'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.5.0', gradle.includes('versionName "1.5.0"') && gradle.includes('versionCode 106'));
+check('release version is 1.6.0', gradle.includes('versionName "1.6.0"') && gradle.includes('versionCode 107'));
 const workflow = read('.github/workflows/build.yml');
 check('Gradle Wrapper is complete', fs.existsSync(new URL('gradlew',root)) && fs.existsSync(new URL('gradlew.bat',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.jar',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.properties',root)));
 check('release tags build release APK', workflow.includes('./gradlew assembleRelease') && workflow.includes('app-release.apk'));
 check('real Android lifecycle tests run on emulator', workflow.includes('connectedDebugAndroidTest') && workflow.includes('android-emulator-runner') && fs.existsSync(new URL('app/src/androidTest/java/net/raiuchi/piket/MainActivityLifecycleTest.java',root)));
+check('native GPS and route unit tests run in CI', workflow.includes('testDebugUnitTest') && fs.existsSync(new URL('app/src/test/java/net/raiuchi/piket/NativeMotionFilterTest.kt',root)) && fs.existsSync(new URL('app/src/test/java/net/raiuchi/piket/NativeRouteEngineTest.kt',root)));
+check('native route contract checks all production points', workflow.includes('native-route-contract.mjs') && fs.existsSync(new URL('tests/native-route-contract.mjs',root)));
 check('release notes include generated GPS report', workflow.includes('tail -n +2 GPS_TEST_RESULTS.md'));
 check('CI restores signing key from secret', workflow.includes('PIKET_KEYSTORE_B64') && workflow.includes('base64 --decode'));
 check('signing key is not stored in repository tree', !fs.existsSync(new URL('app/piket-release.keystore', root)));

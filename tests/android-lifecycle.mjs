@@ -15,6 +15,8 @@ const checks = [
   ['служба останавливается по команде и при смахивании', activity.includes('stopService(new Intent(this, TrackingService.class))') && service.includes('onTaskRemoved') && service.includes('stopSelf()')],
   ['ресурсы освобождаются в onDestroy', ['removeLocationUpdates','unregisterListener','unregisterGnssStatusCallback','wakeLock.release()','tts.shutdown()','headlessWeb.destroy()'].every(x => service.includes(x))],
   ['Android Backup отключён', manifest.includes('android:allowBackup="false"') && manifest.includes('android:fullBackupContent="false"')]
+  ,['нативное состояние поездки переживает пересоздание службы', service.includes('persistNativeTripState') && service.includes('restoreNativeTripState') && service.includes('getSharedPreferences')]
+  ,['потеря GPS переводит оба нативных фильтра в восстановление', service.includes('nativeMotionFilter.markSignalUnavailable()') && service.includes('nativeTripEngine.markSignalUnavailable()')]
 ];
 
 for (const [name, ok] of checks) console.log(`${ok ? 'PASS' : 'FAIL'} ${name}`);

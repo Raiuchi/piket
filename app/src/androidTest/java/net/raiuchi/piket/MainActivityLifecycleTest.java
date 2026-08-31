@@ -52,6 +52,18 @@ public class MainActivityLifecycleTest {
     }
 
     @Test
+    public void foregroundServiceCanBeRecreatedAfterStop() throws Exception {
+        Context context = getApplicationContext();
+        Intent service = new Intent(context, TrackingService.class);
+        context.startForegroundService(service);
+        Thread.sleep(500);
+        assertTrue(context.stopService(service));
+        context.startForegroundService(service);
+        Thread.sleep(500);
+        assertTrue("Recreated foreground service must stop cleanly", context.stopService(service));
+    }
+
+    @Test
     public void installedApplicationDoesNotAllowBackup() throws Exception {
         Context context = getApplicationContext();
         ApplicationInfo info = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.ApplicationInfoFlags.of(0));

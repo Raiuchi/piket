@@ -33,6 +33,10 @@ jobs:
           node tests/android-lifecycle.mjs
           node tests/reliability-scenarios.mjs
           node tests/gps-scenarios.mjs --report
+          node tests/native-route-contract.mjs
+
+      - name: Run native GPS and route unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
       - name: Restore signing key
         if: startsWith(github.ref, 'refs/tags/v')
