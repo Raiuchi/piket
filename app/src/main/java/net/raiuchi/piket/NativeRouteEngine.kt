@@ -7,9 +7,8 @@ import kotlin.math.cos
 import kotlin.math.sqrt
 
 /**
- * Нативная копия геометрии маршрута и официальной километровой оси.
- * Пока работает параллельно с WebView: результат можно сравнивать, не отдавая ему
- * управление поездкой до завершения полевых и регрессионных проверок.
+ * Нативная геометрия маршрута и официальная километровая ось.
+ * Единственный источник расчёта позиции в Android-приложении.
  */
 class NativeRouteEngine private constructor(private val routes: List<Route>) {
     data class Point(val latitude: Double, val longitude: Double, val physicalM: Double)

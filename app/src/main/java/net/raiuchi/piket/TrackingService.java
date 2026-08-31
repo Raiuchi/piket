@@ -8,7 +8,6 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.hardware.Sensor;
@@ -28,10 +27,6 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.os.VibratorManager;
 import android.speech.tts.TextToSpeech;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
@@ -50,12 +45,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Фоновая служба трекинга. Держит СВОЙ собственный headless WebView (без экрана) —
- * вся JS-логика (счисление позиции, проверка ограничений, решение о голосе/вибро)
- * продолжает работать здесь независимо от того, жива ли MainActivity и горит ли экран.
- *
- * MainActivity, когда открыта, просто отображает зеркало того же WebView — но
- * источник правды по позиции и предупреждениям один: этот headless движок.
+ * Полностью нативная фоновая служба трекинга. GPS, счисление позиции,
+ * восстановление после помех и контроль ограничений выполняются Kotlin-ядром.
  */
 public class TrackingService extends Service {
 
@@ -88,9 +79,6 @@ public class TrackingService extends Service {
     private NativeTripEngine nativeTripEngine;
     private volatile String nativeRouteLabel = "Все участки";
 
-    private WebView headlessWeb;
-    private boolean headlessPageReady = false;
-    private boolean headlessRestartPending = false;
     private TextToSpeech tts;
     private boolean ttsReady = false;
     private Vibrator vibrator;
@@ -165,125 +153,8 @@ public class TrackingService extends Service {
         }
 
         initTts();
-        initHeadlessWebView();
         startFusedLocation();
         initAccelHelper();
-    }
-
-    /** Headless WebView — та же страница, тот же JS-движок, но без экрана. Живёт пока жива служба. */
-    private void initHeadlessWebView() {
-        headlessWeb = new WebView(this);
-        WebSettings s = headlessWeb.getSettings();
-        s.setJavaScriptEnabled(true);
-        s.setDomStorageEnabled(true);
-        s.setAllowFileAccess(true);
-        s.setMediaPlaybackRequiresUserGesture(false);
-        s.setCacheMode(WebSettings.LOAD_DEFAULT);
-        // КРИТИЧНЫЙ ФИКС: при первом запуске службы (после установки или перезагрузки
-        // телефона) onCreate() -> onStartCommand() выполняются практически сразу друг за
-        // другом, но loadUrl() асинхронный - страница может физически не успеть загрузиться
-        // к моменту, когда onStartCommand вызывает forceHeadlessStart(). evaluateJavascript
-        // на ещё не загруженной странице просто молча ничего не делает - команда терялась
-        // без какой-либо ошибки, счётчик не двигался именно в первую поездку после установки.
-        // Теперь явно ждём onPageFinished и держим "отложенную команду", если Старт был
-        // нажат раньше, чем страница успела прогрузиться.
-        headlessWeb.setWebViewClient(new WebViewClient() {
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                headlessPageReady = true;
-                if (headlessRestartPending) {
-                    headlessRestartPending = false;
-                    forceHeadlessStart();
-                }
-            }
-        });
-        headlessWeb.addJavascriptInterface(new PiketBridge(), "Android");
-        headlessWeb.loadUrl("file:///android_asset/index.html");
-    }
-
-    /** Тот же мост, что раньше был у MainActivity — теперь живёт здесь, в службе */
-    public class PiketBridge {
-        @JavascriptInterface
-        public void setNativeRouteContext(String routeLabel) {
-            nativeRouteLabel = routeLabel != null ? routeLabel : "Все участки";
-        }
-
-        @JavascriptInterface
-        public void configureNativeTrip(String json) {
-            applyNativeTripConfig(json);
-        }
-
-        @JavascriptInterface
-        public void updatePosition(final String text) {
-            updateNotificationText(TrackingService.this, text);
-        }
-
-        @JavascriptInterface
-        public void startTracking() {
-            // Этот bridge принадлежит ТОЛЬКО headless-копии (см. addJavascriptInterface выше) -
-            // нажатие "Старт" на видимом экране сюда не попадает, оно идёт в ДРУГОЙ PiketBridge,
-            // определённый в MainActivity.java. Реальный путь команды от кнопки "Старт" до
-            // headless-копии - через onStartCommand() этой службы, см. forceHeadlessStart().
-            // Этот метод остаётся как запасной путь, если JS headless-страницы когда-либо сам
-            // вызовет window.Android.startTracking() из своего кода.
-
-            forceHeadlessStart();
-        }
-
-        @JavascriptInterface
-        public void stopTracking() {
-            mainHandler.post(new Runnable() {
-                @Override public void run() { stopSelf(); }
-            });
-        }
-
-        @JavascriptInterface
-        public void openUrl(final String url) {
-            // открытие ссылок не имеет смысла без экрана — игнорируем здесь,
-            // в видимой Activity это всё равно работает через её собственный bridge
-        }
-
-        @JavascriptInterface
-        public String getAppVersion() {
-            try {
-                PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
-                return pi.versionName != null ? pi.versionName : "0.0.0";
-            } catch (Exception e) {
-                return "0.0.0";
-            }
-        }
-
-        @JavascriptInterface
-        public void speak(final String text) {
-            mainHandler.post(new Runnable() {
-                @Override public void run() { speakNative(text); }
-            });
-        }
-
-        @JavascriptInterface
-        public void vibrate(final String kind) {
-            mainHandler.post(new Runnable() {
-                @Override public void run() { vibrateNative(kind); }
-            });
-        }
-
-        @JavascriptInterface
-        public void beep(final String kind) {
-            mainHandler.post(new Runnable() {
-                @Override public void run() { beepNative(kind); }
-            });
-        }
-
-        @JavascriptInterface
-        public boolean isTtsReady() {
-            return ttsReady;
-        }
-
-        @JavascriptInterface
-        public boolean isHeadless() {
-            return true;
-        }
     }
 
     private void initTts() {
@@ -373,7 +244,7 @@ public class TrackingService extends Service {
                 // передаётся в JS для диагностики и там отбрасывается, но больше не
                 // останавливает восстановление GPS-подписки и резервного канала.
                 if (isFreshRealFix(loc)) lastFixReceivedAt = System.currentTimeMillis();
-                feedLocationToWebView(loc);
+                processNativeLocation(loc);
             }
 
             @Override
@@ -393,7 +264,7 @@ public class TrackingService extends Service {
                     // на реальном Android-телефоне (она работала только в веб-версии, где
                     // браузер сам вызывает onErr через стандартный geolocation API).
                     // Добавлен явный мост в JS, аналогичный onNativeLocation ниже.
-                    notifyLocationUnavailable();
+                    persistNativeSnapshot(null, 999f);
                 } else {
                     locationUnavailableSince = 0;
                 }
@@ -528,7 +399,7 @@ public class TrackingService extends Service {
                     // НЕ обновляем lastFixReceivedAt здесь - это поле отслеживает именно
                     // ОСНОВНОЙ (точный) канал, чтобы watchdog продолжал пытаться его восстановить
                     // даже пока запасной подстраховывает.
-                    feedLocationToWebView(loc);
+                    processNativeLocation(loc);
                 }
             };
             LocationRequest backupReq = new LocationRequest.Builder(3000)
@@ -547,41 +418,7 @@ public class TrackingService extends Service {
         networkBackupCallback = null;
     }
 
-    /** Команда headless-копии: перечитать калибровку/настройки из localStorage и реально
-     *  запустить тикер. Вызывается onStartCommand'ом при каждом нажатии «Старт» (через
-     *  startForegroundService из MainActivity) — это единственный реальный путь, которым
-     *  команда добирается до headless-JS. Если страница headless ещё не успела загрузиться
-     *  (первый запуск службы после установки/перезагрузки телефона) — откладываем команду,
-     *  её выполнит сам onPageFinished, как только страница будет готова. */
-    private void forceHeadlessStart() {
-        if (headlessWeb == null) return;
-        if (!headlessPageReady) { headlessRestartPending = true; return; }
-        mainHandler.post(new Runnable() {
-            @Override public void run() {
-                if (headlessWeb == null) return;
-                headlessWeb.evaluateJavascript(
-                    "if(window.headlessRestart)window.headlessRestart();", null);
-            }
-        });
-    }
-
-    /** Команда headless-копии: перечитать ТОЛЬКО калибровку, без полного перезапуска
-     *  трекинга (звук, wake lock, тикер не трогаются). Нужна, когда машинист на остановке
-     *  поправляет км/пикет/метр прямо во время активной поездки, не нажимая «Стоп» -
-     *  без этого headless продолжал бы считать со старой калибровкой в памяти, пока её
-     *  явно не попросят перечитать (localStorage сам по себе JS-переменную не обновляет). */
-    private void forceHeadlessRecalibrate() {
-        if (headlessWeb == null || !headlessPageReady) return;
-        mainHandler.post(new Runnable() {
-            @Override public void run() {
-                if (headlessWeb == null) return;
-                headlessWeb.evaluateJavascript(
-                    "if(window.headlessRecalibrate)window.headlessRecalibrate();", null);
-            }
-        });
-    }
-
-    /** Передаём координату прямо в headless WebView — работает независимо от Activity и экрана */
+    /** Полностью нативная обработка фикса без WebView и JavaScript. */
     private boolean isFreshRealFix(Location loc) {
         long ageMs = Math.max(0L, (SystemClock.elapsedRealtimeNanos()
                 - loc.getElapsedRealtimeNanos()) / 1_000_000L);
@@ -590,21 +427,16 @@ public class TrackingService extends Service {
         return ageMs <= 5000L && !mock;
     }
 
-    private void feedLocationToWebView(Location loc) {
-        if (headlessWeb == null) return;
+    private void processNativeLocation(Location loc) {
         final double lat = loc.getLatitude();
         final double lon = loc.getLongitude();
         final float accuracy = loc.hasAccuracy() ? loc.getAccuracy() : 999f;
         final boolean hasSpeed = loc.hasSpeed();
-        final long time = loc.getTime();
         final long ageMs = Math.max(0L, (SystemClock.elapsedRealtimeNanos()
                 - loc.getElapsedRealtimeNanos()) / 1_000_000L);
-        final boolean hasBearing = loc.hasBearing();
-        final float bearing = hasBearing ? loc.getBearing() : 0f;
         final int satellitesUsed = gnssSatellitesUsed;
         final float averageCn0 = gnssAverageCn0;
         final boolean hasGnssTelemetry = gnssTelemetrySeen;
-        final int constellationDiversity = gnssConstellationDiversity;
         final boolean mockLocation = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                 ? loc.isMock() : loc.isFromMockProvider();
         final float speedAccuracyMps = loc.hasSpeedAccuracy() ? loc.getSpeedAccuracyMetersPerSecond() : -1f;
@@ -614,47 +446,39 @@ public class TrackingService extends Service {
                 loc.hasSpeedAccuracy() ? speedAccuracyMps : null,
                 mockLocation, satellitesUsed, averageCn0, hasGnssTelemetry));
         final Float nativeSpeedMps = nativeResult.getFilteredSpeedMps();
-        final String nativeQuality = nativeResult.getQuality();
-        final String nativeReason = nativeResult.getReason();
         NativeRouteEngine.Snap shadowSnap = nativeRouteEngine != null
                 ? nativeRouteEngine.snap(nativeRouteLabel, lat, lon) : null;
-        final Double nativePhysicalM = shadowSnap != null ? shadowSnap.getPhysicalM() : null;
-        final Double nativeOfficialM = shadowSnap != null ? shadowSnap.getOfficialM() : null;
-        final Double nativeRouteDistanceM = shadowSnap != null ? shadowSnap.getDistanceM() : null;
         NativeTripEngine.Output nativeTrip = nativeTripEngine != null
                 ? nativeTripEngine.update(new NativeTripEngine.Input(
                     loc.getElapsedRealtimeNanos() / 1_000_000L, nativeSpeedMps,
                     nativeResult.getAccepted(), shadowSnap)) : null;
         if (nativeTripEngine != null) persistNativeTripState(nativeTripEngine.save());
-        final Double nativeTripPhysicalM = nativeTrip != null ? nativeTrip.getPhysicalM() : null;
-        final Double nativeTripOfficialM = nativeTrip != null ? nativeTrip.getOfficialM() : null;
-        final boolean nativeTripRecovering = nativeTrip != null && nativeTrip.getRecovering();
-        final String nativeTripSource = nativeTrip != null ? nativeTrip.getSource() : "unavailable";
-        final String nativeAlertId = nativeTrip != null ? nativeTrip.getAlertId() : null;
-        final Double nativeAlertDistanceM = nativeTrip != null ? nativeTrip.getAlertDistanceM() : null;
-        final boolean nativeAlertInZone = nativeTrip != null && nativeTrip.getAlertInZone();
-        mainHandler.post(new Runnable() {
-            @Override public void run() {
-                if (headlessWeb == null) return;
-                String js = "if(window.onNativeLocation)window.onNativeLocation("
-                        + lat + "," + lon + "," + accuracy + ","
-                        + (nativeSpeedMps != null ? String.valueOf(nativeSpeedMps) : "null") + "," + time + ","
-                        + ageMs + "," + (hasBearing ? String.valueOf(bearing) : "null") + ","
-                        + satellitesUsed + "," + averageCn0 + "," + hasGnssTelemetry + ","
-                        + constellationDiversity + "," + mockLocation + "," + speedAccuracyMps + ",\""
-                        + nativeQuality + "\",\"" + nativeReason + "\","
-                        + (nativePhysicalM != null ? nativePhysicalM : "null") + ","
-                        + (nativeOfficialM != null ? nativeOfficialM : "null") + ","
-                        + (nativeRouteDistanceM != null ? nativeRouteDistanceM : "null") + ","
-                        + (nativeTripPhysicalM != null ? nativeTripPhysicalM : "null") + ","
-                        + (nativeTripOfficialM != null ? nativeTripOfficialM : "null") + ","
-                        + nativeTripRecovering + ",\"" + nativeTripSource + "\","
-                        + (nativeAlertId != null ? JSONObject.quote(nativeAlertId) : "null") + ","
-                        + (nativeAlertDistanceM != null ? nativeAlertDistanceM : "null") + ","
-                        + nativeAlertInZone + ");";
-                headlessWeb.evaluateJavascript(js, null);
-            }
-        });
+        persistNativeSnapshot(nativeTrip, accuracy);
+        if (nativeTrip != null && nativeTrip.getOfficialM() != null) {
+            int official = (int) Math.round(nativeTrip.getOfficialM());
+            updateNotificationText(this, (official / 1000) + " км " + ((official % 1000) / 100) + " пк");
+        }
+    }
+
+    private void persistNativeSnapshot(NativeTripEngine.Output output, float accuracy) {
+        try {
+            JSONObject json = new JSONObject();
+            NativeTripEngine.SavedState saved = nativeTripEngine != null ? nativeTripEngine.save() : null;
+            json.put("active", output != null ? output.getActive() : saved != null && saved.getActive());
+            json.put("route", saved != null ? saved.getRoute() : nativeRouteLabel);
+            json.put("direction", saved != null ? saved.getDirection() : "tuda");
+            if (output != null && output.getOfficialM() != null) json.put("officialM", output.getOfficialM());
+            if (output != null && output.getPhysicalM() != null) json.put("physicalM", output.getPhysicalM());
+            json.put("speedKmh", output != null ? output.getSpeedMps() * 3.6f : 0f);
+            json.put("recovering", output != null && output.getRecovering());
+            json.put("source", output != null ? output.getSource() : "unavailable");
+            json.put("satellites", gnssSatellitesUsed); json.put("averageCn0", gnssAverageCn0);
+            json.put("accuracyM", accuracy);
+            if (output != null && output.getAlertId() != null) json.put("alertId", output.getAlertId());
+            if (output != null && output.getAlertDistanceM() != null) json.put("alertDistanceM", output.getAlertDistanceM());
+            json.put("alertInZone", output != null && output.getAlertInZone());
+            getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("snapshot", json.toString()).apply();
+        } catch (Exception ignored) { }
     }
 
     private String readAsset(String path) throws Exception {
@@ -719,6 +543,7 @@ public class TrackingService extends Service {
                     NativeTripEngine.Output output = nativeTripEngine.update(new NativeTripEngine.Input(
                             SystemClock.elapsedRealtime(), null, false, null));
                     if (output.getActive()) persistNativeTripState(nativeTripEngine.save());
+                    persistNativeSnapshot(output, 999f);
                 }
                 if (mainHandler != null) mainHandler.postDelayed(this, 1000L);
             }
@@ -726,28 +551,7 @@ public class TrackingService extends Service {
         mainHandler.postDelayed(nativeTripTicker, 1000L);
     }
 
-    /** Сообщает headless JS-коду, что система явно объявила локацию недоступной прямо сейчас
-     *  (см. onLocationAvailability выше). Без этого моста JS-функция onErr() (плавное снижение
-     *  скорости при потере сигнала, не застывание на старом значении) никогда не вызывалась бы
-     *  на реальном Android-телефоне через основной путь - только в веб-версии, где браузер сам
-     *  вызывает её через стандартный geolocation API. */
-    private void notifyLocationUnavailable() {
-        if (headlessWeb == null) return;
-        mainHandler.post(new Runnable() {
-            @Override public void run() {
-                if (headlessWeb == null) return;
-                headlessWeb.evaluateJavascript("if(window.onNativeLocationUnavailable)window.onNativeLocationUnavailable();", null);
-            }
-        });
-    }
-
-    /** Вспомогательный акселерометр — мягкая подсказка JS-коду при потере/глушении GPS, не
-     *  замена GPS (та же идея, что в веб-версии piket-web, но читается напрямую через нативный
-     *  Android SensorManager, а не через браузерный devicemotion — тот может ненадёжно работать
-     *  именно в невидимом headless WebView, который не attached к экрану; SensorManager этой
-     *  проблемы не имеет, он не зависит от WebView вообще). Передаём в JS только общую величину
-     *  (модуль) вектора ускорения без гравитации — простой индикатор "идёт ли явное резкое
-     *  изменение скорости прямо сейчас", не зависящий от того, как телефон лежит в кабине. */
+    /** Акселерометр остаётся нативной диагностикой движения и не зависит от интерфейса. */
     private void initAccelHelper() {
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         if (sensorManager == null) return;
@@ -758,28 +562,10 @@ public class TrackingService extends Service {
                 float mag = (float) Math.sqrt(event.values[0]*event.values[0]
                         + event.values[1]*event.values[1] + event.values[2]*event.values[2]);
                 accelMag = accelMag*0.7f + mag*0.3f; // то же сглаживание, что и в JS-версии
-                feedAccelToWebView();
             }
             @Override public void onAccuracyChanged(Sensor sensor, int accuracy) {}
         };
         sensorManager.registerListener(accelListener, accelSensor, SensorManager.SENSOR_DELAY_NORMAL);
-    }
-
-    private long lastAccelFeedAt = 0;
-    private void feedAccelToWebView() {
-        if (headlessWeb == null) return;
-        // Не дёргаем JS на каждое срабатывание сенсора (может быть десятки раз в секунду) —
-        // достаточно нескольких раз в секунду для нашей цели (мягкая подсказка, не точный замер).
-        long now = System.currentTimeMillis();
-        if (now - lastAccelFeedAt < 200) return;
-        lastAccelFeedAt = now;
-        final float magToSend = accelMag;
-        mainHandler.post(new Runnable() {
-            @Override public void run() {
-                if (headlessWeb == null) return;
-                headlessWeb.evaluateJavascript("if(window.onNativeAccel)window.onNativeAccel(" + magToSend + ");", null);
-            }
-        });
     }
 
     private void createChannel() {
@@ -811,13 +597,8 @@ public class TrackingService extends Service {
         // км/пикет/метр прямо во время поездки, не нажимая «Стоп»). Полный forceHeadlessStart()
         // здесь не подходит - он сбросил бы звук/тикер/wake lock без необходимости, когда
         // трекинг и так уже активен. Нужна только лёгкая перечитка калибровки.
-        if (intent != null && ACTION_CONFIGURE_NATIVE.equals(intent.getAction())) {
+        if (intent != null && ACTION_CONFIGURE_NATIVE.equals(intent.getAction()))
             applyNativeTripConfig(intent.getStringExtra(EXTRA_NATIVE_CONFIG));
-        } else if (intent != null && ACTION_RECALIBRATE.equals(intent.getAction())) {
-            forceHeadlessRecalibrate();
-        } else {
-            forceHeadlessStart();
-        }
         return START_STICKY;
     }
 
@@ -859,10 +640,8 @@ public class TrackingService extends Service {
             tts.shutdown();
             tts = null;
         }
-        if (headlessWeb != null) {
-            headlessWeb.destroy();
-            headlessWeb = null;
-        }
+        if (nativeTripEngine != null) nativeTripEngine.stop();
+        persistNativeSnapshot(null, 999f);
         super.onDestroy();
     }
 
