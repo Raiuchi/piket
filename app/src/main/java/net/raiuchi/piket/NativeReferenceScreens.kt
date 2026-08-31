@@ -19,12 +19,21 @@ import kotlin.math.roundToInt
 enum class NativeReferenceScreen { TIMETABLE, SPEEDS }
 
 @Composable
-fun NativeTimetableScreen(data: NativeReferenceData, route: String, direction: String, close: () -> Unit) {
+fun NativeTimetableScreen(
+    data: NativeReferenceData,
+    route: String,
+    direction: String,
+    overrides: Map<String, String>,
+    updateTime: (String, String?) -> Unit,
+    resetTrain: (String) -> Unit,
+    close: () -> Unit
+) {
     val matching = remember(data, route, direction) {
         data.trainsFor(route, direction)
     }
     var selected by remember(matching) { mutableStateOf(matching.firstOrNull()) }
     var expanded by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<TimeEdit?>(null) }
     NativeReferenceScaffold("Расписание и время хода", close) {
         item {
             Box {
@@ -40,18 +49,23 @@ fun NativeTimetableScreen(data: NativeReferenceData, route: String, direction: S
             }
         }
         selected?.let { train ->
-            items(train.stops.windowed(2)) { pair ->
-                val from = pair[0]
-                val to = pair[1]
+            items(train.stops.indices.dropLast(1).toList()) { index ->
+                val from = train.stops[index]
+                val to = train.stops[index + 1]
+                val fromTime = effectiveTime(train, index, "dep", from.departure ?: from.arrival, overrides)
+                val toTime = effectiveTime(train, index + 1, "arr", to.arrival ?: to.departure, overrides)
                 val fromM = data.stationMeters(route, from.station, train.number)
                 val toM = data.stationMeters(route, to.station, train.number)
-                val seconds = secondsBetween(from.departure ?: from.arrival, to.arrival ?: to.departure)
+                val seconds = secondsBetween(fromTime, toTime)
                 val speed = if (fromM != null && toM != null && seconds != null && seconds > 0)
                     (kotlin.math.abs(toM - fromM) / seconds * 3.6).roundToInt() else null
                 Card(colors = CardDefaults.cardColors(containerColor = PiketPanel)) {
                     Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("${from.station} → ${to.station}", fontWeight = FontWeight.Bold)
-                        Text("${from.departure ?: from.arrival ?: "—"} → ${to.arrival ?: to.departure ?: "—"}", color = Color.LightGray)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ScheduleTimeButton("отпр", fromTime) { editing = TimeEdit(train.number, index, "dep", fromTime) }
+                            ScheduleTimeButton("приб", toTime) { editing = TimeEdit(train.number, index + 1, "arr", toTime) }
+                        }
                         Text(
                             if (speed == null) "Километраж уточняется" else "Средняя перегонная скорость: $speed км/ч",
                             color = if (speed == null) PiketYellow else PiketBlue
@@ -59,7 +73,64 @@ fun NativeTimetableScreen(data: NativeReferenceData, route: String, direction: S
                     }
                 }
             }
+            item {
+                OutlinedButton({ resetTrain(train.number) }, Modifier.fillMaxWidth()) { Text("Сбросить правки времени поезда ${train.number}") }
+            }
         }
+    }
+    editing?.let { edit ->
+        PremiumTimeDialog(edit.value, { editing = null }, { value -> updateTime(edit.key, value); editing = null })
+    }
+}
+
+private data class TimeEdit(val train: String, val index: Int, val kind: String, val value: String?) {
+    val key get() = "$train:$index:$kind"
+}
+
+private fun effectiveTime(train: TimetableTrain, index: Int, kind: String, original: String?, overrides: Map<String, String>) =
+    overrides["${train.number}:$index:$kind"] ?: overrides["${train.number}:$index"] ?: original
+
+@Composable
+private fun ScheduleTimeButton(label: String, value: String?, click: () -> Unit) {
+    OutlinedButton(click, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, fontSize = 9.sp, color = Color.Gray)
+            Text(value ?: "—", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun PremiumTimeDialog(initial: String?, dismiss: () -> Unit, save: (String?) -> Unit) {
+    val parts = initial?.split(':').orEmpty()
+    var hour by remember { mutableIntStateOf(parts.getOrNull(0)?.toIntOrNull() ?: 0) }
+    var minute by remember { mutableIntStateOf(parts.getOrNull(1)?.toIntOrNull() ?: 0) }
+    var half by remember { mutableStateOf(parts.getOrNull(2) == "30") }
+    AlertDialog(
+        onDismissRequest = dismiss,
+        containerColor = PiketPanel,
+        title = { Text("Время станции", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TimeStepper(hour, { hour = (hour + 23) % 24 }, { hour = (hour + 1) % 24 })
+                    Text(":", fontSize = 38.sp, fontWeight = FontWeight.Bold)
+                    TimeStepper(minute, { minute = (minute + 59) % 60 }, { minute = (minute + 1) % 60 })
+                }
+                FilterChip(half, { half = !half }, { Text(if (half) "Полминуты · :30" else "Полминуты · :00") })
+            }
+        },
+        confirmButton = { Button({ save("%02d:%02d%s".format(hour, minute, if (half) ":30" else "")) }, colors = ButtonDefaults.buttonColors(containerColor = PiketRed)) { Text("Установить") } },
+        dismissButton = { Row { TextButton({ save(null) }) { Text("Сбросить") }; TextButton(dismiss) { Text("Отмена") } } }
+    )
+}
+
+@Composable
+private fun TimeStepper(value: Int, down: () -> Unit, up: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("＋", Modifier.clickable(onClick = up).padding(10.dp), color = PiketRed, fontSize = 25.sp)
+        Text("%02d".format(value), fontSize = 42.sp, fontWeight = FontWeight.ExtraBold)
+        Text("−", Modifier.clickable(onClick = down).padding(10.dp), color = PiketBlue, fontSize = 25.sp)
     }
 }
 

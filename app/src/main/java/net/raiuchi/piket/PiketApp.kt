@@ -45,6 +45,7 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     private val repository = PiketRepository(app)
     var restrictions by mutableStateOf(repository.loadRestrictions()); private set
     var settings by mutableStateOf(repository.loadSettings()); private set
+    var scheduleOverrides by mutableStateOf(repository.loadScheduleOverrides()); private set
     var snapshot by mutableStateOf(repository.loadSnapshot()); private set
     var route by mutableStateOf(snapshot.route); private set
     var direction by mutableStateOf(snapshot.direction); private set
@@ -59,6 +60,14 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     fun add(item: RestrictionRecord): Boolean { val next = restrictions + item; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun remove(id: String): Boolean { val next = restrictions.filterNot { it.id == id }; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun updateSettings(value: PiketSettings) { if (repository.saveSettings(value)) settings = value }
+    fun updateScheduleTime(key: String, value: String?) {
+        val next = scheduleOverrides.toMutableMap().apply { if (value == null) remove(key) else put(key, value) }
+        if (repository.saveScheduleOverrides(next)) scheduleOverrides = next
+    }
+    fun resetSchedule(trainNumber: String) {
+        val next = scheduleOverrides.filterKeys { !it.startsWith("$trainNumber:") }
+        if (repository.saveScheduleOverrides(next)) scheduleOverrides = next
+    }
 }
 
 @Composable
@@ -81,7 +90,10 @@ fun PiketApp(
             Brush.verticalGradient(listOf(Color(0xFF080A0E), Color(0xFF030405)))
         )) {
             when (referenceScreen) {
-                NativeReferenceScreen.TIMETABLE -> NativeTimetableScreen(model.referenceData, model.route, model.direction) { referenceScreen = null }
+                NativeReferenceScreen.TIMETABLE -> NativeTimetableScreen(
+                    model.referenceData, model.route, model.direction, model.scheduleOverrides,
+                    model::updateScheduleTime, model::resetSchedule
+                ) { referenceScreen = null }
                 NativeReferenceScreen.SPEEDS -> NativeSpeedReferenceScreen(model.referenceData) { referenceScreen = null }
                 null -> when (tab) {
                     PiketTab.TRIP -> TripScreen(model, { calibrating = true }, onStart, onStop)

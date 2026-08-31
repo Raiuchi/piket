@@ -48,6 +48,16 @@ class PiketRepository(private val context: Context) {
         .putBoolean("keepScreen", value.keepScreenOn).putBoolean("demo", value.demoMode)
         .putInt("leadM", value.leadM).commit()
 
+    fun loadScheduleOverrides(): Map<String, String> = runCatching {
+        val json = JSONObject(prefs.getString("scheduleOverrides", "{}") ?: "{}")
+        buildMap { json.keys().forEach { key -> put(key, json.getString(key)) } }
+    }.getOrDefault(emptyMap())
+
+    fun saveScheduleOverrides(values: Map<String, String>): Boolean = runCatching {
+        val json = JSONObject().apply { values.forEach { (key, value) -> put(key, value) } }
+        prefs.edit().putString("scheduleOverrides", json.toString()).commit()
+    }.getOrDefault(false)
+
     fun loadSnapshot(): TripSnapshot = runCatching {
         val raw = context.getSharedPreferences("piket_native", Context.MODE_PRIVATE)
             .getString("snapshot", null) ?: return TripSnapshot()
