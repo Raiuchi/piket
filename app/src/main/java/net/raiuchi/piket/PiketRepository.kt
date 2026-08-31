@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-class PiketRepository(context: Context) {
+class PiketRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("piket_compose", Context.MODE_PRIVATE)
 
     fun loadRestrictions(): List<RestrictionRecord> = runCatching {
@@ -69,4 +69,3 @@ class PiketRepository(context: Context) {
     private fun JSONObject.optNullableDouble(key: String): Double? =
         if (has(key) && !isNull(key)) getDouble(key) else null
 }
-

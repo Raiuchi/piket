@@ -175,7 +175,49 @@ private fun PositionCard(state: TripSnapshot) {
 @Composable private fun AlertCard(s: TripSnapshot,r:RestrictionRecord?){Card(colors=CardDefaults.cardColors(containerColor=if(s.alertInZone)Color(0xFF54121C)else Color(0xFF4A3510))){Column(Modifier.fillMaxWidth().padding(18.dp)){Text(if(s.alertInZone)"ОГРАНИЧЕНИЕ" else "ПОДЪЕЗЖАЕШЬ",fontWeight=FontWeight.Bold,color=if(s.alertInZone)PiketRed else PiketYellow);Text("${r?.speed ?: "—"} км/ч · ${r?.reason ?: "Ограничение"}",fontSize=20.sp,fontWeight=FontWeight.Bold);Text("Осталось ${s.alertDistanceM?.roundToInt() ?: 0} м")}}}
 
 @Composable
-private fun RestrictionScreen(model:PiketViewModel){var adding by remember{mutableStateOf(false)};var message by remember{mutableStateOf<String?>(null)};Column(Modifier.fillMaxSize().padding(18.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("Ограничения",fontSize=28.sp,fontWeight=FontWeight.ExtraBold);Text("Хранятся только на телефоне",color=Color.Gray)};Button({adding=true},colors=ButtonDefaults.buttonColors(containerColor=PiketRed)){Text("＋ Добавить")}};Spacer(Modifier.height(14.dp));if(model.restrictions.isEmpty())Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Text("Список пока пуст",color=Color.Gray)}else LazyColumn(verticalArrangement=Arrangement.spacedBy(10.dp)){items(model.restrictions,key={it.id}){r->Card(colors=CardDefaults.cardColors(containerColor=PiketPanel),shape=RoundedCornerShape(17.dp)){Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(54.dp).background(PiketRedDark,RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center){Text(r.speed.toString(),fontSize=21.sp,fontWeight=FontWeight.Bold)};Column(Modifier.weight(1f).padding(horizontal=12.dp)){Text("${r.km} км ${r.pk} пк ${r.meter} м",fontWeight=FontWeight.Bold);Text(r.reason,color=Color.LightGray);Text(r.route,color=PiketBlue,fontSize=11.sp)};Text("×",fontSize=28.sp,modifier=Modifier.clickable{if(!model.remove(r.id))message="Не удалось сохранить изменения"})}}}}};message?.let{Text(it,color=PiketRed)} };if(adding)AddRestrictionDialog(model.routes,{adding=false}){if(model.add(it)){adding=false}else message="Ошибка хранилища: ограничение не сохранено"}}
+private fun RestrictionScreen(model: PiketViewModel) {
+    var adding by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
+    Column(Modifier.fillMaxSize().padding(18.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Ограничения", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Хранятся только на телефоне", color = Color.Gray)
+            }
+            Button(onClick = { adding = true }, colors = ButtonDefaults.buttonColors(containerColor = PiketRed)) {
+                Text("＋ Добавить")
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        if (model.restrictions.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("Список пока пуст", color = Color.Gray) }
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(model.restrictions, key = { it.id }) { restriction ->
+                    Card(colors = CardDefaults.cardColors(containerColor = PiketPanel), shape = RoundedCornerShape(17.dp)) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(54.dp).background(PiketRedDark, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                                Text(restriction.speed.toString(), fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                                Text("${restriction.km} км ${restriction.pk} пк ${restriction.meter} м", fontWeight = FontWeight.Bold)
+                                Text(restriction.reason, color = Color.LightGray)
+                                Text(restriction.route, color = PiketBlue, fontSize = 11.sp)
+                            }
+                            Text("×", fontSize = 28.sp, modifier = Modifier.clickable {
+                                if (!model.remove(restriction.id)) message = "Не удалось сохранить изменения"
+                            })
+                        }
+                    }
+                }
+            }
+        }
+        message?.let { Text(it, color = PiketRed) }
+    }
+    if (adding) AddRestrictionDialog(model.routes, { adding = false }) {
+        if (model.add(it)) adding = false else message = "Ошибка хранилища: ограничение не сохранено"
+    }
+}
 
 @Composable
 private fun AddRestrictionDialog(routes:List<String>,dismiss:()->Unit,save:(RestrictionRecord)->Unit){var km by remember{mutableStateOf("")};var pk by remember{mutableStateOf("")};var meter by remember{mutableStateOf("")};var speed by remember{mutableStateOf("60")};var reason by remember{mutableStateOf("Ремонт пути")};var route by remember{mutableStateOf(routes.firstOrNull()?:"Все участки")};AlertDialog(onDismissRequest=dismiss,containerColor=PiketPanel,title={Text("Новое ограничение",fontWeight=FontWeight.Bold)},text={LazyColumn(verticalArrangement=Arrangement.spacedBy(9.dp)){item{NativeField("Маршрут",route){route=it}};item{Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){Box(Modifier.weight(1f)){NativeField("КМ",km){km=it}};Box(Modifier.weight(1f)){NativeField("ПК",pk){pk=it}};Box(Modifier.weight(1f)){NativeField("М",meter){meter=it}}}};item{NativeField("Скорость",speed){speed=it}};item{NativeField("Причина",reason){reason=it}}}},confirmButton={Button({save(RestrictionRecord(UUID.randomUUID().toString(),route,"both",km.toIntOrNull()?:0,pk.toIntOrNull()?:0,meter.toIntOrNull()?:0,speed.toIntOrNull()?:60,reason))},colors=ButtonDefaults.buttonColors(containerColor=PiketRed)){Text("Сохранить")}},dismissButton={TextButton(dismiss){Text("Отмена")}})}
