@@ -54,8 +54,8 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     }.getOrDefault(listOf("СпбГл - Москва"))
 
     init { viewModelScope.launch { while (isActive) { snapshot = repository.loadSnapshot(); delay(500) } } }
-    fun setRoute(value: String) { route = value }
-    fun setDirection(value: String) { direction = value }
+    fun selectRoute(value: String) { route = value }
+    fun selectDirection(value: String) { direction = value }
     fun add(item: RestrictionRecord): Boolean { val next = restrictions + item; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun remove(id: String): Boolean { val next = restrictions.filterNot { it.id == id }; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun updateSettings(value: PiketSettings) { if (repository.saveSettings(value)) settings = value }
@@ -141,13 +141,13 @@ private fun RouteSelector(model: PiketViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().background(PiketPanel, RoundedCornerShape(15.dp))) {
             listOf("tuda" to "Туда", "obratno" to "Обратно").forEach { (value, title) ->
-                Text(title, modifier = Modifier.weight(1f).clickable { model.setDirection(value) }.background(if (model.direction == value) PiketRedDark else Color.Transparent).padding(14.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                Text(title, modifier = Modifier.weight(1f).clickable { model.selectDirection(value) }.background(if (model.direction == value) PiketRedDark else Color.Transparent).padding(14.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
             }
         }
         Box {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text(model.route, Modifier.weight(1f), textAlign = TextAlign.Start); Text("⌄") }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.fillMaxWidth(.9f).background(PiketPanel)) {
-                model.routes.forEach { route -> DropdownMenuItem(text = { Text(route) }, onClick = { model.setRoute(route); expanded = false }) }
+                model.routes.forEach { route -> DropdownMenuItem(text = { Text(route) }, onClick = { model.selectRoute(route); expanded = false }) }
             }
         }
     }
