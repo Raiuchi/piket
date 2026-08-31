@@ -21,7 +21,7 @@ enum class NativeReferenceScreen { TIMETABLE, SPEEDS }
 @Composable
 fun NativeTimetableScreen(data: NativeReferenceData, route: String, direction: String, close: () -> Unit) {
     val matching = remember(data, route, direction) {
-        data.trains.filter { it.route == route && it.direction == direction }
+        data.trainsFor(route, direction)
     }
     var selected by remember(matching) { mutableStateOf(matching.firstOrNull()) }
     var expanded by remember { mutableStateOf(false) }
@@ -43,8 +43,8 @@ fun NativeTimetableScreen(data: NativeReferenceData, route: String, direction: S
             items(train.stops.windowed(2)) { pair ->
                 val from = pair[0]
                 val to = pair[1]
-                val fromM = data.stationMeters(route, from.station)
-                val toM = data.stationMeters(route, to.station)
+                val fromM = data.stationMeters(route, from.station, train.number)
+                val toM = data.stationMeters(route, to.station, train.number)
                 val seconds = secondsBetween(from.departure ?: from.arrival, to.arrival ?: to.departure)
                 val speed = if (fromM != null && toM != null && seconds != null && seconds > 0)
                     (kotlin.math.abs(toM - fromM) / seconds * 3.6).roundToInt() else null

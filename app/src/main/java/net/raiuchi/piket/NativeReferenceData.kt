@@ -30,11 +30,38 @@ class NativeReferenceData(context: Context) {
         speedRoutes = parseSpeedRoutes(JSONObject(asset("speed-reference.json")).getJSONArray("routes"))
     }
 
-    fun stations(route: String): List<TimingStation> = timingStations[route].orEmpty()
+    private val chudovoLegs = setOf("Чудово - Новгород", "Волховстрой - Чудово", "Горы - Петрозаводск")
+    private val dachaLegs = setOf("Д. Долг - Павлово", "Павлово - Горы II путь", "Горы - Павлово I путь", "Горы - Петрозаводск")
+    private val vyborgLegs = setOf("СПбФин - Выборг", "Выборг - Каменногорск")
 
-    fun stationMeters(route: String, station: String): Double? {
-        val wanted = normalizeStation(station)
-        val candidates = stations(route)
+    fun trainsFor(route: String, direction: String): List<TimetableTrain> {
+        val sourceRoutes = when {
+            route == "Горы - Петрозаводск" -> setOf("Горы - Петрозаводск", "__819_820__")
+            route in setOf("Чудово - Новгород", "Волховстрой - Чудово") -> setOf("__819_820__")
+            route in dachaLegs -> "Горы - Петрозаводск"
+            route in vyborgLegs -> "СПбФин - Выборг"
+            else -> route
+        }
+        return trains.filter { train ->
+            train.direction == direction && when (sourceRoutes) {
+                is Set<*> -> train.route in sourceRoutes || ("__819_820__" in sourceRoutes && train.number in setOf("819", "820"))
+                else -> train.route == sourceRoutes
+            }
+        }
+    }
+
+    fun stations(route: String, trainNumber: String? = null): List<TimingStation> = when {
+        trainNumber in setOf("819", "820") -> chudovoThroughStations()
+        route in setOf("Чудово - Новгород", "Волховстрой - Чудово") -> chudovoThroughStations()
+        route in dachaLegs -> dachaThroughStations()
+        route in vyborgLegs -> vyborgThroughStations()
+        else -> timingStations[route].orEmpty()
+    }
+
+    fun stationMeters(route: String, station: String, trainNumber: String? = null): Double? {
+        val raw = normalizeStation(station)
+        val wanted = stationAliases[raw] ?: raw
+        val candidates = stations(route, trainNumber)
         return candidates.firstOrNull { normalizeStation(it.name) == wanted }?.meters
             ?: candidates.firstOrNull {
                 val candidate = normalizeStation(it.name)
@@ -43,6 +70,24 @@ class NativeReferenceData(context: Context) {
     }
 
     companion object {
+        private val stationAliases = mapOf(
+            "СПЕТЕРБУРГГЛ" to "САНКТПЕТЕРБУРГГЛАВНЫЙ",
+            "СПЕТЕРБУРГТМ" to "САНКТПЕТЕРБУРГТОВАРНЫЙМОСКОВСКИЙ",
+            "СПСМПОБУХОВО" to "ОБУХОВО",
+            "ЧУДОВОМОСК" to "ЧУДОВОМОСКОВСКОЕ",
+            "БОЛОГОЕМОСК" to "БОЛОГОЕМОСКОВСКОЕ",
+            "МУРМАНСКВОРОТА" to "МУРМАНСКИЕВОРОТА",
+            "ОЯТЬВОЛХОВСТР" to "ОЯТЬ",
+            "БП284КМ" to "ПОСТ284КМ",
+            "ВЫБОРГПАСС" to "ВЫБОРГПАССАЖИРСКИЙ",
+            "СППОЛИСТЬ" to "СПАССКАЯПОЛИСТЬ",
+            "ПРЕДУЗПАВЛОВСК" to "ПРЕДУЗЛОВАЯПАВЛОВСКАЯ",
+            "НОВГОРОДПОСТ" to "НОВГОРОДТРАНСПОРТНЫЙПОСТ",
+            "НОВООКТЯБРЬСКИЙ" to "ВОЛХОВСТРОЙ1",
+            "БПОСТ42КМ" to "БЛОКПОСТ42КМ",
+            "БПОСТ60КМ" to "БЛОКПОСТ60КМ"
+        )
+
         fun normalizeStation(value: String): String = value
             .uppercase(Locale.ROOT)
             .replace('Ё', 'Е')
@@ -50,6 +95,29 @@ class NativeReferenceData(context: Context) {
             .replace("САНКТПЕТЕРБУРГ", "СПБ")
             .replace("МОСКОВСКОЕ", "МОСК")
             .replace("ПАССАЖИРСКИЙ", "ПАСС")
+    }
+
+    private fun chudovoThroughStations(): List<TimingStation> {
+        val novgorod = timingStations["Чудово - Новгород"].orEmpty().asReversed()
+            .map { TimingStation(it.name, 70_000.0 - it.meters) }
+        val volkhov = timingStations["Волховстрой - Чудово"].orEmpty().asReversed()
+            .map { TimingStation(it.name, 70_000.0 + (101_000.0 - it.meters)) }
+        val north = timingStations["Горы - Петрозаводск"].orEmpty()
+        val northStart = north.indexOfFirst { normalizeStation(it.name).contains("ВОЛХОВСТРОЙ2") }.coerceAtLeast(0)
+        return novgorod + volkhov + north.drop(northStart).map { TimingStation(it.name, 171_000.0 + it.meters - 124_400.0) }
+    }
+
+    private fun dachaThroughStations(): List<TimingStation> {
+        val dacha = timingStations["Д. Долг - Павлово"].orEmpty()
+        val north = timingStations["Горы - Петрозаводск"].orEmpty()
+        return dacha + listOf(TimingStation("Горы", 42_000.0)) + north.drop(1)
+    }
+
+    private fun vyborgThroughStations(): List<TimingStation> {
+        val first = timingStations["СПбФин - Выборг"].orEmpty()
+        val second = timingStations["Выборг - Каменногорск"].orEmpty().drop(1)
+            .map { TimingStation(it.name, 128_900.0 + it.meters) }
+        return first + second
     }
 
     private fun parseTrains(array: JSONArray) = (0 until array.length()).map { index ->
@@ -87,4 +155,3 @@ private fun JSONArray.objects() = (0 until length()).map(::getJSONObject)
 private fun JSONArray.arrays() = (0 until length()).map(::getJSONArray)
 private fun JSONObject.nullableString(key: String) = if (has(key) && !isNull(key)) getString(key) else null
 private fun JSONObject.nullableInt(key: String) = if (has(key) && !isNull(key)) getInt(key) else null
-
