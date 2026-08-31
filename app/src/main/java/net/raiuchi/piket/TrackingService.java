@@ -117,14 +117,6 @@ public class TrackingService extends Service {
     public void onCreate() {
         super.onCreate();
         mainHandler = new Handler(Looper.getMainLooper());
-        try {
-            nativeRouteEngine = NativeRouteEngine.Companion.fromCoreJs(readAsset("assets/piket-core.js"));
-            nativeTripEngine = new NativeTripEngine(nativeRouteEngine);
-            restoreNativeTripState();
-            startNativeTripTicker();
-        } catch (Exception ignored) {
-            nativeRouteEngine = null; // JS остаётся рабочим источником истины.
-        }
 
         createChannel();
 
@@ -145,6 +137,18 @@ public class TrackingService extends Service {
             startForeground(1, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
         } else {
             startForeground(1, notification);
+        }
+
+        // Android требует вызвать startForeground немедленно. Разбор 1558 маршрутных
+        // точек выполняем только после него, иначе холодный/повторный запуск службы может
+        // получить ForegroundServiceDidNotStartInTimeException на медленном устройстве.
+        try {
+            nativeRouteEngine = NativeRouteEngine.Companion.fromCoreJs(readAsset("assets/piket-core.js"));
+            nativeTripEngine = new NativeTripEngine(nativeRouteEngine);
+            restoreNativeTripState();
+            startNativeTripTicker();
+        } catch (Exception ignored) {
+            nativeRouteEngine = null; // JS остаётся рабочим источником истины.
         }
 
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);

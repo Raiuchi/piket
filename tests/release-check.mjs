@@ -55,6 +55,7 @@ const nativeMotion = read('app/src/main/java/net/raiuchi/piket/NativeMotionFilte
 const nativeRoute = read('app/src/main/java/net/raiuchi/piket/NativeRouteEngine.kt');
 const nativeTrip = read('app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt');
 check('notification updates retain content intent', /updateNotificationText[\s\S]*?setContentIntent\(pi\)/.test(service));
+check('foreground notification starts before native route parsing', service.indexOf('startForeground(1, notification') < service.indexOf('NativeRouteEngine.Companion.fromCoreJs'));
 check('accelerometer listener is unregistered', service.includes('unregisterListener(accelListener)'));
 check('GNSS quality monitor is registered and released', service.includes('registerGnssStatusCallback') && service.includes('unregisterGnssStatusCallback'));
 check('fresh high-frequency locations requested without suppressing degraded fixes', service.includes('new LocationRequest.Builder(1000)') && service.includes('.setMaxUpdateAgeMillis(0)') && service.includes('.setWaitForAccurateLocation(false)'));
