@@ -88,6 +88,39 @@ for (const train of schedules.trains) {
 for (const [stationName, trainNumbers] of unresolved) {
   failures.push(`unresolved station ${stationName}: trains ${[...new Set(trainNumbers)].join(', ')}`);
 }
+const throughRows = stations['СПбФин - Выборг'].map(row => [row[0], row[1]])
+  .concat(stations['Выборг - Каменногорск'].slice(1).map(row => [row[0], 128900 + row[1]]));
+for (const [number, expected] of Object.entries({821:17, 822:18, 823:17, 824:18})) {
+  const train = schedules.trains.find(item => item.number === number);
+  const matchedIndexes = train.stops.map((stop, index) => mapped(stop.station, throughRows) ? index : -1).filter(index => index >= 0);
+  const first = matchedIndexes[0], last = matchedIndexes.at(-1);
+  const unresolvedThrough = train.stops.slice(first, last + 1).filter(stop => !mapped(stop.station, throughRows));
+  if (last - first + 1 !== expected || unresolvedThrough.length) failures.push(`${number}: incomplete SPb-Finlandsky - Kamennogorsk through schedule`);
+}
+const dachaThroughRows = stations['Д. Долг - Павлово'].map(row => [row[0], row[1]])
+  .concat([['Горы', 42000]])
+  .concat(stations['Горы - Петрозаводск'].slice(1).map(row => [row[0], row[1]]));
+for (const number of [803, 804, 805, 806]) {
+  const train = schedules.trains.find(item => String(item.number) === String(number));
+  const matchedIndexes = train.stops.map((stop, index) => mapped(stop.station, dachaThroughRows) ? index : -1).filter(index => index >= 0);
+  const first = matchedIndexes[0], last = matchedIndexes.at(-1);
+  const unresolvedThrough = train.stops.slice(first, last + 1).filter(stop => !mapped(stop.station, dachaThroughRows));
+  if (last - first + 1 !== 34 || unresolvedThrough.length) failures.push(`${number}: incomplete Dacha Dolgorukova - Petrozavodsk through schedule`);
+}
+const dutyRows = stations['Чудово - Новгород'].slice().reverse().map(row => [row[0], 70000 - row[1]])
+  .concat(stations['Волховстрой - Чудово'].slice().reverse().map(row => [row[0], 70000 + (101000 - row[1])]))
+  .concat(stations['Горы - Петрозаводск'].slice(stations['Горы - Петрозаводск'].findIndex(row => row[0] === 'Волховстрой-2')).map(row => [row[0], 171000 + (row[1] - 124400)]));
+for (const [number, fromName, toName, expected] of [
+  ['819', 'ПЕТРОЗАВОДСК-ПАСС.', 'ВЕЛИКИЙ НОВГОРОД', 38],
+  ['820', 'ВЕЛИКИЙ НОВГОРОД', 'ПЕТРОЗАВОДСК-ПАСС.', 38]
+]) {
+  const train = schedules.trains.find(item => String(item.number) === number);
+  const from = train.stops.findIndex(stop => stop.station === fromName);
+  const to = train.stops.findIndex(stop => stop.station === toName);
+  const leg = train.stops.slice(Math.min(from, to), Math.max(from, to) + 1);
+  const missing = leg.filter(stop => !mapped(stop.station, dutyRows));
+  if (leg.length !== expected || missing.length) failures.push(`${number}: incomplete Chudovo - Petrozavodsk duty leg (${missing.map(stop => stop.station).join(', ')})`);
+}
 let selectableTotal = 0;
 for (const route of ['СпбГл - Москва','Горы - Петрозаводск','Броневая - Луга','Чудово - Новгород','СПбФин - Выборг']) {
   for (const direction of ['tuda','obratno']) {
