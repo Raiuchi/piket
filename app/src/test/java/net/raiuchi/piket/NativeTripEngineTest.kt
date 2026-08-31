@@ -11,9 +11,9 @@ class NativeTripEngineTest {
     private lateinit var engine: NativeTripEngine
 
     @Before fun setup() {
-        val coreFile = listOf(File("app/src/main/assets/assets/piket-core.js"),
-            File("src/main/assets/assets/piket-core.js")).first { it.exists() }
-        routes = NativeRouteEngine.fromCoreJs(coreFile.readText())
+        val dataFile = listOf(File("app/src/main/assets/data/routes.json"),
+            File("src/main/assets/data/routes.json")).first { it.exists() }
+        routes = NativeRouteEngine.fromJson(dataFile.readText())
         route = routes.route(routes.labels().first())!!
         engine = NativeTripEngine(routes)
         engine.configure(route.label, "tuda", route.chainageM.first(), true, emptyList())

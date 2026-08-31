@@ -108,11 +108,20 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
     }
 
     companion object {
+        fun fromJson(source: String): NativeRouteEngine {
+            val root = JSONObject(source)
+            return fromArrays(root.getJSONObject("tracks"), root.getJSONArray("chainage"))
+        }
+
         fun fromCoreJs(source: String): NativeRouteEngine {
             val track = JSONObject(extractAssignment(source, "TRACK"))
+            val chainage = JSONArray(extractAssignment(source, "CHAINAGE"))
+            return fromArrays(track, chainage)
+        }
+
+        private fun fromArrays(track: JSONObject, chainage: JSONArray): NativeRouteEngine {
             val labels = track.getJSONArray("labels")
             val segments = track.getJSONArray("segs")
-            val chainage = JSONArray(extractAssignment(source, "CHAINAGE"))
             require(labels.length() == segments.length() && labels.length() == chainage.length())
             val routes = (0 until labels.length()).map { routeIndex ->
                 val rawPoints = segments.getJSONArray(routeIndex)

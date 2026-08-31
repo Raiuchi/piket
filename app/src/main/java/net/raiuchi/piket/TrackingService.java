@@ -131,7 +131,7 @@ public class TrackingService extends Service {
         // точек выполняем только после него, иначе холодный/повторный запуск службы может
         // получить ForegroundServiceDidNotStartInTimeException на медленном устройстве.
         try {
-            nativeRouteEngine = NativeRouteEngine.Companion.fromCoreJs(readAsset("assets/piket-core.js"));
+            nativeRouteEngine = NativeRouteEngine.Companion.fromJson(readAsset("data/routes.json"));
             nativeTripEngine = new NativeTripEngine(nativeRouteEngine);
             restoreNativeTripState();
             startNativeTripTicker();

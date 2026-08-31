@@ -48,8 +48,9 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     var snapshot by mutableStateOf(repository.loadSnapshot()); private set
     var route by mutableStateOf(snapshot.route); private set
     var direction by mutableStateOf(snapshot.direction); private set
+    val referenceData = NativeReferenceData(app)
     val routes: List<String> = runCatching {
-        app.assets.open("assets/piket-core.js").bufferedReader().use { NativeRouteEngine.fromCoreJs(it.readText()).labels() }
+        app.assets.open("data/routes.json").bufferedReader().use { NativeRouteEngine.fromJson(it.readText()).labels() }
     }.getOrDefault(listOf("СпбГл - Москва"))
 
     init { viewModelScope.launch { while (isActive) { snapshot = repository.loadSnapshot(); delay(500) } } }
@@ -70,18 +71,23 @@ fun PiketApp(
 ) {
     var tab by rememberSaveable { mutableStateOf(PiketTab.TRIP) }
     var calibrating by remember { mutableStateOf(false) }
+    var referenceScreen by rememberSaveable { mutableStateOf<NativeReferenceScreen?>(null) }
     LaunchedEffect(model.settings.keepScreenOn) { onKeepScreen(model.settings.keepScreenOn) }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = { PiketNavigation(tab) { tab = it } }
+        bottomBar = { if (referenceScreen == null) PiketNavigation(tab) { tab = it } }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).background(
             Brush.verticalGradient(listOf(Color(0xFF080A0E), Color(0xFF030405)))
         )) {
-            when (tab) {
-                PiketTab.TRIP -> TripScreen(model, { calibrating = true }, onStart, onStop)
-                PiketTab.LIST -> RestrictionScreen(model)
-                PiketTab.SETTINGS -> SettingsScreen(model)
+            when (referenceScreen) {
+                NativeReferenceScreen.TIMETABLE -> NativeTimetableScreen(model.referenceData, model.route, model.direction) { referenceScreen = null }
+                NativeReferenceScreen.SPEEDS -> NativeSpeedReferenceScreen(model.referenceData) { referenceScreen = null }
+                null -> when (tab) {
+                    PiketTab.TRIP -> TripScreen(model, { calibrating = true }, onStart, onStop)
+                    PiketTab.LIST -> RestrictionScreen(model)
+                    PiketTab.SETTINGS -> SettingsScreen(model) { referenceScreen = it }
+                }
             }
         }
     }
@@ -224,11 +230,36 @@ private fun AddRestrictionDialog(routes:List<String>,dismiss:()->Unit,save:(Rest
 @Composable private fun NativeField(label:String,value:String,on:(String)->Unit){OutlinedTextField(value,on,singleLine=true,label={Text(label)},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(13.dp))}
 
 @Composable
-private fun SettingsScreen(model:PiketViewModel){val s=model.settings;LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text("Настройки",fontSize=28.sp,fontWeight=FontWeight.ExtraBold)};item{SettingSwitch("Звуковой сигнал","Голосовые и звуковые предупреждения",s.sound){model.updateSettings(s.copy(sound=it))}};item{SettingSwitch("Вибрация","Тактильное подтверждение",s.vibration){model.updateSettings(s.copy(vibration=it))}};item{SettingSwitch("Не гасить экран","Экран остаётся включённым во время поездки",s.keepScreenOn){model.updateSettings(s.copy(keepScreenOn=it))}};item{SettingSwitch("Демо-режим","Проверка интерфейса без движения",s.demoMode){model.updateSettings(s.copy(demoMode=it))}};item{Card(colors=CardDefaults.cardColors(containerColor=PiketPanel)){Column(Modifier.padding(18.dp)){Text("Дальность предупреждения",fontWeight=FontWeight.Bold);Text("${s.leadM/1000.0} км",color=PiketBlue);Slider(s.leadM.toFloat(),{model.updateSettings(s.copy(leadM=(it/100).roundToInt()*100))},valueRange=1000f..8000f)}}};item{Text("Работает офлайн, данные на телефоне.\nНативное Kotlin-ядро · интерфейс Jetpack Compose",color=Color.Gray,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth().padding(20.dp))}}}
+private fun SettingsScreen(model:PiketViewModel, openReference:(NativeReferenceScreen)->Unit){val s=model.settings;LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text("Настройки",fontSize=28.sp,fontWeight=FontWeight.ExtraBold)};item{ReferenceCard("Расписание и время хода","Поезда, станции и расчёт средней скорости"){openReference(NativeReferenceScreen.TIMETABLE)}};item{ReferenceCard("Справочник скоростей","Главный путь — красный, боковой — жёлтый"){openReference(NativeReferenceScreen.SPEEDS)}};item{SettingSwitch("Звуковой сигнал","Голосовые и звуковые предупреждения",s.sound){model.updateSettings(s.copy(sound=it))}};item{SettingSwitch("Вибрация","Тактильное подтверждение",s.vibration){model.updateSettings(s.copy(vibration=it))}};item{SettingSwitch("Не гасить экран","Экран остаётся включённым во время поездки",s.keepScreenOn){model.updateSettings(s.copy(keepScreenOn=it))}};item{SettingSwitch("Демо-режим","Проверка интерфейса без движения",s.demoMode){model.updateSettings(s.copy(demoMode=it))}};item{Card(colors=CardDefaults.cardColors(containerColor=PiketPanel)){Column(Modifier.padding(18.dp)){Text("Дальность предупреждения",fontWeight=FontWeight.Bold);Text("${s.leadM/1000.0} км",color=PiketBlue);Slider(s.leadM.toFloat(),{model.updateSettings(s.copy(leadM=(it/100).roundToInt()*100))},valueRange=1000f..8000f)}}};item{Text("Работает офлайн, данные на телефоне.\nНативное Kotlin-ядро · интерфейс Jetpack Compose",color=Color.Gray,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth().padding(20.dp))}}}
+@Composable private fun ReferenceCard(title:String,subtitle:String,onClick:()->Unit){Card(Modifier.fillMaxWidth().clickable(onClick=onClick),colors=CardDefaults.cardColors(containerColor=PiketPanel),shape=RoundedCornerShape(17.dp)){Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(subtitle,color=Color.Gray,fontSize=12.sp)};Text("›",fontSize=28.sp,color=PiketRed)}}}
 @Composable private fun SettingSwitch(title:String,subtitle:String,checked:Boolean,on:(Boolean)->Unit){Card(colors=CardDefaults.cardColors(containerColor=PiketPanel),shape=RoundedCornerShape(17.dp)){Row(Modifier.fillMaxWidth().padding(17.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(subtitle,color=Color.Gray,fontSize=12.sp)};Switch(checked,on,colors=SwitchDefaults.colors(checkedThumbColor=Color.White,checkedTrackColor=PiketRed))}}}
 
 @Composable
 private fun CalibrationDialog(model:PiketViewModel,dismiss:()->Unit,save:(Double)->Unit){val current=model.snapshot.officialM?.roundToInt();var km by remember{mutableStateOf(current?.div(1000)?.toString()?:"")};var pk by remember{mutableStateOf(current?.rem(1000)?.div(100)?.toString()?:"")};var meter by remember{mutableStateOf(current?.rem(100)?.toString()?:"")};AlertDialog(onDismissRequest=dismiss,containerColor=PiketPanel,title={Text("Калибровка по столбу",fontWeight=FontWeight.Bold)},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Text("Впиши фактический километр, пикет и метр.",color=Color.LightGray);Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){Box(Modifier.weight(1f)){NativeField("КМ",km){km=it}};Box(Modifier.weight(1f)){NativeField("ПК",pk){pk=it}};Box(Modifier.weight(1f)){NativeField("М",meter){meter=it}}}}},confirmButton={Button({save((km.toIntOrNull()?:0)*1000.0+(pk.toIntOrNull()?:0)*100+(meter.toIntOrNull()?:0))},colors=ButtonDefaults.buttonColors(containerColor=PiketRed)){Text("Установить")}},dismissButton={TextButton(dismiss){Text("Отмена")}})}
 
 @Composable
-private fun PiketNavigation(selected:PiketTab,on:(PiketTab)->Unit){NavigationBar(containerColor=Color(0xFF20232B),tonalElevation=0.dp,modifier=Modifier.padding(horizontal=14.dp,vertical=8.dp).border(1.dp,Color(0xFF565A64),RoundedCornerShape(20.dp))){PiketTab.entries.forEach{tab->NavigationBarItem(selected==tab,{on(tab)},icon={Text(tab.symbol,fontSize=20.sp)},label={Text(tab.title,fontWeight=FontWeight.Bold)},colors=NavigationBarItemDefaults.colors(selectedIconColor=Color.White,selectedTextColor=Color.White,indicatorColor=PiketRedDark,unselectedIconColor=Color.LightGray,unselectedTextColor=Color.LightGray))}} 
+private fun PiketNavigation(selected: PiketTab, on: (PiketTab) -> Unit) {
+    NavigationBar(
+        containerColor = Color(0xFF20232B),
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .border(1.dp, Color(0xFF565A64), RoundedCornerShape(20.dp))
+    ) {
+        PiketTab.entries.forEach { tab ->
+            NavigationBarItem(
+                selected = selected == tab,
+                onClick = { on(tab) },
+                icon = { Text(tab.symbol, fontSize = 20.sp) },
+                label = { Text(tab.title, fontWeight = FontWeight.Bold) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = Color.White,
+                    selectedTextColor = Color.White,
+                    indicatorColor = PiketRedDark,
+                    unselectedIconColor = Color.LightGray,
+                    unselectedTextColor = Color.LightGray
+                )
+            )
+        }
+    }
+}

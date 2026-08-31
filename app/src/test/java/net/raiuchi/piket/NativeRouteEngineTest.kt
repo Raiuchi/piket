@@ -11,10 +11,9 @@ class NativeRouteEngineTest {
         private lateinit var engine: NativeRouteEngine
 
         @JvmStatic @BeforeClass fun loadRealRoutes() {
-            val coreFile = listOf(File("app/src/main/assets/assets/piket-core.js"),
-                File("src/main/assets/assets/piket-core.js")).first { it.exists() }
-            val core = coreFile.readText()
-            engine = NativeRouteEngine.fromCoreJs(core)
+            val dataFile = listOf(File("app/src/main/assets/data/routes.json"),
+                File("src/main/assets/data/routes.json")).first { it.exists() }
+            engine = NativeRouteEngine.fromJson(dataFile.readText())
         }
     }
 
