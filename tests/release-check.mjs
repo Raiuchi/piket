@@ -11,8 +11,9 @@ const check = (name, condition) => {
 
 const html = read('app/src/main/assets/index.html');
 const core = read('app/src/main/assets/assets/piket-core.js');
+const schedule = read('app/src/main/assets/assets/piket-schedules.js');
 const source = core + '\n' + html;
-const scripts = [core, ...[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(match => match[1])];
+const scripts = [core, schedule, ...[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(match => match[1])];
 check('all embedded JavaScript parses', scripts.every((script, index) => {
   try { new vm.Script(script, { filename: `asset-script-${index}.js` }); return true; }
   catch { return false; }
@@ -78,9 +79,11 @@ check('wrong direction requires repeated heading mismatch', source.includes('dir
 check('unacknowledged restrictions repeat without constant spam', source.includes('Date.now()-(rt.alertRepeatAt||0)>20000') && source.includes('Ограничение не подтверждено'));
 check('restriction trigger distance is audited', source.includes('sap_triggerAudit') && core.includes('triggerAudit'));
 check('running time calculator is guarded against impossible plans', source.includes('Перегонное время хода') && source.includes('План недостижим безопасно') && core.includes('requiredAverageKmh'));
+check('official timetable train selector is bundled', source.includes('id="scheduleTrainPick"') && source.includes('function renderTrainSchedule') && schedule.includes('window.PIKET_SCHEDULES=') && (schedule.match(/"number":"\d{3}"/g) || []).length === 66);
+check('station time edits and restriction-aware run calculation are implemented', source.includes('sap_schedule_overrides') && source.includes('openScheduleTimePicker') && source.includes('function scheduleRequirement'));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.97', gradle.includes('versionName "1.4.97"') && gradle.includes('versionCode 103'));
+check('release version is 1.4.98', gradle.includes('versionName "1.4.98"') && gradle.includes('versionCode 104'));
 const workflow = read('.github/workflows/build.yml');
 check('Gradle Wrapper is complete', fs.existsSync(new URL('gradlew',root)) && fs.existsSync(new URL('gradlew.bat',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.jar',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.properties',root)));
 check('release tags build release APK', workflow.includes('./gradlew assembleRelease') && workflow.includes('app-release.apk'));
