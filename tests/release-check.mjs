@@ -81,9 +81,11 @@ check('restriction trigger distance is audited', source.includes('sap_triggerAud
 check('running time calculator is guarded against impossible plans', source.includes('Перегонное время хода') && source.includes('План недостижим безопасно') && core.includes('requiredAverageKmh'));
 check('official timetable train selector is bundled', source.includes('id="scheduleTrainPick"') && source.includes('function renderTrainSchedule') && schedule.includes('window.PIKET_SCHEDULES=') && (schedule.match(/"number":"\d{3}"/g) || []).length === 66);
 check('station time edits and restriction-aware run calculation are implemented', source.includes('sap_schedule_overrides') && source.includes('openScheduleTimePicker') && source.includes('function scheduleRequirement'));
+check('scheduled run uses departure to next arrival', source.includes('fromTime=x.dep||x.arr,toTime=next.arr||next.dep') && source.includes('speedTitle=calc.zones?\'вне зон \':\'средняя \''));
+check('impossible timetable averages are never shown as driving advice', source.includes('req>MAXSPD?\'проверь данные\''));
 
 const gradle = read('app/build.gradle');
-check('release version is 1.4.98', gradle.includes('versionName "1.4.98"') && gradle.includes('versionCode 104'));
+check('release version is 1.4.99', gradle.includes('versionName "1.4.99"') && gradle.includes('versionCode 105'));
 const workflow = read('.github/workflows/build.yml');
 check('Gradle Wrapper is complete', fs.existsSync(new URL('gradlew',root)) && fs.existsSync(new URL('gradlew.bat',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.jar',root)) && fs.existsSync(new URL('gradle/wrapper/gradle-wrapper.properties',root)));
 check('release tags build release APK', workflow.includes('./gradlew assembleRelease') && workflow.includes('app-release.apk'));
