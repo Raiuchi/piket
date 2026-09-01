@@ -9,15 +9,16 @@ class NativeRepositoryContractTest {
     private fun projectFile(path: String): File = listOf(File(path), File("../$path")).first { it.exists() }
     private fun json(path: String) = JSONObject(projectFile("app/src/main/assets/data/$path").readText())
 
-    @Test fun productionAndTestSourcesAreKotlinOnlyCompose() {
+    @Test fun premiumHtmlIsViewAndCriticalEngineRemainsKotlin() {
         val main = projectFile("app/src/main/java/net/raiuchi/piket/MainActivity.kt").readText()
-        val gradle = projectFile("app/build.gradle").readText()
-        assertTrue(main.contains("ComponentActivity") && main.contains("setContent"))
-        assertFalse(main.contains("WebView"))
-        assertTrue(gradle.contains("compose true") && gradle.contains("compose-bom"))
+        val service = projectFile("app/src/main/java/net/raiuchi/piket/TrackingService.kt").readText()
+        val html = projectFile("app/src/main/assets/index.html").readText()
+        assertTrue(main.contains("WebView") && main.contains("publishSnapshot"))
+        assertTrue(service.contains("NativeTripEngine") && service.contains("NativeMotionFilter"))
+        assertTrue(html.contains("Kotlin is the source of truth"))
         val sourceFiles = sequenceOf(projectFile("app/src/main"), projectFile("app/src/test"), projectFile("app/src/androidTest"))
             .flatMap { it.walkTopDown().asSequence() }.filter { it.isFile }.toList()
-        assertFalse(sourceFiles.any { it.extension in setOf("java", "js", "mjs", "html") })
+        assertFalse(sourceFiles.any { it.extension == "java" })
     }
 
     @Test fun allRouteGeometryAndOfficialAxesRemainComplete() {
