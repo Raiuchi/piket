@@ -13,6 +13,7 @@ const activity = read('app/src/main/java/net/raiuchi/piket/MainActivity.kt');
 const app = read('app/src/main/java/net/raiuchi/piket/PiketApp.kt');
 const references = read('app/src/main/java/net/raiuchi/piket/NativeReferenceData.kt');
 const screens = read('app/src/main/java/net/raiuchi/piket/NativeReferenceScreens.kt');
+const calculator = read('app/src/main/java/net/raiuchi/piket/NativeTimetableCalculator.kt');
 const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.java');
 const routeEngine = read('app/src/main/java/net/raiuchi/piket/NativeRouteEngine.kt');
 const tripEngine = read('app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt');
@@ -27,6 +28,7 @@ check('activity uses Compose without WebView', activity.includes('ComponentActiv
 check('trip, restrictions and settings are native', ['TripScreen', 'RestrictionScreen', 'SettingsScreen'].every(name => app.includes(name)));
 check('timetable and speed reference are native', screens.includes('NativeTimetableScreen') && screens.includes('NativeSpeedReferenceScreen'));
 check('premium station time editor is native', screens.includes('PremiumTimeDialog') && app.includes('updateScheduleTime'));
+check('running-time formula is isolated and guarded', calculator.includes('object NativeTimetableCalculator') && calculator.includes('average <= maxKmh'));
 check('GPS route engine reads JSON', routeEngine.includes('fun fromJson') && service.includes('data/routes.json') && !service.includes('piket-core.js'));
 check('native engines own motion, route and trip state', ['NativeMotionFilter', 'NativeRouteEngine', 'NativeTripEngine'].every(name => service.includes(name)));
 check('native trip survives signal loss and recreation', tripEngine.includes('markSignalUnavailable') && service.includes('persistNativeTripState') && service.includes('restoreNativeTripState'));

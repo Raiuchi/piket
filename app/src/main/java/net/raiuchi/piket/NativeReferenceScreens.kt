@@ -56,10 +56,8 @@ fun NativeTimetableScreen(
                 val toTime = effectiveTime(train, index + 1, "arr", to.arrival ?: to.departure, overrides)
                 val fromM = data.stationMeters(route, from.station, train.number)
                 val toM = data.stationMeters(route, to.station, train.number)
-                val seconds = secondsBetween(fromTime, toTime)
-                val speed = if (fromM != null && toM != null && seconds != null && seconds > 0)
-                    (kotlin.math.abs(toM - fromM) / seconds * 3.6).roundToInt() else null
-                val distanceKm = if (fromM != null && toM != null) kotlin.math.abs(toM - fromM) / 1000.0 else null
+                val calculation = NativeTimetableCalculator.calculate(fromM, toM, fromTime, toTime)
+                val speed = calculation?.averageKmh?.roundToInt()
                 Card(colors = CardDefaults.cardColors(containerColor = PiketPanel)) {
                     Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("${from.station} → ${to.station}", fontWeight = FontWeight.Bold)
@@ -69,11 +67,11 @@ fun NativeTimetableScreen(
                         }
                         Text(
                             when {
-                                speed == null -> "Километраж уточняется"
-                                speed > 250 -> "Проверь километраж или время — значение недостижимо"
-                                else -> "${"%.1f".format(distanceKm ?: 0.0)} км · ${"%.1f".format((seconds ?: 0) / 60.0)} мин · средняя $speed км/ч"
+                                calculation == null -> "Километраж уточняется"
+                                !calculation.plausible -> "Проверь километраж или время — значение недостижимо"
+                                else -> "${"%.1f".format(calculation.distanceM / 1000.0)} км · ${"%.1f".format(calculation.durationSeconds / 60.0)} мин · средняя $speed км/ч"
                             },
-                            color = if (speed == null || speed > 250) PiketYellow else PiketBlue
+                            color = if (calculation == null || !calculation.plausible) PiketYellow else PiketBlue
                         )
                     }
                 }
@@ -188,17 +186,4 @@ private fun NativeReferenceScaffold(title: String, close: () -> Unit, content: L
         Spacer(Modifier.height(12.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp), content = content)
     }
-}
-
-private fun secondsBetween(from: String?, to: String?): Int? {
-    fun parse(value: String?): Int? {
-        if (value == null) return null
-        val parts = value.split(':').mapNotNull(String::toIntOrNull)
-        if (parts.size !in 2..3) return null
-        return parts[0] * 3600 + parts[1] * 60 + parts.getOrElse(2) { 0 }
-    }
-    val start = parse(from) ?: return null
-    var end = parse(to) ?: return null
-    if (end < start) end += 24 * 3600
-    return end - start
 }
