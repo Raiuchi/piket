@@ -672,7 +672,10 @@ public class TrackingService extends Service {
             tts.shutdown();
             tts = null;
         }
-        if (nativeTripEngine != null) nativeTripEngine.stop();
+        if (nativeTripEngine != null) {
+            nativeTripEngine.stop();
+            persistNativeTripState(nativeTripEngine.save());
+        }
         persistNativeSnapshot(null, 999f);
         super.onDestroy();
     }

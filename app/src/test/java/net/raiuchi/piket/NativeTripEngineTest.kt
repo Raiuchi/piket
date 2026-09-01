@@ -88,4 +88,12 @@ class NativeTripEngineTest {
         assertTrue(output.speedMps in 1f..49f)
         assertTrue(output.physicalM!! > route.points.first().physicalM + 5_000.0)
     }
+
+    @Test fun stoppedStateCannotResumeAsActiveAfterProcessRestart() {
+        engine.update(NativeTripEngine.Input(1_000, 20f, true, snap(0)))
+        engine.stop()
+        val restored = NativeTripEngine(routes)
+        restored.restore(engine.save())
+        assertFalse(restored.update(NativeTripEngine.Input(2_000, null, false, null)).active)
+    }
 }
