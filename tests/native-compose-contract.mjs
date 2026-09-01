@@ -14,7 +14,7 @@ const app = read('app/src/main/java/net/raiuchi/piket/PiketApp.kt');
 const references = read('app/src/main/java/net/raiuchi/piket/NativeReferenceData.kt');
 const screens = read('app/src/main/java/net/raiuchi/piket/NativeReferenceScreens.kt');
 const calculator = read('app/src/main/java/net/raiuchi/piket/NativeTimetableCalculator.kt');
-const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.java');
+const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.kt');
 const routeEngine = read('app/src/main/java/net/raiuchi/piket/NativeRouteEngine.kt');
 const tripEngine = read('app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt');
 const journeyRouter = read('app/src/main/java/net/raiuchi/piket/NativeJourneyRouter.kt');
@@ -24,6 +24,7 @@ const routes = json('app/src/main/assets/data/routes.json');
 const schedules = json('app/src/main/assets/data/schedules.json');
 const speeds = json('app/src/main/assets/data/speed-reference.json');
 const timing = json('app/src/main/assets/data/timing.json');
+const journeys = json('app/src/main/assets/data/journeys.json');
 
 check('activity uses Compose without WebView', activity.includes('ComponentActivity') && activity.includes('setContent') && !activity.includes('WebView'));
 check('trip, restrictions and settings are native', ['TripScreen', 'RestrictionScreen', 'SettingsScreen'].every(name => app.includes(name)));
@@ -32,8 +33,9 @@ check('premium station time editor is native', screens.includes('PremiumTimeDial
 check('running-time formula is isolated and guarded', calculator.includes('object NativeTimetableCalculator') && calculator.includes('average <= maxKmh'));
 check('GPS route engine reads JSON', routeEngine.includes('fun fromJson') && service.includes('data/routes.json') && !service.includes('piket-core.js'));
 check('native engines own motion, route and trip state', ['NativeMotionFilter', 'NativeRouteEngine', 'NativeTripEngine'].every(name => service.includes(name)));
-check('native trip survives signal loss and recreation', tripEngine.includes('markSignalUnavailable') && service.includes('persistNativeTripState') && service.includes('restoreNativeTripState'));
-check('known route chains switch only after repeated boundary fixes', journeyRouter.includes('confirmations < 2') && service.includes('nativeJourneyRouter.consider'));
+check('native trip survives signal loss and recreation', tripEngine.includes('markSignalUnavailable') && service.includes('persistTripState') && service.includes('restoreTripState'));
+check('known route chains switch only after repeated boundary fixes', journeyRouter.includes('confirmations < 2') && service.includes('journeyRouter?.consider'));
+check('819/820 technical directions are native', ['819', '820'].every(id => journeys.journeys[id]?.length > 1) && journeyRouter.includes('movedInNextDirection'));
 check('official kilometer discontinuities remain explicit', routeEngine.includes('abs(official - physical) > 3_000.0'));
 check('all 10 route geometries migrated', routes.schemaVersion === 1 && routes.tracks.labels.length === 10 && routes.tracks.segs.length === 10 && routes.chainage.length === 10);
 check('all 1558 route points migrated', routes.tracks.segs.reduce((sum, segment) => sum + segment.length, 0) === 1558);
@@ -47,6 +49,7 @@ check('location foreground service is private', manifest.includes('FOREGROUND_SE
 check('Android backup is disabled', manifest.includes('android:allowBackup="false"'));
 check('keep-screen is controlled by Android window', activity.includes('FLAG_KEEP_SCREEN_ON'));
 check('Compose is enabled', gradle.includes('compose true') && gradle.includes('compose-bom'));
+check('APK production sources are Kotlin-only', !fs.readdirSync(new URL('app/src/main/java/net/raiuchi/piket/', root)).some(name => name.endsWith('.java')));
 
 for (const result of checks) console.log(`${result.ok ? 'PASS' : 'FAIL'} ${result.name}`);
 console.log(`${checks.filter(result => result.ok).length}/${checks.length} native checks passed`);

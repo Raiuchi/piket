@@ -103,8 +103,9 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
 
     fun stop() { active = false; speedMps = 0f }
 
-    fun switchRoute(nextRoute: String, snap: NativeRouteEngine.Snap) {
+    fun switchRoute(nextRoute: String, nextDirection: String, snap: NativeRouteEngine.Snap) {
         route = nextRoute
+        direction = nextDirection
         physicalM = snap.physicalM
         officialOffsetM = 0.0
         recoveryCandidateM = null

@@ -81,11 +81,13 @@ data class NativeUiConfig(
     val leadM: Int,
     val sound: Boolean,
     val vibration: Boolean,
-    val active: Boolean = true
+    val active: Boolean = true,
+    val journey: String? = null
 ) {
     fun toJson() = JSONObject().apply {
         put("route", route); put("direction", direction); put("manualOfficialM", manualOfficialM)
         put("lead", leadM); put("active", active); put("sound", sound); put("vibration", vibration)
+        if (journey != null) put("journey", journey)
         put("restrictions", JSONArray().apply {
             restrictions.forEach { item -> put(JSONObject().apply {
                 put("id", item.id); put("peregon", item.route); put("dir", item.direction)

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "journeys": {
+    "819": [
+      { "route": "Волховстрой - Чудово", "direction": "obratno" },
+      { "route": "Горы - Петрозаводск", "direction": "tuda" }
+    ],
+    "820": [
+      { "route": "Горы - Петрозаводск", "direction": "obratno" },
+      { "route": "Волховстрой - Чудово", "direction": "tuda" },
+      { "route": "Чудово - Новгород", "direction": "tuda" },
+      { "route": "Чудово - Новгород", "direction": "obratno" }
+    ]
+  }
+}

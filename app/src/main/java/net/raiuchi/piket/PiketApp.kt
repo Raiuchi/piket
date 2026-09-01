@@ -49,6 +49,7 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     var snapshot by mutableStateOf(repository.loadSnapshot()); private set
     var route by mutableStateOf(snapshot.route); private set
     var direction by mutableStateOf(snapshot.direction); private set
+    var journey by mutableStateOf<String?>(null); private set
     var manualOfficialM by mutableStateOf<Double?>(null); private set
     val referenceData = NativeReferenceData(app)
     val routes: List<String> = runCatching {
@@ -56,8 +57,15 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     }.getOrDefault(listOf("СпбГл - Москва"))
 
     init { viewModelScope.launch { while (isActive) { snapshot = repository.loadSnapshot(); delay(500) } } }
-    fun selectRoute(value: String) { if (route != value) manualOfficialM = null; route = value }
-    fun selectDirection(value: String) { if (direction != value) manualOfficialM = null; direction = value }
+    fun selectRoute(value: String) { if (route != value) manualOfficialM = null; route = value; journey = null }
+    fun selectDirection(value: String) { if (direction != value) manualOfficialM = null; direction = value; journey = null }
+    fun selectJourney(value: String?) {
+        journey = value; manualOfficialM = null
+        when (value) {
+            "819" -> { route = "Волховстрой - Чудово"; direction = "obratno" }
+            "820" -> { route = "Горы - Петрозаводск"; direction = "obratno" }
+        }
+    }
     fun setManualCalibration(value: Double) { manualOfficialM = value }
     fun add(item: RestrictionRecord): Boolean { val next = restrictions + item; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun remove(id: String): Boolean { val next = restrictions.filterNot { it.id == id }; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
@@ -107,7 +115,7 @@ fun PiketApp(
     }
     if (calibrating) CalibrationDialog(model, { calibrating = false }) { official ->
         model.setManualCalibration(official)
-        val config = NativeUiConfig(model.route, model.direction, official, model.restrictions, model.settings.leadM, model.settings.sound, model.settings.vibration)
+        val config = NativeUiConfig(model.route, model.direction, official, model.restrictions, model.settings.leadM, model.settings.sound, model.settings.vibration, journey = model.journey)
         if (model.snapshot.active) onRecalibrate(config)
         calibrating = false
     }
@@ -130,7 +138,7 @@ private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (N
                         else {
                             val manual = model.manualOfficialM
                             if (manual == null) calibrate()
-                            else onStart(NativeUiConfig(model.route, model.direction, manual, model.restrictions, model.settings.leadM, model.settings.sound, model.settings.vibration))
+                            else onStart(NativeUiConfig(model.route, model.direction, manual, model.restrictions, model.settings.leadM, model.settings.sound, model.settings.vibration, journey = model.journey))
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = if (state.active) Color(0xFF761626) else PiketRed),
@@ -157,6 +165,7 @@ private fun BrandHeader(state: TripSnapshot) = Row(Modifier.fillMaxWidth(), vert
 @Composable
 private fun RouteSelector(model: PiketViewModel) {
     var expanded by remember { mutableStateOf(false) }
+    var journeyExpanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.fillMaxWidth().background(PiketPanel, RoundedCornerShape(15.dp))) {
             listOf("tuda" to "Туда", "obratno" to "Обратно").forEach { (value, title) ->
@@ -167,6 +176,18 @@ private fun RouteSelector(model: PiketViewModel) {
             OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text(model.route, Modifier.weight(1f), textAlign = TextAlign.Start); Text("⌄") }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.fillMaxWidth(.9f).background(PiketPanel)) {
                 model.routes.forEach { route -> DropdownMenuItem(text = { Text(route) }, onClick = { model.selectRoute(route); expanded = false }) }
+            }
+        }
+        Box {
+            OutlinedButton(onClick = { journeyExpanded = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) {
+                Text(model.journey?.let { "Составной рейс · поезд $it" } ?: "Обычный маршрут", Modifier.weight(1f), textAlign = TextAlign.Start)
+                Text("⌄")
+            }
+            DropdownMenu(journeyExpanded, { journeyExpanded = false }, modifier = Modifier.fillMaxWidth(.9f).background(PiketPanel)) {
+                DropdownMenuItem(text = { Text("Обычный маршрут") }, onClick = { model.selectJourney(null); journeyExpanded = false })
+                listOf("819", "820").forEach { number ->
+                    DropdownMenuItem(text = { Text("Поезд $number · автоматические переходы") }, onClick = { model.selectJourney(number); journeyExpanded = false })
+                }
             }
         }
     }
