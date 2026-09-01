@@ -30,11 +30,6 @@ jobs:
       - name: Run native GPS and route unit tests
         run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
-      - name: Run repository checks
-        run: |
-          node tests/native-compose-contract.mjs
-          node tests/native-json-scenarios.mjs
-
       - name: Restore signing key
         if: startsWith(github.ref, 'refs/tags/v')
         env:

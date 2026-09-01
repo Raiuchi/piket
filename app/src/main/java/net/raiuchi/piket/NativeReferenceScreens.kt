@@ -1,6 +1,7 @@
 package net.raiuchi.piket
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +26,8 @@ fun NativeTimetableScreen(
     route: String,
     direction: String,
     overrides: Map<String, String>,
+    currentRoute: String,
+    currentOfficialM: Double?,
     updateTime: (String, String?) -> Unit,
     resetTrain: (String) -> Unit,
     close: () -> Unit
@@ -49,6 +53,7 @@ fun NativeTimetableScreen(
             }
         }
         selected?.let { train ->
+            val currentJourneyM = NativeJourneyPosition.unifiedMeters(route, currentRoute, currentOfficialM, train.number)
             items((0 until train.stops.lastIndex).toList()) { index ->
                 val from = train.stops[index]
                 val to = train.stops[index + 1]
@@ -58,7 +63,12 @@ fun NativeTimetableScreen(
                 val toM = data.stationMeters(route, to.station, train.number)
                 val calculation = NativeTimetableCalculator.calculate(fromM, toM, fromTime, toTime)
                 val speed = calculation?.averageKmh?.roundToInt()
-                Card(colors = CardDefaults.cardColors(containerColor = PiketPanel)) {
+                val current = NativeJourneyPosition.isCurrentLeg(currentJourneyM, fromM, toM)
+                Card(
+                    modifier = Modifier.then(if (current) Modifier.border(2.dp, PiketRed, RoundedCornerShape(16.dp)) else Modifier),
+                    colors = CardDefaults.cardColors(containerColor = PiketPanel),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
                     Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("${from.station} → ${to.station}", fontWeight = FontWeight.Bold)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

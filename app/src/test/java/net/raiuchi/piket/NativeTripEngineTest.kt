@@ -96,4 +96,23 @@ class NativeTripEngineTest {
         restored.restore(engine.save())
         assertFalse(restored.update(NativeTripEngine.Input(2_000, null, false, null)).active)
     }
+
+    @Test fun manualOneKilometerOffsetExpiresAfterTrustedGpsOnEveryRoute() {
+        routes.labels().forEach { label ->
+            val testedRoute = routes.route(label)!!
+            val tested = NativeTripEngine(routes)
+            val routeSnap = NativeRouteEngine.Snap(label, testedRoute.points.first().physicalM,
+                testedRoute.chainageM.first(), 3.0, 0)
+            tested.configure(label, "tuda", testedRoute.chainageM.first() - 1_000.0, true, emptyList())
+            val initial = tested.update(NativeTripEngine.Input(1_000, 0f, true, routeSnap))
+            assertEquals("$label must initially honor manual calibration",
+                testedRoute.chainageM.first() - 1_000.0, initial.officialM!!, 0.01)
+            var corrected = initial
+            repeat(3) { index ->
+                corrected = tested.update(NativeTripEngine.Input(2_000L + index * 1_000L, 0f, true, routeSnap))
+            }
+            assertEquals("$label must not retain a permanent 1 km offset",
+                testedRoute.chainageM.first(), corrected.officialM!!, 0.01)
+        }
+    }
 }
