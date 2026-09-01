@@ -79,6 +79,7 @@ public class TrackingService extends Service {
     private final NativeMotionFilter nativeMotionFilter = new NativeMotionFilter();
     private NativeRouteEngine nativeRouteEngine;
     private NativeTripEngine nativeTripEngine;
+    private NativeJourneyRouter nativeJourneyRouter;
     private volatile String nativeRouteLabel = "Все участки";
 
     private TextToSpeech tts;
@@ -139,6 +140,7 @@ public class TrackingService extends Service {
         // получить ForegroundServiceDidNotStartInTimeException на медленном устройстве.
         try {
             nativeRouteEngine = NativeRouteEngine.Companion.fromJson(readAsset("data/routes.json"));
+            nativeJourneyRouter = NativeJourneyRouter.Companion.fromTimingJson(readAsset("data/timing.json"));
             nativeTripEngine = new NativeTripEngine(nativeRouteEngine);
             restoreNativeTripState();
             startNativeTripTicker();
@@ -445,6 +447,26 @@ public class TrackingService extends Service {
         final Float nativeSpeedMps = nativeResult.getFilteredSpeedMps();
         NativeRouteEngine.Snap shadowSnap = nativeRouteEngine != null
                 ? nativeRouteEngine.snap(nativeRouteLabel, lat, lon) : null;
+        if (nativeRouteEngine != null && nativeJourneyRouter != null && nativeTripEngine != null) {
+            NativeTripEngine.SavedState state = nativeTripEngine.save();
+            String nextLabel = nativeJourneyRouter.nextRoute(nativeRouteLabel, state.getDirection());
+            NativeRouteEngine.Snap nextSnap = nextLabel != null ? nativeRouteEngine.snap(nextLabel, lat, lon) : null;
+            NativeRouteEngine.Route currentRoute = nativeRouteEngine.route(nativeRouteLabel);
+            Double boundary = null;
+            if (currentRoute != null && !currentRoute.getPoints().isEmpty()) {
+                boundary = "obratno".equals(state.getDirection())
+                        ? currentRoute.getPoints().get(0).getPhysicalM()
+                        : currentRoute.getPoints().get(currentRoute.getPoints().size() - 1).getPhysicalM();
+            }
+            String switched = nativeJourneyRouter.consider(nativeRouteLabel, state.getDirection(),
+                    state.getPhysicalM(), boundary, shadowSnap != null ? shadowSnap.getDistanceM() : null,
+                    nextSnap != null ? nextSnap.getDistanceM() : null);
+            if (switched != null && nextSnap != null) {
+                nativeRouteLabel = switched;
+                nativeTripEngine.switchRoute(switched, nextSnap);
+                shadowSnap = nextSnap;
+            }
+        }
         NativeTripEngine.Output nativeTrip = nativeTripEngine != null
                 ? nativeTripEngine.update(new NativeTripEngine.Input(
                     loc.getElapsedRealtimeNanos() / 1_000_000L, nativeSpeedMps,

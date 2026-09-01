@@ -103,6 +103,15 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
 
     fun stop() { active = false; speedMps = 0f }
 
+    fun switchRoute(nextRoute: String, snap: NativeRouteEngine.Snap) {
+        route = nextRoute
+        physicalM = snap.physicalM
+        officialOffsetM = 0.0
+        recoveryCandidateM = null
+        recoveryConfirmations = 0
+        recovering = false
+    }
+
     private fun output(source: String): Output {
         val physical = physicalM
         val official = physical?.let { routes.officialMeters(route, it)?.plus(officialOffsetM) }

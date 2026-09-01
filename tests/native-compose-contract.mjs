@@ -17,6 +17,7 @@ const calculator = read('app/src/main/java/net/raiuchi/piket/NativeTimetableCalc
 const service = read('app/src/main/java/net/raiuchi/piket/TrackingService.java');
 const routeEngine = read('app/src/main/java/net/raiuchi/piket/NativeRouteEngine.kt');
 const tripEngine = read('app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt');
+const journeyRouter = read('app/src/main/java/net/raiuchi/piket/NativeJourneyRouter.kt');
 const manifest = read('app/src/main/AndroidManifest.xml');
 const gradle = read('app/build.gradle');
 const routes = json('app/src/main/assets/data/routes.json');
@@ -32,6 +33,7 @@ check('running-time formula is isolated and guarded', calculator.includes('objec
 check('GPS route engine reads JSON', routeEngine.includes('fun fromJson') && service.includes('data/routes.json') && !service.includes('piket-core.js'));
 check('native engines own motion, route and trip state', ['NativeMotionFilter', 'NativeRouteEngine', 'NativeTripEngine'].every(name => service.includes(name)));
 check('native trip survives signal loss and recreation', tripEngine.includes('markSignalUnavailable') && service.includes('persistNativeTripState') && service.includes('restoreNativeTripState'));
+check('known route chains switch only after repeated boundary fixes', journeyRouter.includes('confirmations < 2') && service.includes('nativeJourneyRouter.consider'));
 check('official kilometer discontinuities remain explicit', routeEngine.includes('abs(official - physical) > 3_000.0'));
 check('all 10 route geometries migrated', routes.schemaVersion === 1 && routes.tracks.labels.length === 10 && routes.tracks.segs.length === 10 && routes.chainage.length === 10);
 check('all 1558 route points migrated', routes.tracks.segs.reduce((sum, segment) => sum + segment.length, 0) === 1558);
