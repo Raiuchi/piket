@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,10 +57,23 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     val routes: List<String> = runCatching {
         app.assets.open("data/routes.json").bufferedReader().use { NativeRouteEngine.fromJson(it.readText()).labels() }
     }.getOrDefault(listOf("СпбГл - Москва"))
+    val routeChoices = NativeRouteCatalog.choices
 
     init { viewModelScope.launch { while (isActive) { snapshot = repository.loadSnapshot(); delay(500) } } }
-    fun selectRoute(value: String) { if (route != value) manualOfficialM = null; route = value; journey = null }
-    fun selectDirection(value: String) { if (direction != value) manualOfficialM = null; direction = value; journey = null }
+    fun selectRoute(choice: NativeRouteCatalog.Choice) {
+        val value = choice.start(direction)
+        if (route != value) manualOfficialM = null
+        route = value
+        journey = null
+    }
+    fun selectDirection(value: String) {
+        if (direction == value) return
+        val choice = NativeRouteCatalog.forInternalRoute(route)
+        manualOfficialM = null
+        direction = value
+        route = choice.start(value)
+        journey = null
+    }
     fun selectJourney(value: String?) {
         journey = value; manualOfficialM = null
         when (value) {
@@ -125,7 +140,7 @@ fun PiketApp(
 @Composable
 private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (NativeUiConfig) -> Unit, onStop: () -> Unit) {
     val state = model.snapshot
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { BrandHeader(state) }
         item { RouteSelector(model) }
         item { Speedometer(state.speedKmh) }
@@ -156,8 +171,8 @@ private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (N
 
 @Composable
 private fun BrandHeader(state: TripSnapshot) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    Box(Modifier.size(42.dp).background(PiketRedDark, CircleShape).border(1.dp, PiketRed, CircleShape), contentAlignment = Alignment.Center) { Text("🚄") }
-    Column(Modifier.padding(start = 11.dp)) { Text("ПИКЕТ", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold); Text("КОНТРОЛЬ ОГРАНИЧЕНИЙ", fontSize = 9.sp, letterSpacing = 2.sp, color = PiketBlue) }
+    Box(Modifier.size(48.dp).shadow(14.dp, CircleShape).background(Brush.radialGradient(listOf(Color(0xFFFF304C), Color(0xFF830D20))), CircleShape).border(1.dp, Color(0xFFFF5268), CircleShape), contentAlignment = Alignment.Center) { Text("🚄", fontSize = 21.sp) }
+    Column(Modifier.padding(start = 12.dp)) { Text("ПИКЕТ", fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp); Text("КОНТРОЛЬ ОГРАНИЧЕНИЙ", fontSize = 9.sp, letterSpacing = 2.2.sp, color = PiketBlue) }
     Spacer(Modifier.weight(1f))
     val color = if (state.source == "native-gps") Color(0xFF31DB83) else PiketYellow
     Text(if (state.active) "● GPS" else "● GPS выкл", color = color, fontSize = 12.sp)
@@ -168,15 +183,15 @@ private fun RouteSelector(model: PiketViewModel) {
     var expanded by remember { mutableStateOf(false) }
     var journeyExpanded by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth().background(PiketPanel, RoundedCornerShape(15.dp))) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF151A22)).border(1.dp, Color(0xFF303844), RoundedCornerShape(16.dp))) {
             listOf("tuda" to "Туда", "obratno" to "Обратно").forEach { (value, title) ->
-                Text(title, modifier = Modifier.weight(1f).clickable { model.selectDirection(value) }.background(if (model.direction == value) PiketRedDark else Color.Transparent).padding(14.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
+                Text(title, modifier = Modifier.weight(1f).clickable { model.selectDirection(value) }.background(if (model.direction == value) Brush.horizontalGradient(listOf(Color(0xFF7B0D20), PiketRed)) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))).padding(vertical = 13.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.ExtraBold)
             }
         }
         Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text(model.route, Modifier.weight(1f), textAlign = TextAlign.Start); Text("⌄") }
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text(NativeRouteCatalog.forInternalRoute(model.route).title, Modifier.weight(1f), textAlign = TextAlign.Start); Text("⌄") }
             DropdownMenu(expanded, { expanded = false }, modifier = Modifier.fillMaxWidth(.9f).background(PiketPanel)) {
-                model.routes.forEach { route -> DropdownMenuItem(text = { Text(route) }, onClick = { model.selectRoute(route); expanded = false }) }
+                model.routeChoices.forEach { choice -> DropdownMenuItem(text = { Text(choice.title) }, onClick = { model.selectRoute(choice); expanded = false }) }
             }
         }
         Box {
@@ -197,16 +212,18 @@ private fun RouteSelector(model: PiketViewModel) {
 @Composable
 private fun Speedometer(speed: Float) {
     val value = speed.coerceIn(0f, 250f)
-    Box(Modifier.fillMaxWidth().aspectRatio(1f), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize().padding(18.dp)) {
-            val radius = size.minDimension * .42f; val center = Offset(size.width / 2, size.height / 2)
-            drawCircle(Color(0xFF10151D), radius, center)
-            drawArc(Color(0xFF35404D), 135f, 270f, false, topLeft = Offset(center.x-radius,center.y-radius), size=androidx.compose.ui.geometry.Size(radius*2,radius*2), style=Stroke(18f, cap=StrokeCap.Round))
-            drawArc(Brush.sweepGradient(listOf(PiketBlue,PiketRed,PiketYellow)),135f,270f*(value/250f),false,topLeft=Offset(center.x-radius,center.y-radius),size=androidx.compose.ui.geometry.Size(radius*2,radius*2),style=Stroke(20f,cap=StrokeCap.Round))
-            for (i in 0..25) { val a=(135.0+i*10.8)*PI/180; val p1=Offset(center.x+(radius-24)*cos(a).toFloat(),center.y+(radius-24)*sin(a).toFloat()); val p2=Offset(center.x+(radius-8)*cos(a).toFloat(),center.y+(radius-8)*sin(a).toFloat()); drawLine(if(i%5==0) Color.White else Color(0xFF77808B),p1,p2,if(i%5==0)5f else 2f,StrokeCap.Round) }
-            val needle=(135.0+270.0*value/250.0)*PI/180; drawLine(PiketRed,center,Offset(center.x+radius*.72f*cos(needle).toFloat(),center.y+radius*.72f*sin(needle).toFloat()),6f,StrokeCap.Round); drawCircle(PiketRed,13f,center)
+    Box(Modifier.fillMaxWidth().height(326.dp), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(318.dp)) {
+            val radius = size.minDimension * .44f; val center = Offset(size.width / 2, size.height / 2)
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF171C25), Color(0xFF080A0F))), radius, center)
+            drawCircle(Color(0xFF91A0B2), radius, center, style = Stroke(3f))
+            drawCircle(Color(0xFF252D38), radius - 10f, center, style = Stroke(10f))
+            drawArc(Color(0xFF26303C), 135f, 270f, false, topLeft = Offset(center.x-radius+16,center.y-radius+16), size=androidx.compose.ui.geometry.Size((radius-16)*2,(radius-16)*2), style=Stroke(16f, cap=StrokeCap.Round))
+            drawArc(Brush.sweepGradient(listOf(Color(0xFFFF4057), PiketRed, Color(0xFFFF7B35), Color(0xFFD73DCC))),135f,270f*(value/250f),false,topLeft=Offset(center.x-radius+16,center.y-radius+16),size=androidx.compose.ui.geometry.Size((radius-16)*2,(radius-16)*2),style=Stroke(18f,cap=StrokeCap.Round))
+            for (i in 0..25) { val a=(135.0+i*10.8)*PI/180; val major=i%5==0; val p1=Offset(center.x+(radius-if(major)28 else 22)*cos(a).toFloat(),center.y+(radius-if(major)28 else 22)*sin(a).toFloat()); val p2=Offset(center.x+(radius-8)*cos(a).toFloat(),center.y+(radius-8)*sin(a).toFloat()); drawLine(if(major) Color.White else Color(0xFF66717F),p1,p2,if(major)4f else 2f,StrokeCap.Round) }
+            val needle=(135.0+270.0*value/250.0)*PI/180; drawLine(Color(0xFFFF2947),center,Offset(center.x+radius*.68f*cos(needle).toFloat(),center.y+radius*.68f*sin(needle).toFloat()),5f,StrokeCap.Round); drawCircle(Color(0xFFFF2947),12f,center)
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(value.roundToInt().toString(), fontSize = 68.sp, fontWeight = FontWeight.ExtraBold); Text("К М / Ч", letterSpacing = 5.sp, color = Color.LightGray, fontSize = 11.sp) }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(value.roundToInt().toString(), fontSize = 70.sp, fontWeight = FontWeight.Black); Text("К М / Ч", letterSpacing = 5.sp, color = Color(0xFF9EABB9), fontSize = 10.sp) }
     }
 }
 
@@ -280,27 +297,27 @@ private fun CalibrationDialog(model:PiketViewModel,dismiss:()->Unit,save:(Double
 
 @Composable
 private fun PiketNavigation(selected: PiketTab, on: (PiketTab) -> Unit) {
-    NavigationBar(
-        containerColor = Color(0xFF20232B),
-        tonalElevation = 0.dp,
-        modifier = Modifier
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-            .border(1.dp, Color(0xFF565A64), RoundedCornerShape(20.dp))
+    Row(
+        Modifier.padding(horizontal = 14.dp, vertical = 8.dp).height(72.dp)
+            .shadow(18.dp, RoundedCornerShape(22.dp))
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFF171C24))
+            .border(1.dp, Color(0xFF46505D), RoundedCornerShape(22.dp))
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         PiketTab.entries.forEach { tab ->
-            NavigationBarItem(
-                selected = selected == tab,
-                onClick = { on(tab) },
-                icon = { Text(tab.symbol, fontSize = 20.sp) },
-                label = { Text(tab.title, fontWeight = FontWeight.Bold) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color.White,
-                    indicatorColor = PiketRedDark,
-                    unselectedIconColor = Color.LightGray,
-                    unselectedTextColor = Color.LightGray
-                )
-            )
+            val active = selected == tab
+            Column(
+                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(17.dp))
+                    .background(if (active) Brush.horizontalGradient(listOf(Color(0xFF821024), Color(0xFFC1162F))) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent)))
+                    .clickable { on(tab) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(tab.symbol, fontSize = 19.sp, color = if (active) Color.White else Color(0xFFAAB3BE))
+                Text(tab.title, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, color = if (active) Color.White else Color(0xFFD2D7DE))
+            }
         }
     }
 }
