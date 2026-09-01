@@ -94,6 +94,9 @@ fun NativeTimetableScreen(
             }
         }
     }
+    if (expanded) PremiumPickerSheet("Выбери поезд", { expanded = false }) {
+        matching.forEach { train -> PremiumPickerRow("Поезд ${train.number}", train.title, selected == train) { selected = train; expanded = false } }
+    }
     editing?.let { edit ->
         PremiumTimeDialog(edit.value, { editing = null }, { value -> updateTime(edit.key, value); editing = null })
     }
@@ -123,9 +126,6 @@ private fun ScheduleTimeButton(label: String, value: String?, click: () -> Unit)
             Text(label.uppercase(), fontSize = 8.sp, color = Color(0xFF9BA8B7))
             Text(value ?: "—", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
         }
-    }
-    if (expanded) PremiumPickerSheet("Выбери поезд", { expanded = false }) {
-        matching.forEach { train -> PremiumPickerRow("Поезд ${train.number}", train.title, selected == train) { selected = train; expanded = false } }
     }
 }
 
