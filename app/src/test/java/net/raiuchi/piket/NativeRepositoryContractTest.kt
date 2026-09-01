@@ -21,6 +21,20 @@ class NativeRepositoryContractTest {
         assertFalse(sourceFiles.any { it.extension == "java" })
     }
 
+    @Test fun premiumWebAssetsCalibrationAndNativeBridgeAreBundled() {
+        val html = projectFile("app/src/main/assets/index.html").readText()
+        val service = projectFile("app/src/main/java/net/raiuchi/piket/TrackingService.kt").readText()
+        assertTrue(projectFile("app/src/main/assets/icons/piket-signal.gif").length() > 100_000)
+        assertTrue(projectFile("app/src/main/assets/assets/piket-core.js").length() > 50_000)
+        assertTrue(projectFile("app/src/main/assets/assets/piket-schedules.js").length() > 100_000)
+        assertTrue(html.contains("VYBORG_THROUGH=\"СПбФин - Каменногорск\""))
+        assertTrue(html.contains("DACHA_THROUGH=\"Дача Долгорукова - Петрозаводск\""))
+        assertTrue(html.contains("CHUDOVO_DUTY=\"Чудово - Петрозаводск · 819/820\""))
+        assertTrue(html.contains("syncNativeRouteContext();") && html.contains("window.Android.startTracking();"))
+        assertTrue(html.contains("manualOfficialM:manual") && html.contains("m:+r.m||0"))
+        assertTrue(service.contains("optDouble(\"pk\", 1.0) - 1.0"))
+    }
+
     @Test fun allRouteGeometryAndOfficialAxesRemainComplete() {
         val root = json("routes.json")
         val tracks = root.getJSONObject("tracks")

@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#070B12">
 <title>ПИКЕТ · Сапсан</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ПИКЕТ">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   @font-face{font-family:"Manrope";font-style:normal;font-weight:400 800;font-display:swap;src:url("assets/fonts/manrope-cyrillic.woff2") format("woff2");unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
   @font-face{font-family:"Manrope";font-style:normal;font-weight:400 800;font-display:swap;src:url("assets/fonts/manrope-latin.woff2") format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
@@ -710,6 +716,13 @@
     </div>
     <p class="small" style="margin:18px 4px 8px">Работает офлайн, данные на телефоне.</p>
     <p class="small" id="appVerLine" style="margin:0 4px 8px;opacity:.6"></p>
+    <div class="small" style="margin:14px 4px 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.03)">
+      <b>Веб-версия — важные особенности:</b><br><br>
+      <b>На iPhone (Safari):</b> экран должен оставаться включённым и вкладка — на переднем плане всё время поездки. Если свернуть Safari или экран потухнет — отслеживание остановится, как в обычном навигаторе на подставке. При первом запуске разреши доступ к местоположению и звуку (всплывёт запрос сверху).<br><br>
+      <b>Установка на главный экран (рекомендуется):</b> в Safari нажми кнопку «Поделиться» (квадрат со стрелкой вверх) → «На экран “Домой”» → «Добавить». Появится иконка ПИКЕТ, как у обычного приложения — открывается без адресной строки браузера, быстрее и удобнее. Это не убирает ограничение на потухший экран, но даёт более привычный вид и более быстрый запуск.<br><br>
+      <b>На Android:</b> то же ограничение, что и на iPhone, если открыто через обычный браузер (Chrome). Для фоновой работы с потухшим экраном используй отдельное Android-приложение (APK) — у него есть собственная фоновая служба, веб-версия её не имеет. На главный экран добавляется через меню (три точки) → «Добавить на главный экран» / «Установить приложение».<br><br>
+      <b>Обоим:</b> один раз открой страницу при включённом интернете — дальше иконки/звуки/голос продолжат работать и без сети (карта станций уже встроена в страницу).
+    </div>
   </section>
 
   <section class="view pad" id="v-speedlist">
@@ -797,15 +810,7 @@
 
 <div class="sheet" id="sheetReason"><div class="grab"></div><h3>Причина</h3><div id="reasonList"></div></div>
 
-<div class="premium-picker" id="premiumPicker" aria-hidden="true">
-  <div class="pp-backdrop" id="ppBackdrop"></div>
-  <section class="pp-card" role="dialog" aria-modal="true" aria-labelledby="ppTitle">
-    <div class="pp-grab"></div>
-    <div class="pp-head"><h3 id="ppTitle">Выбор</h3><button type="button" class="pp-close" id="ppClose" aria-label="Закрыть">×</button></div>
-    <div class="pp-body" id="ppBody"></div>
-    <div class="pp-actions" id="ppActions" style="display:none"><button type="button" class="btn ghost" id="ppClear">Очистить</button><button type="button" class="btn primary" id="ppApply">Установить</button></div>
-  </section>
-</div>
+<div class="premium-picker" id="premiumPicker" aria-hidden="true"><div class="pp-backdrop" id="ppBackdrop"></div><section class="pp-card" role="dialog" aria-modal="true" aria-labelledby="ppTitle"><div class="pp-grab"></div><div class="pp-head"><h3 id="ppTitle">Выбор</h3><button type="button" class="pp-close" id="ppClose" aria-label="Закрыть">×</button></div><div class="pp-body" id="ppBody"></div><div class="pp-actions" id="ppActions" style="display:none"><button type="button" class="btn ghost" id="ppClear">Очистить</button><button type="button" class="btn primary" id="ppApply">Установить</button></div></section></div>
 <div class="sheet" id="sheetBgHelp"><div class="grab"></div><h3>Если приложение перестаёт считать в фоне</h3>
   <div style="padding:0 4px 16px;line-height:1.5;font-size:14px">
     <p>На некоторых телефонах (особенно Xiaomi, Redmi, POCO, Vivo, Samsung, Huawei, Honor, OPPO, OnePlus, Realme) сам телефон ради экономии заряда «засыпает» приложения, если они долго работают в фоне с потухшим экраном — даже когда ПИКЕТ честно показывает значок в строке состояния, что он работает. Это особенность конкретного телефона, не ошибка приложения.</p>
@@ -850,8 +855,8 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="assets/piket-core.js"></script>
-<script src="assets/piket-schedules.js"></script>
+<script src="assets/piket-core.js?v=1.5.0"></script>
+<script src="assets/piket-schedules.js?v=1.5.0"></script>
 <script>
 "use strict";
 (function(){
@@ -1015,11 +1020,7 @@
       if(trackM>b) continue;
       var physical=b-a, official=ids[i+1]-ids[i];
       var discontinuity=official<=0 || Math.abs(official-physical)>3000;
-      if(discontinuity){
-        // Обе ординаты относятся к разным официальным шкалам. До второй опорной точки
-        // продолжаем старую шкалу по физическому расстоянию, на самой точке переключаемся.
-        return trackM>=b-1 ? ids[i+1] : ids[i]+(trackM-a);
-      }
+      if(discontinuity) return trackM>=b-1 ? ids[i+1] : ids[i]+(trackM-a);
       var f=physical>0?(trackM-a)/physical:0;
       return ids[i]+f*official;
     }
@@ -1027,15 +1028,13 @@
   }
   function routeOfficialOffset(label){
     var offsets=load("sap_routeOffsets",{}), value=+(offsets[label]);
-    // Только небольшая локальная доводка по реальному столбу; крупные разрывы уже
-    // описаны CHAINAGE и не должны маскироваться одной поправкой на весь маршрут.
     return isFinite(value) && Math.abs(value)<=1500 ? value : 0;
   }
   function officialTrackM(trackM,label){ return baseOfficialTrackM(trackM,label)+routeOfficialOffset(label); }
   function learnRouteOffset(label,officialM,trackM){
     if(!label || label==="Все участки" || !isFinite(officialM) || !isFinite(trackM)) return null;
     var value=Math.round(officialM-baseOfficialTrackM(trackM,label));
-    if(Math.abs(value)>1500) return null; // неверный перегон/фикс — не запоминаем
+    if(Math.abs(value)>1500) return null;
     var offsets=load("sap_routeOffsets",{}); offsets[label]=value; save("sap_routeOffsets",offsets);
     return value;
   }
@@ -1048,11 +1047,27 @@
   };
   function syncNativeRouteContext(){
     try{
-      if(IS_HEADLESS&&window.Android&&window.Android.setNativeRouteContext)window.Android.setNativeRouteContext(state.ctx.peregon||"Все участки");
       if(window.Android&&window.Android.configureNativeTrip){
         var manual=state.calib?metersOf(state.calib.km,state.calib.pk,state.calib.m):0;
-        var nativeRestrictions=(state.restrictions||[]).map(function(r){return Object.assign({},r,{id:r.id||((r.km||0)+"_"+(r.pk||0))});});
-        window.Android.configureNativeTrip(JSON.stringify({route:state.ctx.peregon||"Все участки",direction:state.ctx.towards||"tuda",manualOfficialM:manual,active:!!rt.tracking,lead:state.settings.lead||3000,restrictions:nativeRestrictions}));
+        var nativeRestrictions=(state.restrictions||[]).map(function(r){
+          return Object.assign({},r,{
+            id:r.id||((r.km||0)+"_"+(r.pk||0)),
+            m:+r.m||0,
+            mE:+r.mE||0,
+            speed:r.spd==null?r.speed:r.spd,
+            lead:r.lead==null?(state.settings.lead||3000):r.lead
+          });
+        });
+        window.Android.configureNativeTrip(JSON.stringify({
+          route:state.ctx.peregon||"Все участки",
+          direction:state.ctx.towards||"tuda",
+          manualOfficialM:manual,
+          active:!!rt.tracking,
+          lead:state.settings.lead||3000,
+          sound:state.settings.sound!==false,
+          vibration:state.settings.vibe!==false,
+          restrictions:nativeRestrictions
+        }));
       }
     }catch(e){}
   }
@@ -1101,7 +1116,7 @@
     $("#gpsTxt").textContent="частая зона помех";
   }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting",lastFixAgeMs:0,satellitesUsed:0,averageCn0:0};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserCallAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting"};
   rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0; rt.speedCand=null; rt.speedCandCount=0; rt.stationaryAnchor=null; rt.stationarySince=0; rt.lastSnapSegIdx=-1; rt.zoneHintUntil=0; rt.zoneHintCooldownUntil=0;
   rt.lastAccuracy=999; rt.directionMismatchCount=0; rt.directionWarning=false; rt.alertRepeatAt=0;
   var TIMING_STATIONS={
@@ -1176,26 +1191,6 @@
     var limit=Math.max(20,Math.min(120,(+accuracy||30)*2));
     median=Math.max(-limit,Math.min(limit,median));
     return expectedTrackM+median;
-  }
-  function validatedNativeTrackM(jsTrackM,coords){
-    var nativeM=+(coords&&coords.nativeTripPhysicalM);
-    if(!isFinite(nativeM)||!isFinite(jsTrackM)){rt.nativeTrusted=false;return jsTrackM;}
-    var diff=Math.abs(nativeM-jsTrackM);
-    if(diff>50){
-      rt.nativeAgreement=0;
-      rt.nativeTrusted=false;
-      if(!rt.nativeMismatchAt||Date.now()-rt.nativeMismatchAt>10000){
-        rt.nativeMismatchAt=Date.now();
-        var audit=load("sap_native_compare",[]);
-        audit.push({at:Date.now(),peregon:state.ctx.peregon,js:Math.round(jsTrackM),native:Math.round(nativeM),diff:Math.round(diff),source:coords.nativeTripSource||"native"});
-        if(audit.length>100)audit=audit.slice(-100); save("sap_native_compare",audit);
-      }
-      return jsTrackM; // расхождение фиксируем, но источник молча не меняем
-    }
-    rt.nativeAgreement=(rt.nativeAgreement||0)+1;
-    if(rt.nativeAgreement>=3 && coords.nativeTripRecovering!==true && (+coords.nativeRouteDistanceM||999)<=120){rt.nativeTrusted=true;return nativeM;}
-    rt.nativeTrusted=false;
-    return jsTrackM;
   }
   // Ожидаемый курс движения ПО ПУТИ в точке trackM конкретного сегмента (для сверки с GPS-курсом).
   // Поезд может двигаться только вдоль рельс в одну из двух сторон — резкое несовпадение
@@ -1318,25 +1313,37 @@
   document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&rt.tracking)reqWake(); });
 
   // ВСПОМОГАТЕЛЬНЫЙ АКСЕЛЕРОМЕТР — мягкая подсказка при потере/глушении GPS, НЕ замена GPS.
-  // Перенесено из веб-версии piket-web (правило синхронизации) — см. там подробные комментарии.
-  // Не вычисляем точную скорость через интегрирование (физически ненадёжно), используем
-  // только общую величину (модуль) вектора ускорения как индикатор "идёт ли явное резкое
-  // изменение скорости прямо сейчас" — не зависит от ориентации телефона.
+  // КРИТИЧНО: не пытаемся вычислить точную скорость через интегрирование ускорения — это
+  // физически ненадёжно (ошибка накапливается со временем без GPS-коррекции, и неизвестно,
+  // какая из трёх осей телефона соответствует направлению движения поезда — зависит от того,
+  // как телефон лежит). Используем ТОЛЬКО общую величину (модуль) вектора ускорения как
+  // простой индикатор "идёт ли явное резкое изменение скорости прямо сейчас" — эта величина
+  // не зависит от ориентации телефона. Если акселерометр показывает заметное ускорение —
+  // считаем вероятным, что скорость поезда реально меняется, и НЕ применяем фильтр защиты от
+  // помех так строго в этот момент (см. onPos) — даём пройти честному резкому изменению.
+  // Если акселерометр спокоен — скорость поезда, скорее всего, не меняется сильно, можно
+  // увереннее держать последнее известное значение при потере сигнала.
+  // accelMag (текущая величина "избыточного" ускорения сверх покоя, м/с²) уже в rt выше.
   function handleMotion(e){
-    var a=e.acceleration;
+    var a=e.acceleration; // без учёта гравитации — в покое должно быть около (0,0,0)
     if(!a||a.x==null) return;
-    rt.accelAvailable=true;
+    rt.accelAvailable=true; // явная отметка, что хотя бы один честный замер реально пришёл
     var mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
+    // Лёгкое сглаживание — единичный шумовой выброс акселерометра не должен мгновенно
+    // "включать" режим повышенного доверия к резким изменениям скорости.
     rt.accelMag=rt.accelMag*0.7+mag*0.3;
   }
   function startAccelHelper(){
-    if(!("DeviceMotionEvent"in window)) return;
+    if(!("DeviceMotionEvent"in window)) return; // нет такого датчика/API — просто не используем
     try{
       if(typeof DeviceMotionEvent.requestPermission==="function"){
+        // iOS 13+ требует явного разрешения по жесту пользователя — startTrack() вызывается
+        // по реальному тапу на кнопку Старт, это и есть подходящий момент для запроса.
         DeviceMotionEvent.requestPermission().then(function(resp){
           if(resp==="granted") window.addEventListener("devicemotion",handleMotion);
         }).catch(function(){});
       } else {
+        // Android и более старые версии iOS не требуют отдельного разрешения для этого API.
         window.addEventListener("devicemotion",handleMotion);
       }
     }catch(e){}
@@ -1540,15 +1547,19 @@
   function updateAndroidNotification(){
     try{ var m=rt.posM; if(m==null)return; var txt=kmFrom(m)+" км · ПК"+pkFrom(m)+" · "+Math.round(rt.speed)+" км/ч"; if(window.Android&&window.Android.updatePosition)window.Android.updatePosition(txt); }catch(e){}
   }
-  function onPos(p){ var c=p.coords,acc=c.accuracy||999; rt.lastAccuracy=acc;
+  function onPos(p,fromBackup){ var c=p.coords,acc=c.accuracy||999; rt.lastAccuracy=acc;
     if(state.calib&&c.heading!=null&&(+c.speed||0)>5){
       var dsi=TRACK.labels.indexOf(state.ctx.peregon),dtm=currentTrackMeters();
       if(dsi>=0&&dtm!=null){var db=expectedTrackBearing(TRACK.segs[dsi],dtm);if(db!=null){var wanted=dirDown()?(db+180)%360:db,wrong=bearingDiff(c.heading,wanted)>110;rt.directionMismatchCount=Math.max(0,(rt.directionMismatchCount||0)+(wrong?1:-1));var was=rt.directionWarning;rt.directionWarning=rt.directionMismatchCount>=3;if(rt.directionWarning&&!was){toast("⚠️ Движение не совпадает с выбранным направлением");say("Проверь выбранное направление движения");}}}
     }
-    var fixAge=(c.fixAgeMs==null?0:+c.fixAgeMs), sats=+c.satellitesUsed||0, cn0=+c.averageCn0||0;
-    rt.lastFixAgeMs=fixAge; rt.satellitesUsed=sats; rt.averageCn0=cn0;
+    // fromBackup=true - замер пришёл из запасного сетевого канала (см. startNetworkBackup).
+    // НЕ обновляем lastBrowserCallAt в этом случае - это поле отслеживает именно ОСНОВНОЙ
+    // (точный) канал, чтобы вотчдог подписки в tickerStep продолжал пытаться его восстановить
+    // даже пока запасной канал подстраховывает (та же логика, что в Android TrackingService).
+    if(!fromBackup) rt.lastBrowserCallAt=Date.now(); // watchdog подписки - см. tickerStep
+    var fixAge=(c.fixAgeMs==null?Math.max(0,Date.now()-(p.timestamp||Date.now())):+c.fixAgeMs);
+    var sats=+c.satellitesUsed||0, cn0=+c.averageCn0||0, diversity=+c.constellationDiversity||0;
     if(c.mockLocation===true || fixAge>5000){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; onErr({code:2,stale:true}); return; }
-    var diversity=+c.constellationDiversity||0;
     var satelliteWeak=(c.gnssTelemetry===true && (sats<4 || cn0<18 || (diversity<2 && sats<6)));
     var signalGood=acc<=30 && !satelliteWeak;
     rt.gpsState=signalGood?(rt.lastGoodFix==null?"checking":"precise"):(acc<=70?"degraded":"deadreckoning");
@@ -1583,19 +1594,25 @@
       if(stationaryDist>45){rt.stationaryAnchor=pt;rt.stationarySince=now;}
       else if(stationaryAge>=10 && stationaryDist<=25){spd=0;rt.speed=0;rt.speedRecovery=false;rt.speedCand=null;rt.speedCandCount=0;}
     } else {rt.stationaryAnchor=null;rt.stationarySince=0;}
-    // КРИТИЧНО (перенесено из веб-версии piket-web, найдено по сообщению с дороги о
-    // глушении GPS): реальный поезд физически не может изменить скорость больше чем на
-    // ~60 км/ч за секунду даже при самом жёстком аварийном торможении (паспортное
-    // служебное торможение ЭВС ~0.5 м/с² = 1.8 км/ч/с — взят порог на порядок больше с
-    // огромным запасом). При намеренном радиоэлектронном подавлении сигнала GPS-чип может
-    // выдавать ИСКАЖЁННОЕ, но НЕ null значение скорости — отличающееся от текущего больше
-    // чем на этот порог отбраковывается как вероятная помеха, не реальное изменение
-    // скорости. ВАЖНО: порог намеренно большой (не строже) и без требования подтверждения -
-    // первая, более строгая версия (с подтверждением) была найдена опасной собственным
-    // стресс-тестом до публикации: она блокировала ЧЕСТНОЕ экстренное торможение, потому что
-    // каждый следующий замер при непрерывном замедлении не повторяет предыдущий точно.
-    // Лучше иногда пропустить помеху, чем хоть на секунду подавить данные о реальном
-    // экстренном торможении.
+    // КРИТИЧНО (сообщено напрямую с дороги — глушение GPS даёт скачки скорости и неверный
+    // счёт): при намеренном радиоэлектронном подавлении сигнала GPS-чип может выдавать
+    // ИСКАЖЁННОЕ, НО НЕ null значение скорости — это не "нет сигнала" (который ловится
+    // отдельно через onErr), а правдоподобно выглядящее, но физически невозможное число.
+    // Реальный поезд физически не может изменить скорость больше чем на ~60 км/ч за секунду
+    // даже при самом жёстком аварийном торможении (паспортное служебное торможение ЭВС
+    // ~0.5 м/с² = 1.8 км/ч/с — взят порог на порядок больше с огромным запасом). Если новое
+    // значение отличается от текущего больше чем на это — подозрительно похоже на помеху
+    // (намеренное глушение GPS), не на реальное изменение скорости поезда.
+    //
+    // КРИТИЧНО: первая версия этого фильтра требовала подтверждения (два похожих резких
+    // замера подряд), но стресс-тест показал это ОПАСНЫМ — при ЧЕСТНОМ экстренном торможении
+    // (плавное, но быстрое снижение 155→0 за несколько секунд) каждый следующий замер не
+    // повторяет предыдущий с точностью — torможение НЕПРЕРЫВНО меняется, и "подтверждение"
+    // никогда не находилось, блокируя честные данные о реальном замедлении поезда. Это
+    // неприемлемо для безопасности — лучше иногда пропустить помеху, чем хоть на секунду
+    // подавить честное экстренное торможение. Порог увеличен (60 км/ч/с) и подтверждение
+    // убрано — фильтр теперь отбраковывает только самые крайние, физически невозможные
+    // скачки одним замером, не задерживая реальные резкие изменения скорости.
     if(spd!=null && rt.signalLostAt && rt.speed<10 && spd>30){
       if(rt.speedCand!=null && Math.abs(spd-rt.speedCand)<=12)rt.speedCandCount=(rt.speedCandCount||0)+1;
       else rt.speedCandCount=1;
@@ -1611,7 +1628,7 @@
         var maxSpeedChange=Math.min(12*Math.max(dt,0.5)+5, 45);
         if(Math.abs(spd-rt.speed)>maxSpeedChange) spd=null;
       }
-      rt.speedRecovery=false;
+      rt.speedRecovery=false; // сбрасываем флаг — следующий фикс уже под обычным фильтром
     }
     // АБСОЛЮТНЫЙ ПОТОЛОК: Сапсан физически не может ехать быстрее ~250 км/ч (конструктивный
     // максимум). Даём запас 255 км/ч. Если GPS выдал что-то выше — это однозначно артефакт
@@ -1622,6 +1639,9 @@
     if(spd!=null && spd>255) spd=null;
     if(spd!=null && rt.speed!=null && rt.speed<10 && rt.last!=null) rt.speedRecovery=true;
     if(spd!=null){
+      // Во время восстановления (speedRecovery) или при первом фиксе с нуля — прямая запись
+      // без сглаживания: экспоненциальное 0.6/0.4 создало бы промежуточное значение ~49 км/ч,
+      // которое строгий динамический фильтр потом не пропустил бы до реальной скорости никогда.
       if(rt.speedRecovery || (rt.speed!=null && rt.speed<10)){
         rt.speed=Math.min(255, spd>5 ? spd : Math.max(0,rt.speed*0.7));
       } else {
@@ -1653,10 +1673,15 @@
     // должно быть явное предупреждение, что позиция определена автоматически и её стоит
     // проверить/исправить, точность ниже чем при ручном вводе по факту проезжаемого столба.
     if(false && state.calib==null && rt.tracking && !IS_MIRROR){
-      // БРАУЗЕРНЫЙ ПОРОГ ТОЧНОСТИ: FusedLocation на Android первые минуты часто даёт
-      // 20-30м (особенно после холодного старта или в помещении). С acc<=20 кандидаты
-      // не копились и автокалибровка не срабатывала никогда. Порог 35м безопасен: 4
-      // согласованных замера в 150м надёжно защищают от случайного шума.
+      // БРАУЗЕРНЫЙ ПОРОГ ТОЧНОСТИ: в APK ≤20м было достаточно (FusedLocation стабильно даёт
+      // 8-15м). В браузере первые несколько минут accuracy обычно 25-60м даже при хорошем сигнале
+      // — с порогом ≤20м кандидаты вообще не копились и автокалибровка не срабатывала никогда.
+      // Поднимаем до ≤35м: 4 согласованных замера в пределах 150м уже надёжно защищают от шума,
+      // поэтому ослабление порога входа безопасно. Итоговая точность всё равно ограничена
+      // привязкой к ближайшей точке пути (snapToTrack), а не самим acc.
+      // Автокалибровка только при движении (>10 км/ч): в стоячем положении GPS-шум
+      // даёт ложную скорость (40-50 км/ч) и случайное смещение координат на десятки метров,
+      // что приводит к неправильной автокалибровке. На ходу шум исчезает, позиция стабильна.
       if(acc<=35 && rt.speed>=10){
         var autoTM=snapToTrack(c.latitude,c.longitude);
         var triedAllRoutes=false;
@@ -1745,8 +1770,7 @@
         // ── ШАГ 3: GPS-КОРРЕКЦИЯ (только если _trackM установлен) ──────────────
         if(state.calib._trackM!=null){
           var calibM0=metersOf(state.calib.km,state.calib.pk,state.calib.m);
-          // Поиск и коррекция всегда идут по непрерывной физической оси. Официальная
-          // ордината может скачнуть на смене км и не должна выглядеть как GPS-скачок.
+          // Поиск и коррекция всегда идут по непрерывной физической оси.
           var expectedTrackM=state.calib._trackM+(dirDown()?-1:1)*
             (rt.correctionTargetOdo!=null?rt.correctionTargetOdo:rt.odo);
 
@@ -1769,7 +1793,7 @@
             if(tM==null && acc<=40){
               tM=snapToTrack(c.latitude,c.longitude);
             }
-            if(tM!=null){ tM=stableAlongTrackCandidate(tM,expectedTrackM,now,acc,signalGood); tM=validatedNativeTrackM(tM,c); candM=officialTrackM(tM,state.ctx.peregon); viaTrack=true; tMfinal=tM; }
+            if(tM!=null){ tM=stableAlongTrackCandidate(tM,expectedTrackM,now,acc,signalGood); candM=officialTrackM(tM,state.ctx.peregon); viaTrack=true; tMfinal=tM; }
           }
 
           // Аварийный широкий поиск после 25с без хорошего фикса (запасной путь для acc>40)
@@ -1777,7 +1801,7 @@
           var sinceAnyGoodOrStart=rt.lastGoodFix!=null?(now-rt.lastGoodFix):(now-rt.trackingSince);
           if(candM==null && acc<=120 && sinceAnyGoodOrStart>25000){
             var tMwide=snapToTrack(c.latitude,c.longitude);
-            if(tMwide!=null){ tMwide=stableAlongTrackCandidate(tMwide,expectedTrackM,now,acc,signalGood); tMwide=validatedNativeTrackM(tMwide,c); candM=officialTrackM(tMwide,state.ctx.peregon); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
+            if(tMwide!=null){ tMwide=stableAlongTrackCandidate(tMwide,expectedTrackM,now,acc,signalGood); candM=officialTrackM(tMwide,state.ctx.peregon); viaTrack=true; tMfinal=tMwide; usedWideSearch=true; }
           }
 
           if(candM!=null && usedWideSearch){
@@ -1790,10 +1814,9 @@
             // Подтверждения от того же испорченного источника ничего не докажут — отклоняем
             // коррекцию целиком, не даём накопиться "подтверждениям" плохих данных.
             var physicallyImplausible = false;
-            // Если плавная коррекция уже запущена, текущий drM намеренно ещё отстаёт от
-            // подтверждённой GPS-цели. Сравнивать следующий хороший фикс со старым drM
-            // ошибочно: на движущемся поезде он выглядит как новый "невозможный скачок"
-            // и цель замирает позади. Во время recovery сверяемся с целевой позицией.
+            // Во время плавного восстановления текущий drM ещё намеренно отстаёт от
+            // подтверждённой GPS-цели. Следующий фикс сравниваем с целью коррекции,
+            // иначе на движущемся поезде она может застыть позади реальной позиции.
             var plausibilityDiff=diff;
             if(rt.correctionTargetOdo!=null){
               var targetTrackM=state.calib._trackM+(dirDown()?-1:1)*rt.correctionTargetOdo;
@@ -1828,7 +1851,6 @@
             //   2 подтверждения (не 1) всё же защищают от одиночного ложного скачка GPS,
             //   который мог бы перекинуть позицию мимо реальной зоны ограничения.
             var needed = diff<100 ? 1 : (diff<2000 ? 3 : 4);
-            if(satelliteWeak || fixAge>2000) needed+=2;
             // КУРС ДВИЖЕНИЯ ПРОТИВ ГЛУШЕНИЯ: поезд физически может двигаться только вдоль
             // рельс в одну из двух сторон. Если GPS-приёмник даёт курс (heading) и он сильно
             // (>90°, то есть "поперёк" пути) не совпадает с ожидаемым направлением рельс в
@@ -1856,13 +1878,10 @@
             if(rt.pendingCount>=needed){
               var newOdoVal=(dirDown()?-1:1)*(tMfinal-state.calib._trackM);
               if(diff>=50 && signalGood && !satelliteWeak){
-                // После подтверждений крупная поправка положения применяется сразу:
-                // это восстановление координаты после РЭБ, а не ускорение самого поезда.
                 rt.odo=newOdoVal; rt.correctionTargetOdo=null;
               } else if(rt.correctionTargetOdo!=null){
-                // Recovery уже идёт: поезд продолжает двигаться, поэтому каждый новый
-                // подтверждённый фикс обязан передвигать цель. Раньше при diff<300 цель
-                // оставалась старой и после восстановления позиция отставала на 100-300м.
+                // Пока восстановление активно, обновляем цель каждым подтверждённым
+                // GPS-фиксом движущегося поезда; иначе старая цель остаётся позади.
                 rt.correctionTargetOdo=newOdoVal;
               } else if(diff<300){
                 // Мелкая коррекция (обычный шум GPS, не реальный дрейф) — сглаживаем
@@ -1935,7 +1954,8 @@
     autoDetectPeregon(c.latitude, c.longitude, acc);
     updateAndroidNotification();
     renderTrip(); evalAlerts(); }
-  function onErr(e){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
+  function onErr(e){ rt.lastBrowserCallAt=Date.now(); rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; // watchdog подписки - см. tickerStep
+    if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
       // КРИТИЧНО: при полной потере сигнала скорость раньше оставалась ЗАСТЫВШЕЙ на
       // последнем известном значении - если перед самой потерей был случайный шумовой
       // выброс (GPS даёт скачок скорости в момент ухудшения сигнала перед тем как пропасть
@@ -1945,18 +1965,22 @@
       // не идеально (поезд может реально ехать), но безопаснее, чем доверять застывшему
       // случайному выбросу неопределённо долго.
       //
-      // ВСПОМОГАТЕЛЬНАЯ ПОДСКАЗКА ОТ АКСЕЛЕРОМЕТРА (мягкая, не замена GPS, перенесено из
-      // веб-версии piket-web): если он показывает низкое ускорение (поезд явно не тормозит/
-      // разгоняется прямо сейчас) - снижаем скорость МЕДЛЕННЕЕ, есть основания думать, что
-      // реальная скорость близка к последней известной. Если ускорение заметное - снижаем
-      // как раньше, не рискуя держать неактуальное значение именно в момент вероятного
-      // реального изменения скорости.
+      // ВСПОМОГАТЕЛЬНАЯ ПОДСКАЗКА ОТ АКСЕЛЕРОМЕТРА (мягкая, не замена GPS): если он
+      // показывает низкое ускорение (поезд явно не тормозит/разгоняется прямо сейчас) -
+      // снижаем скорость МЕДЛЕННЕЕ, есть основания думать, что реальная скорость близка к
+      // последней известной. Если ускорение заметное - снижаем как раньше, не рискуя
+      // держать неактуальное значение именно в момент вероятного реального изменения скорости.
+      // ВСПОМОГАТЕЛЬНАЯ ПОДСКАЗКА ОТ АКСЕЛЕРОМЕТРА (мягкая, не замена GPS), теперь ступенчато:
+      // тихо (почти нет ускорения) → снижаем ОЧЕНЬ медленно, скорость скорее всего та же;
+      // небольшое ускорение → снижаем чуть быстрее (плавный переход, не скачок на границе);
+      // заметное → снижаем как было раньше;
+      // сильное (похоже на активное/экстренное торможение) → снижаем БЫСТРО - если поезд
+      // реально тормозит, безопаснее недооценить пройденное расстояние у ограничения, чем
+      // переоценить и "проехать" мимо него на бумаге, пока GPS молчит.
       var lossNow=Date.now();
       if(!rt.signalLostAt)rt.signalLostAt=lossNow;
       var lossDt=rt.lastLossDecayAt?Math.max(0,Math.min(5,(lossNow-rt.lastLossDecayAt)/1000)):0;
       rt.lastLossDecayAt=lossNow;
-      // Затухание задаётся на секунду, а не на системный callback: частые сообщения
-      // Android о недоступности больше не способны искусственно остановить счёт пути.
       var decayPerSecond;
       if(!rt.accelAvailable) decayPerSecond=0.997;
       else if(rt.accelMag<0.5) decayPerSecond=0.999;
@@ -1968,13 +1992,14 @@
     else { $("#gps").className="gps dead"; $("#gpsTxt").textContent=(e&&e.code===1)?"нет доступа":"нет сигнала"; $("#spdSrc").textContent=(e&&e.code===1)?"GPS запрещён (file://)":"жду спутники…"; $("#spdSrc").className="src dr"; } }
 
   function tickerStep(){ if(state.calib==null){
-    // Служба работает, но калибровки нет.
-    // Сохраняем heartbeat-снэпшот чтобы зеркало видело что служба жива.
-    // Без этого: зеркало никогда не получает свежий снэпшот → висит "GPS инициализируется" вечно.
     if(IS_HEADLESS){ rt.lastTick=Date.now(); saveTrackSnapshot(); }
     return;
   }
     var now=Date.now(), dt=(now-(rt.lastTick||now))/1000; rt.lastTick=now;
+    // КРИТИЧНО: odo накапливаем ТОЛЬКО при реальном движении (>5 км/ч).
+    // GPS-шум на стоянке показывает 30-50 км/ч — без этой защиты за 5 минут
+    // накапливается 3+ км фиктивного odo, что бакует неправильный _trackM
+    // и даёт систематическую ошибку позиции на весь рейс.
     if(dt>0&&dt<10&&rt.speed>5) rt.odo+=(rt.speed/3.6)*dt;
     if(rt.correctionTargetOdo!=null && dt>0 && dt<10){
       var correctionLeft=rt.correctionTargetOdo-rt.odo;
@@ -1984,8 +2009,47 @@
       if(Math.abs(rt.correctionTargetOdo-rt.odo)<5){ rt.odo=rt.correctionTargetOdo; rt.correctionTargetOdo=null; rt.fixQuality="good"; rt.gpsState="precise"; }
     }
     rt.posM=currentMeters(); renderTrip(); evalAlerts(); recordZoneQuality(); checkZoneWarning();
+    // ВОТЧДОГ ПОДПИСКИ (браузерный аналог Java watchdog в Android-приложении): если ни onPos,
+    // ни onErr вообще не вызывались браузером дольше 20 секунд - это значит сама подписка
+    // watchPosition молча "зависла" (известны такие случаи на некоторых телефонах/системах -
+    // та же категория проблем, что найдена для Samsung One UI 8 в Android-приложении).
+    // ЧЕСТНОЕ ОГРАНИЧЕНИЕ: у браузера нет способа явно выбрать "именно сетевой провайдер,
+    // не GPS" (в отличие от Java/Google Play Services, где это отдельный Priority) - браузер
+    // сам решает внутри себя, как искать позицию. Единственный доступный инструмент -
+    // полностью пересобрать саму подписку (clearWatch + новый watchPosition), это похоже на
+    // действие "выключить и включить определение местоположения", которое реально помогает
+    // пользователям при подобных системных зависаниях.
+    if(rt.tracking && rt.watchId!=null && rt.lastBrowserCallAt && (now-rt.lastBrowserCallAt)>20000){
+      try{
+        navigator.geolocation.clearWatch(rt.watchId);
+        rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:27000});
+        rt.lastBrowserCallAt=now; // не дёргаем пересборку на каждом тике, ждём ещё 20с
+      }catch(e){}
+    }
+    // ЗАПАСНОЙ СЕТЕВОЙ КАНАЛ (браузерный аналог Android network backup, v1.4.29): если основной
+    // канал молчит дольше 10с - включаем второй watchPosition с enableHighAccuracy:false как
+    // подстраховку, отключаем как только основной снова заговорил. ЧЕСТНОЕ ОГРАНИЧЕНИЕ: в отличие
+    // от Android (Priority.PRIORITY_BALANCED_POWER_ACCURACY - явно "через вышки/wifi, не GPS"),
+    // у браузера нет способа явно запросить именно сетевое позиционирование - enableHighAccuracy:
+    // false лишь просьба "не обязательно GPS-точность", решение всё равно за браузером/ОС. Это
+    // ближайший доступный эквивалент, не гарантированный аналог.
+    if(rt.tracking && rt.watchId!=null){
+      var sinceGoodFix = rt.lastBrowserCallAt ? (now-rt.lastBrowserCallAt) : 0;
+      if(sinceGoodFix>10000 && !rt.backupActive){
+        try{
+          rt.backupWatchId=navigator.geolocation.watchPosition(
+            function(p){ onPos(p,true); },
+            function(){}, // ошибки запасного канала не обрабатываем отдельно - основной watchdog и так следит
+            {enableHighAccuracy:false,maximumAge:5000,timeout:15000});
+          rt.backupActive=true;
+        }catch(e){}
+      } else if(sinceGoodFix<=10000 && rt.backupActive){
+        try{ if(rt.backupWatchId!=null) navigator.geolocation.clearWatch(rt.backupWatchId); }catch(e){}
+        rt.backupActive=false; rt.backupWatchId=null;
+      }
+    }
     if(IS_HEADLESS) saveTrackSnapshot(); }
-  function startTicker(){ rt.lastTick=Date.now(); if(rt.tickTimer)clearInterval(rt.tickTimer); rt.tickTimer=setInterval(tickerStep,600); }
+  function startTicker(){ rt.lastTick=Date.now(); rt.lastBrowserCallAt=Date.now(); if(rt.tickTimer)clearInterval(rt.tickTimer); rt.tickTimer=setInterval(tickerStep,600); }
   function stopTicker(){ if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } }
 
   // ========= ЗЕРКАЛИРОВАНИЕ ГОЛОВНОГО (headless) ДВИЖКА В ВИДИМЫЙ ЭКРАН =========
@@ -2010,19 +2074,20 @@
     return {gps:"live", txt:"GPS вкл", src:"GPS — фоновая служба", srcCls:"src live"};
   }
   function mirrorTick(graceMs,gen){
-    if(gen!==rt.mirrorGen) return;
+    if(gen!==rt.mirrorGen) return; // зеркало уже остановлено/перезапущено — этот отложенный вызов устарел, игнорируем
     var snap=readTrackSnapshot();
     var fresh = snap && snap.tracking && (Date.now()-snap.ts)<=5000;
     if(!fresh){
-      // Служба ещё не ответила — ждём, не выходим автоматически.
-      // Показываем статус инициализации. Выход только по явному нажатию Стоп.
-      var elapsed = graceMs > 0 ? (20000-graceMs) : 20000;
-      if(elapsed < 8000){
-        $("#spdSrc").textContent="GPS запускается..."; $("#spdSrc").className="src dr";
-      } else {
-        $("#spdSrc").textContent="GPS инициализируется, подождите..."; $("#spdSrc").className="src dr";
+      if(graceMs && graceMs>0){
+        // Даём headless-копии в службе время прогрузиться и сделать первый тик —
+        // не гасим кнопку из-за пустого localStorage в первые секунды после старта.
+        setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700),gen); }, 700);
+        return;
       }
-      setTimeout(function(){ mirrorTick(Math.max(0,graceMs-700),gen); }, 700);
+      // headless перестал писать снэпшоты (служба остановлена) — выходим из зеркала
+      if(gen===rt.mirrorGen){ IS_MIRROR=false; stopTicker();
+        $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
+        setTrackBtn(false); renderTrip(); renderList(); }
       return;
     }
     if(gen!==rt.mirrorGen) return;
@@ -2059,7 +2124,7 @@
   }
   function startMirror(){ IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
     rt.mirrorGen=(rt.mirrorGen||0)+1;
-    if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(20000,rt.mirrorGen); }
+    if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(8000,rt.mirrorGen); }
   function stopMirror(){
     rt.mirrorGen=(rt.mirrorGen||0)+1; // обесценивает все отложенные вызовы mirrorTick этой сессии
     IS_MIRROR=false; stopTicker(); rt.tracking=false; rt.speed=0;
@@ -2081,28 +2146,38 @@
     var hasNative=false;
     try{ hasNative=!!(window.Android&&window.Android.startTracking); }catch(e){}
     if(hasNative && !IS_HEADLESS){
+      // Always send the freshly entered calibration and selected unified route
+      // before starting the Kotlin service, including after a process restart.
+      syncNativeRouteContext();
       // На телефоне реальный GPS принимает headless-копия внутри службы (работает без экрана).
       // Этот видимый экран запускает службу и сразу переходит в режим зеркала — читает
       // позицию/скорость из её снэпшота, не пытаясь сам слушать onNativeLocation (туда больше
       // ничего не приходит, см. TrackingService).
       window.Android.startTracking();
-      IS_MIRROR=true;rt.tracking=true;setTrackBtn(true);
+      IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
       toast("Отслеживание включено");
       return;
     }
     rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0;
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     if("geolocation"in navigator){
-      // Запасной браузерный GPS — для теста вне APK
-      // КРИТИЧНО (тот же фикс что и в веб-версии piket-web): maximumAge:0 - не разрешаем
-      // браузеру отдавать закэшированную координату/скорость. Эта строка - ЗАПАСНОЙ путь
-      // (используется только если headless-служба по какой-то причине не передаёт координаты
-      // через нативный мост Android) - тот же риск устаревшего кэша скорости применим и
-      // здесь, хотя основной путь (через Java FusedLocationProviderClient) этой проблемы
-      // не имеет вообще (там нет такого параметра кэша).
+      // ПРОГРЕВ GPS: одиночный getCurrentPosition ПЕРЕД watchPosition.
+      // Браузер не держит GPS-чип постоянно включённым - он "просыпается" на первом запросе.
+      // Если сразу открыть watchPosition, первый полезный фикс придёт через 5-15 секунд пока
+      // чип прогревается. getCurrentPosition запускает чип НЕМЕДЛЕННО и к моменту старта
+      // watchPosition чип уже тёплый - первый замер приходит за 1-3 секунды. На Android APK
+      // FusedLocation держит чип тёплым сам, поэтому там эта проблема отсутствует.
+      // Ошибку прогрева игнорируем - watchPosition запустится в любом случае.
+      try{
+        navigator.geolocation.getCurrentPosition(
+          function(p){ onPos(p); }, // если сразу дал хороший фикс - сразу идёт в счёт
+          function(){},              // ошибка прогрева - не страшно, watchPosition всё равно запустится
+          {enableHighAccuracy:true, maximumAge:0, timeout:8000}
+        );
+      }catch(e){}
       rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:27000});
     } else { toast("GPS недоступен"); rt.tracking=false; return; }
-    startAccelHelper(); // запасной путь — основной (headless) получает данные через Java, см. onNativeAccel
+    startAccelHelper();
     reqWake();
     startTicker();
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
@@ -2110,40 +2185,20 @@
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
   window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone){
     if(!rt.tracking)return;
-    // Kotlin is the source of truth; the premium page only paints its result.
+    // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
     if(nativeOfficialM!=null){
-      rt.nativeAlertId=nativeAlertId;rt.nativeAlertDistanceM=nativeAlertDistanceM;rt.nativeAlertInZone=nativeAlertInZone===true;
-      rt.posM=+nativeOfficialM;rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
+      rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
+      rt.posM=+nativeOfficialM; rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
       rt.fixQuality=nativeTripRecovering?"recovering":(nativeTripSource||"native");
-      rt.gpsState=nativeTripRecovering?"checking":"precise";rt.satellitesUsed=+satellitesUsed||0;rt.averageCn0=+averageCn0||0;
+      rt.gpsState=nativeTripRecovering?"checking":"precise"; rt.satellitesUsed=+satellitesUsed||0; rt.averageCn0=+averageCn0||0;
       $("#gps").className="gps "+(nativeTripRecovering?"weak":"live");
       $("#gpsTxt").textContent=nativeTripRecovering?"позиция восстанавливается":"GPS + Kotlin";
       $("#spdSrc").textContent=nativeTripRecovering?"Расчётная позиция":"Нативная позиция ✓";
       $("#spdSrc").className="src"+(nativeTripRecovering?" dr":"");
-      renderTrip();renderList();evalAlerts();updateAndroidNotification();return;
+      renderTrip(); renderList(); evalAlerts(); updateAndroidNotification(); return;
     }
-    rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
-    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0, gnssTelemetry:gnssTelemetry, constellationDiversity:constellationDiversity, mockLocation:mockLocation, speedAccuracyMps:speedAccuracyMps, nativeQuality:nativeQuality, nativeReason:nativeReason, nativePhysicalM:nativePhysicalM, nativeOfficialM:nativeOfficialM, nativeRouteDistanceM:nativeRouteDistanceM, nativeTripPhysicalM:nativeTripPhysicalM, nativeTripOfficialM:nativeTripOfficialM, nativeTripRecovering:nativeTripRecovering, nativeTripSource:nativeTripSource, nativeAlertId:nativeAlertId, nativeAlertDistanceM:nativeAlertDistanceM, nativeAlertInZone:nativeAlertInZone }, timestamp:time };
+    var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0 }, timestamp:time };
     onPos(fakePos); };
-  // КРИТИЧНО: вызывается из Java (TrackingService.notifyLocationUnavailable), когда система
-  // явно сообщает "сейчас локация недоступна" (onLocationAvailability). Без этого моста
-  // onErr() (плавное снижение скорости, не застывание на старом значении при потере сигнала)
-  // физически не мог сработать на реальном Android-телефоне через основной путь - раньше
-  // он вызывался только в веб-версии, где браузер сам вызывает onErr через стандартный
-  // geolocation API. Найдено при переносе вспомогательного акселерометра в эту версию.
-  window.onNativeLocationUnavailable=function(){
-    if(!rt.tracking)return;
-    onErr({code:2});
-  };
-  // Получает уже вычисленную в Java величину ускорения (через нативный Android SensorManager -
-  // надёжнее браузерного devicemotion именно в невидимом headless WebView, см. подробности в
-  // TrackingService.initAccelHelper). Пишем в ТЕ ЖЕ переменные rt.accelMag/rt.accelAvailable,
-  // что использует веб-версия piket-web (там источник - браузерный devicemotion) - значит
-  // логика onErr (плавное снижение скорости при потере сигнала) работает одинаково в обоих
-  // случаях, не зависит от того, откуда именно пришли данные об ускорении.
-  window.onNativeAccel=function(mag){
-    rt.accelMag=mag; rt.accelAvailable=true;
-  };
 
   function startSim(){
     if(state.calib==null){
@@ -2176,9 +2231,11 @@
     var dirSeg=$("#dirSeg"); if(dirSeg) dirSeg.style.opacity = on ? "0.5" : "1"; }
   function stopTrack(){ rt.tracking=false;
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
+    if(rt.backupWatchId!=null){ try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){} rt.backupWatchId=null; }
+    rt.backupActive=false;
     if(rt.simTimer){ clearInterval(rt.simTimer); rt.simTimer=null; }
-    stopAccelHelper();
     stopTicker();
+    stopAccelHelper();
     relWake(); rt.speed=0;
     try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){}
     if(rt.autoCalib){ state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; }
@@ -2262,7 +2319,7 @@
     if(!r){ el.style.display="none"; return; }
     el.className="g-limit "+speedClass(r.spd); el.style.display="flex"; $("#limVal").textContent=r.spd||"—"; }
 
-  function renderTrip(){ renderPositionTrust(); renderTimingStations(); renderTrainPicker();
+  function renderTrip(){ renderPositionTrust(); renderTimingStations(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker();
     // В режиме зеркала (IS_MIRROR) видимый экран НЕ ведёт свой расчёт позиции - rt.odo
     // здесь всегда 0 (считает только headless-копия в службе). currentMeters() пересчитывал
     // бы позицию через локальный (нулевой) rt.odo и затирал бы правильное значение rt.posM,
@@ -2331,10 +2388,6 @@
       var lead=r.lead||state.settings.lead,tr=trackPos!=null?restrictionTrackRange(r,trackPos):null,s=tr?tr.start:metersOf(r.km,r.pk),e=tr?tr.end:((r.kmE!=null)?metersOf(r.kmE,r.pkE):s),lo=Math.min(s,e),hi=Math.max(s,e),up=!dirDown();
       var key=r.id||(r.km+"_"+r.pk),st=alertState[key]||(alertState[key]={a:false,z:false});
       var inzone=pos>=lo-5&&pos<=hi+5,ahead=up?(s-pos):(pos-s);
-      if(rt.nativeTrusted){
-        if(String(rt.nativeAlertId)!==String(key))return;
-        ahead=+rt.nativeAlertDistanceM||0; inzone=rt.nativeAlertInZone===true;
-      }
       if(ahead>lead*1.3)st.a=false; if(pos<lo-50||pos>hi+50)st.z=false;
       if(inzone&&!st.z){ st.z=true; st.a=true; fireAlert("danger",r,0); }
       else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); }
@@ -2491,9 +2544,11 @@
     var pk=parseInt($("#cPk").value,10); if(isNaN(pk))pk=1;
     var mm=parseInt($("#cM").value,10); if(isNaN(mm))mm=0; mm=Math.max(0,Math.min(99,mm));
     var enteredM=metersOf(km,pk,mm);
-    // Диалог только если разница небольшая (1-3км) — возможна опечатка.
-    // Если разница >3км — пользователь явно знает лучше GPS (глушение, потеря сигнала).
-    // В таком случае сохраняем без вопросов.
+    // ПРОВЕРКА: если GPS уже реально работает (rt.posM есть, неважно headless или обычный
+    // режим - posM актуальна в обоих) - сравниваем то, что машинист только что ВВЁЛ, с тем,
+    // что приложение УЖЕ ВЫЧИСЛИЛО по факту GPS прямо сейчас. Это не относится к самому
+    // первому старту (там rt.posM ещё нет, calib==null, GPS только запускается) - там и
+    // нечего сравнивать. Применимо именно к рекалибровке НА ХОДУ, когда GPS уже зелёный.
     if(!rt.pendingCalibConfirm && rt.tracking && rt.posM!=null && Math.abs(rt.posM-enteredM)>1000 && Math.abs(rt.posM-enteredM)<=3000){
       rt.pendingCalibConfirm=true;
       var gpsKm=kmFrom(rt.posM), gpsPk=pkFrom(rt.posM), gpsM=meterInPk(rt.posM);
@@ -2508,7 +2563,7 @@
     state.calib=cal; rt.autoCalib=false;
     rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; rt.correctionTargetOdo=null; alertState={}; rt.posM=currentMeters(); persist();
     rt.manualCalibAt=Date.now();
-    save("sap_manualCalib", rt.manualCalibAt); // headless-служба тоже прочитает
+    save("sap_manualCalib", rt.manualCalibAt);
     closeSheets(); renderTrip(); renderList(); toast("Откалибровано: "+km+" км");
     // Если меняем калибровку во время активной поездки (видимый экран в режиме зеркала,
     // реальный счёт идёт в headless-службе) - сразу командуем службе перечитать калибровку.
@@ -2693,9 +2748,7 @@
       state.settings=Object.assign({lead:3000,voice:true,sound:true,vibe:true,wake:true,demo:false}, load("sap_set",{}));
       state.calib=load("sap_cal",null);
       state.ctx=Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}));
-      syncNativeRouteContext();
       rt.tracking=true; rt.last=null; rt.speed=0; rt.odo=0; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0;
-      syncNativeRouteContext();
       rt.lastGoodFix=null; rt.fixQuality=null; rt.trackingSince=null; rt.awaitingManualCalib=false;
       if(state.calib) state.calib._trackM=null; // заново ищем привязку к пути на свежей калибровке
       reqWake(); startTicker(); saveTrackSnapshot();
@@ -2732,9 +2785,18 @@
       window.headlessRestart();
     }
   } else if(window.Android && window.Android.isServiceTracking && (function(){try{return window.Android.isServiceTracking();}catch(e){return false;}})()){
-    IS_MIRROR=true;rt.tracking=true;setTrackBtn(true);
+    IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
   }
 })();
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function () {
+      // Основное приложение продолжает работать онлайн, даже если PWA-кэш недоступен.
+    });
+  });
+}
 </script>
 </body>
 </html>

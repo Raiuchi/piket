@@ -322,8 +322,8 @@ class TrackingService : Service() {
             val items = root.optJSONArray("restrictions") ?: return@buildList
             repeat(items.length()) { index ->
                 val item = items.optJSONObject(index) ?: return@repeat
-                val start = item.optDouble("km") * 1_000 + item.optDouble("pk") * 100 + item.optDouble("m")
-                val end = if (item.has("kmE")) item.optDouble("kmE") * 1_000 + item.optDouble("pkE") * 100 + item.optDouble("mE") else start
+                val start = item.optDouble("km") * 1_000 + (item.optDouble("pk", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("m", 0.0)
+                val end = if (item.has("kmE")) item.optDouble("kmE") * 1_000 + (item.optDouble("pkE", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("mE", 0.0) else start
                 val id = item.optString("id", index.toString())
                 add(NativeTripEngine.Restriction(id, item.optString("peregon", "Все участки"),
                     item.optString("dir", "both"), start, end, item.optDouble("lead", root.optDouble("lead", 3_000.0))))
