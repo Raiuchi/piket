@@ -12,6 +12,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -20,6 +23,7 @@ import kotlin.math.roundToInt
 
 enum class NativeReferenceScreen { TIMETABLE, SPEEDS }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeTimetableScreen(
     data: NativeReferenceData,
@@ -39,19 +43,7 @@ fun NativeTimetableScreen(
     var expanded by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<TimeEdit?>(null) }
     NativeReferenceScaffold("Расписание и время хода", close) {
-        item {
-            Box {
-                OutlinedButton({ expanded = true }, Modifier.fillMaxWidth()) {
-                    Text(selected?.let { "Поезд ${it.number} · ${it.title}" } ?: "Для участка поездов нет", Modifier.weight(1f))
-                    Text("⌄")
-                }
-                DropdownMenu(expanded, { expanded = false }) {
-                    matching.forEach { train ->
-                        DropdownMenuItem({ Text("${train.number} · ${train.title}") }, { selected = train; expanded = false })
-                    }
-                }
-            }
-        }
+        item { PremiumSelector("НОМЕР ПОЕЗДА", selected?.let { "Поезд ${it.number} · ${it.title}" } ?: "Для участка поездов нет") { expanded = true } }
         selected?.let { train ->
             val currentJourneyM = NativeJourneyPosition.unifiedMeters(route, currentRoute, currentOfficialM, train.number)
             items(train.stops.indices.toList()) { index ->
@@ -67,10 +59,10 @@ fun NativeTimetableScreen(
                 val current = to != null && NativeJourneyPosition.isCurrentLeg(currentJourneyM, fromM, toM)
                 Card(
                     modifier = Modifier.then(if (current) Modifier.border(2.dp, PiketRed, RoundedCornerShape(16.dp)) else Modifier),
-                    colors = CardDefaults.cardColors(containerColor = PiketPanel),
-                    shape = RoundedCornerShape(16.dp)
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                    shape = RoundedCornerShape(19.dp)
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF1A202A),Color(0xFF0B0D12))),RoundedCornerShape(19.dp)).border(1.dp,if(current)PiketRed else Color(0xFF303946),RoundedCornerShape(19.dp)).padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.Top) {
                             Text(
                                 buildString { append(from.station); fromM?.let { append(" · "); append(formatChainage(it)) } },
@@ -132,6 +124,9 @@ private fun ScheduleTimeButton(label: String, value: String?, click: () -> Unit)
             Text(value ?: "—", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
         }
     }
+    if (expanded) PremiumPickerSheet("Выбери поезд", { expanded = false }) {
+        matching.forEach { train -> PremiumPickerRow("Поезд ${train.number}", train.title, selected == train) { selected = train; expanded = false } }
+    }
 }
 
 @Composable
@@ -168,29 +163,21 @@ private fun TimeStepper(value: Int, down: () -> Unit, up: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeSpeedReferenceScreen(data: NativeReferenceData, close: () -> Unit) {
     var selected by remember { mutableStateOf(data.speedRoutes.firstOrNull()) }
     var expanded by remember { mutableStateOf(false) }
     NativeReferenceScaffold("Справочник скоростей", close) {
-        item {
-            Box {
-                OutlinedButton({ expanded = true }, Modifier.fillMaxWidth()) {
-                    Text(selected?.let { "${it.train} · ${it.route}" } ?: "Нет данных", Modifier.weight(1f))
-                    Text("⌄")
-                }
-                DropdownMenu(expanded, { expanded = false }) {
-                    data.speedRoutes.forEach { route -> DropdownMenuItem({ Text("${route.train} · ${route.route}") }, { selected = route; expanded = false }) }
-                }
-            }
-        }
+        item { PremiumSelector("ПОЕЗД И УЧАСТОК", selected?.let { "${it.train} · ${it.route}" } ?: "Нет данных") { expanded = true } }
         selected?.let { route ->
-            if (route.note.isNotBlank()) item { Text(route.note, color = Color.LightGray, fontSize = 12.sp) }
+            if (route.note.isNotBlank()) item { Text(route.note, color = Color(0xFFAFBAC8), fontSize = 13.sp, lineHeight = 21.sp, modifier=Modifier.background(Color(0xFF0C1016),RoundedCornerShape(16.dp)).border(1.dp,Color(0xFF29313C),RoundedCornerShape(16.dp)).padding(15.dp)) }
+            item { Row(Modifier.fillMaxWidth().padding(vertical=3.dp),horizontalArrangement=Arrangement.spacedBy(18.dp)){Text("● Главный путь",color=Color(0xFFFF4057),fontSize=12.sp);Text("● Боковой путь",color=Color(0xFFFFC14B),fontSize=12.sp)} }
             route.groups.forEach { group ->
                 item { Text(group.title, color = PiketRed, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
                 items(group.rows) { row ->
-                    Card(colors = CardDefaults.cardColors(containerColor = PiketPanel)) {
-                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Card(colors = CardDefaults.cardColors(containerColor = Color.Transparent),shape=RoundedCornerShape(17.dp)) {
+                        Row(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color(0xFF1B212B),Color(0xFF0C0E13))),RoundedCornerShape(17.dp)).border(1.dp,Color(0xFF2E3743),RoundedCornerShape(17.dp)).padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(row.name, Modifier.weight(1f))
                             row.mainSpeed?.let { SpeedBadge(it, PiketRedDark) }
                             row.sideSpeed?.let { Spacer(Modifier.width(7.dp)); SpeedBadge(it, Color(0xFF735411)) }
@@ -200,21 +187,40 @@ fun NativeSpeedReferenceScreen(data: NativeReferenceData, close: () -> Unit) {
             }
         }
     }
+    if (expanded) PremiumPickerSheet("Выбери справочник", { expanded = false }) {
+        data.speedRoutes.forEach { route -> PremiumPickerRow(route.train, route.route, selected == route) { selected = route; expanded = false } }
+    }
 }
 
 @Composable
-private fun SpeedBadge(value: Int, color: Color) = Box(Modifier.background(color, MaterialTheme.shapes.medium).padding(horizontal = 12.dp, vertical = 9.dp)) {
+private fun SpeedBadge(value: Int, color: Color) = Box(Modifier.shadow(9.dp,RoundedCornerShape(12.dp)).background(Brush.verticalGradient(listOf(color,Color(0xFF301018))), RoundedCornerShape(12.dp)).border(1.dp,color.copy(alpha=.8f),RoundedCornerShape(12.dp)).padding(horizontal = 13.dp, vertical = 10.dp)) {
     Text(value.toString(), fontWeight = FontWeight.ExtraBold)
 }
 
 @Composable
 private fun NativeReferenceScaffold(title: String, close: () -> Unit, content: LazyListScope.() -> Unit) {
-    Column(Modifier.fillMaxSize().padding(18.dp)) {
+    Column(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF080A0F),Color(0xFF020305)))).padding(horizontal=18.dp,vertical=12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("‹", fontSize = 34.sp, modifier = Modifier.clickable(onClick = close).padding(end = 14.dp))
-            Text(title, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+            Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(Color(0xFF151A22)).border(1.dp,Color(0xFF343E4B),RoundedCornerShape(13.dp)).clickable(onClick = close),contentAlignment=Alignment.Center){Text("‹", fontSize = 32.sp)}
+            Text(title, fontSize = 25.sp, fontWeight = FontWeight.Black, modifier=Modifier.padding(start=13.dp))
         }
         Spacer(Modifier.height(12.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(9.dp), content = content)
     }
+}
+
+@Composable
+private fun PremiumSelector(label:String,value:String,onClick:()->Unit){
+    Row(Modifier.fillMaxWidth().shadow(14.dp,RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp)).background(Brush.horizontalGradient(listOf(Color(0xFF171D26),Color(0xFF090B10)))).border(1.dp,Color(0xFF475463),RoundedCornerShape(18.dp)).clickable(onClick=onClick).padding(horizontal=17.dp,vertical=13.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(label,color=Color(0xFF86CDEA),fontSize=9.sp,letterSpacing=1.8.sp);Text(value,color=Color(0xFFFF4057),fontWeight=FontWeight.ExtraBold,fontSize=15.sp,maxLines=2)};Text("⌄",color=PiketRed,fontSize=20.sp)}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable private fun PremiumPickerSheet(title:String,dismiss:()->Unit,content:@Composable ColumnScope.()->Unit){
+    ModalBottomSheet(onDismissRequest=dismiss,containerColor=Color(0xFF090B0F),shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp),dragHandle={Box(Modifier.padding(vertical=12.dp).size(48.dp,4.dp).background(Color(0xFF555E6A),RoundedCornerShape(4.dp)))}){
+        Column(Modifier.fillMaxWidth().padding(horizontal=16.dp).padding(bottom=28.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){Text(title,fontSize=24.sp,fontWeight=FontWeight.Black,modifier=Modifier.padding(bottom=5.dp));content()}
+    }
+}
+
+@Composable private fun PremiumPickerRow(title:String,subtitle:String,selected:Boolean,onClick:()->Unit){
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(if(selected)Brush.horizontalGradient(listOf(Color(0xFF65101F),Color(0xFF180E13)))else Brush.horizontalGradient(listOf(Color(0xFF191F28),Color(0xFF0A0C10)))).border(1.dp,if(selected)Color(0xFFFF5364)else Color(0xFF313B47),RoundedCornerShape(17.dp)).clickable(onClick=onClick).padding(16.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Black,fontSize=16.sp);Text(subtitle,color=Color(0xFF9AA6B4),fontSize=12.sp,modifier=Modifier.padding(top=3.dp))};Text(if(selected)"✓" else "›",color=if(selected)PiketRed else Color(0xFF788493),fontSize=22.sp)}
 }

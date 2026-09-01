@@ -91,6 +91,10 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     fun setManualCalibration(value: Double) { manualOfficialM = value }
+    fun shiftPicket(deltaM: Double) {
+        val base = manualOfficialM ?: snapshot.officialM ?: return
+        manualOfficialM = (base + deltaM).coerceAtLeast(0.0)
+    }
     fun add(item: RestrictionRecord): Boolean { val next = restrictions + item; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun remove(id: String): Boolean { val next = restrictions.filterNot { it.id == id }; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun updateSettings(value: PiketSettings) { if (repository.saveSettings(value)) settings = value }
@@ -131,7 +135,7 @@ fun PiketApp(
                 ) { referenceScreen = null }
                 NativeReferenceScreen.SPEEDS -> NativeSpeedReferenceScreen(model.referenceData) { referenceScreen = null }
                 null -> when (tab) {
-                    PiketTab.TRIP -> TripScreen(model, { calibrating = true }, onStart, onStop)
+                    PiketTab.TRIP -> TripScreen(model, { calibrating = true }, onStart, onStop) { referenceScreen = NativeReferenceScreen.SPEEDS }
                     PiketTab.LIST -> RestrictionScreen(model)
                     PiketTab.SETTINGS -> SettingsScreen(model) { referenceScreen = it }
                 }
@@ -147,13 +151,19 @@ fun PiketApp(
 }
 
 @Composable
-private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (NativeUiConfig) -> Unit, onStop: () -> Unit) {
+private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (NativeUiConfig) -> Unit, onStop: () -> Unit, openSpeeds:()->Unit) {
     val state = model.snapshot
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { BrandHeader(state) }
         item { RouteSelector(model) }
         item { Speedometer(state.speedKmh) }
         item { PositionCard(state) }
+        item {
+            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                PremiumOutlineButton("− пикет", Modifier.weight(1f)) { model.shiftPicket(-100.0) }
+                PremiumOutlineButton("＋ пикет", Modifier.weight(1f)) { model.shiftPicket(100.0) }
+            }
+        }
         if (state.alertId != null) item { AlertCard(state, model.restrictions.firstOrNull { it.id == state.alertId }) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -174,15 +184,16 @@ private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (N
                 }
             }
         }
+        item { PremiumOutlineButton("▤  Открыть в приказе скоростей (по позиции)",Modifier.fillMaxWidth(),openSpeeds) }
         item { NativeStatusCard(state) }
     }
 }
 
 @Composable
 private fun BrandHeader(state: TripSnapshot) = Box(
-    Modifier.fillMaxWidth().height(92.dp).clip(RoundedCornerShape(2.dp))
+    Modifier.fillMaxWidth().height(92.dp).shadow(18.dp,RoundedCornerShape(18.dp)).clip(RoundedCornerShape(18.dp))
         .background(Brush.horizontalGradient(listOf(Color(0xFF090B10), Color(0xFF170B10), Color(0xFF25090F))))
-        .border(width = 1.dp, color = Color(0xFF4B111C), shape = RoundedCornerShape(2.dp))
+        .border(width = 1.dp, color = Color(0xFF6B1725), shape = RoundedCornerShape(18.dp))
 ) {
     Canvas(Modifier.matchParentSize()) {
         drawLine(Color(0x332E91FF), Offset(size.width * .30f, 0f), Offset(size.width * .43f, size.height), 2f)
@@ -273,18 +284,22 @@ private fun Speedometer(speed: Float) {
                 val p1=Offset(center.x+inner*cos(a).toFloat(),center.y+inner*sin(a).toFloat()); val p2=Offset(center.x+(radius-10)*cos(a).toFloat(),center.y+(radius-10)*sin(a).toFloat())
                 drawLine(if(major) Color(0xFFEAF2F8) else if(medium) Color(0xFF8794A2) else Color(0xFF4A5663),p1,p2,if(major)4f else if(medium)2.4f else 1.4f,StrokeCap.Round)
             }
-            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(220,228,235); textSize = 14f; textAlign = Paint.Align.CENTER; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
+            val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.rgb(220,228,235); textSize = 10.dp.toPx(); textAlign = Paint.Align.CENTER; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD) }
             listOf(0,60,80,100,120,140,160,180,200,220,250).forEach { label ->
                 val angle = (135.0 + 270.0 * label / 250.0) * PI / 180.0
                 val lr = radius - 48f
                 drawContext.canvas.nativeCanvas.drawText(label.toString(), center.x + lr*cos(angle).toFloat(), center.y + lr*sin(angle).toFloat() + 5f, labelPaint)
             }
-            drawCircle(Brush.radialGradient(listOf(Color(0xFF151C25), Color(0xFF06080C))), radius*.57f, center)
+            drawCircle(Brush.radialGradient(listOf(Color(0xFF26303C),Color(0xFF10151D), Color(0xFF030406))), radius*.62f, center)
             drawCircle(Color(0xFF343D48), radius*.57f, center, style=Stroke(1.5f))
             val needle=(135.0+270.0*value/250.0)*PI/180; drawLine(Color(0xFFFF384F),center,Offset(center.x+radius*.72f*cos(needle).toFloat(),center.y+radius*.72f*sin(needle).toFloat()),5f,StrokeCap.Round); drawCircle(Color(0xFFE5EDF3),14f,center); drawCircle(Color(0xFF111820),10f,center); drawCircle(Color(0xFFFF384F),4f,center)
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(value.roundToInt().toString(), fontSize = 66.sp, fontWeight = FontWeight.Black); Text("К М / Ч", letterSpacing = 5.sp, color = Color(0xFF9EABB9), fontSize = 9.sp); Text(if(value == 0f) "GPS НЕ АКТИВЕН" else "НАТИВНАЯ ПОЗИЦИЯ", color=Color(0xFF566373),fontSize=8.sp,modifier=Modifier.padding(top=7.dp)); Row(horizontalArrangement=Arrangement.spacedBy(4.dp),modifier=Modifier.padding(top=5.dp)){repeat(4){Box(Modifier.size(4.dp).background(Color(0xFF313943),CircleShape))}} }
     }
+}
+
+@Composable private fun PremiumOutlineButton(text:String,modifier:Modifier=Modifier,onClick:()->Unit){
+    Box(modifier.height(52.dp).shadow(12.dp,RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp)).background(Brush.verticalGradient(listOf(Color(0xFF1B222C),Color(0xFF0A0D12)))).border(1.dp,Color(0xFF3A4857),RoundedCornerShape(16.dp)).clickable(onClick=onClick),contentAlignment=Alignment.Center){Text(text,fontWeight=FontWeight.ExtraBold,color=Color(0xFFA9D6EC),fontSize=13.sp)}
 }
 
 @Composable
@@ -354,21 +369,29 @@ private fun RestrictionScreen(model: PiketViewModel) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddRestrictionDialog(routes:List<String>,dismiss:()->Unit,save:(RestrictionRecord)->Unit){
-    var km by remember{mutableStateOf("")};var pk by remember{mutableStateOf("")};var meter by remember{mutableStateOf("")};var speed by remember{mutableStateOf("60")};var reason by remember{mutableStateOf("Ремонт пути")};var route by remember{mutableStateOf(routes.firstOrNull()?:"Все участки")}
+    var km by remember{mutableStateOf("")};var pk by remember{mutableStateOf("")};var meter by remember{mutableStateOf("")};var speed by remember{mutableStateOf("60")};var reason by remember{mutableStateOf("Ремонт пути")};var route by remember{mutableStateOf(routes.firstOrNull()?:"Все участки")};var picker by remember{mutableStateOf<String?>(null)}
     Dialog(onDismissRequest=dismiss){
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Brush.verticalGradient(listOf(Color(0xFF202027),Color(0xFF09090B)))).border(1.dp,Color(0x55FF5B66),RoundedCornerShape(24.dp)).padding(20.dp),verticalArrangement=Arrangement.spacedBy(13.dp)){
             Box(Modifier.width(46.dp).height(4.dp).background(Color(0xFF55555E),RoundedCornerShape(4.dp)).align(Alignment.CenterHorizontally))
             Text("Новое ограничение",fontSize=24.sp,fontWeight=FontWeight.Black)
-            NativeField("Маршрут",route){route=it}
+            PremiumDialogSelector("МАРШРУТ",route){picker="route"}
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Box(Modifier.weight(1f)){NativeField("КМ",km){km=it}};Box(Modifier.weight(1f)){NativeField("ПК",pk){pk=it}};Box(Modifier.weight(1f)){NativeField("М",meter){meter=it}}}
-            NativeField("Скорость",speed){speed=it};NativeField("Причина",reason){reason=it}
+            PremiumDialogSelector("СКОРОСТЬ","$speed км/ч"){picker="speed"};PremiumDialogSelector("ПРИЧИНА",reason){picker="reason"}
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)){TextButton(dismiss,Modifier.weight(1f)){Text("Отмена")};Button({save(RestrictionRecord(UUID.randomUUID().toString(),route,"both",km.toIntOrNull()?:0,pk.toIntOrNull()?:0,meter.toIntOrNull()?:0,speed.toIntOrNull()?:60,reason))},Modifier.weight(1.25f),colors=ButtonDefaults.buttonColors(containerColor=PiketRed),shape=RoundedCornerShape(15.dp)){Text("Сохранить",fontWeight=FontWeight.Bold)}}
+        }
+    }
+    picker?.let { kind ->
+        val values=when(kind){"route"->routes;"speed"->listOf("25","40","60","70","80","100","120");else->listOf("Ремонт пути","Проверка тормозов","Путь свободен с ограничением","Путевые работы","Неисправность инфраструктуры","Другое")}
+        ModalBottomSheet(onDismissRequest={picker=null},containerColor=Color(0xFF090B0F),shape=RoundedCornerShape(topStart=28.dp,topEnd=28.dp)){
+            Column(Modifier.fillMaxWidth().padding(18.dp).padding(bottom=22.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){Text(when(kind){"route"->"Выбери маршрут";"speed"->"Выбери скорость";else->"Выбери причину"},fontSize=23.sp,fontWeight=FontWeight.Black);values.forEach{value->val chosen=when(kind){"route"->route==value;"speed"->speed==value;else->reason==value};Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(if(chosen)Color(0xFF51101B)else Color(0xFF151A22)).border(1.dp,if(chosen)PiketRed else Color(0xFF323D49),RoundedCornerShape(15.dp)).clickable{when(kind){"route"->route=value;"speed"->speed=value;else->reason=value};picker=null}.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Text(if(kind=="speed")"$value км/ч" else value,Modifier.weight(1f),fontWeight=FontWeight.Bold);Text(if(chosen)"✓" else "›",color=if(chosen)PiketRed else Color.Gray)}}}
         }
     }
 }
 @Composable private fun NativeField(label:String,value:String,on:(String)->Unit){OutlinedTextField(value,on,singleLine=true,label={Text(label)},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(14.dp),colors=OutlinedTextFieldDefaults.colors(focusedBorderColor=Color(0xFFFF5965),unfocusedBorderColor=Color(0xFF4A515C),focusedContainerColor=Color(0xFF111218),unfocusedContainerColor=Color(0xFF111218)))}
+@Composable private fun PremiumDialogSelector(label:String,value:String,onClick:()->Unit){Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFF111218)).border(1.dp,Color(0xFF4A515C),RoundedCornerShape(14.dp)).clickable(onClick=onClick).padding(horizontal=15.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(label,color=PiketBlue,fontSize=8.sp,letterSpacing=1.5.sp);Text(value,fontWeight=FontWeight.Bold,modifier=Modifier.padding(top=3.dp))};Text("⌄",color=PiketRed)}}
 
 @Composable
 private fun SettingsScreen(model:PiketViewModel, openReference:(NativeReferenceScreen)->Unit){val s=model.settings;LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Text("Настройки",fontSize=28.sp,fontWeight=FontWeight.ExtraBold)};item{ReferenceCard("Расписание и время хода","Поезда, станции и расчёт средней скорости"){openReference(NativeReferenceScreen.TIMETABLE)}};item{ReferenceCard("Справочник скоростей","Главный путь — красный, боковой — жёлтый"){openReference(NativeReferenceScreen.SPEEDS)}};item{SettingSwitch("Звуковой сигнал","Голосовые и звуковые предупреждения",s.sound){model.updateSettings(s.copy(sound=it))}};item{SettingSwitch("Вибрация","Тактильное подтверждение",s.vibration){model.updateSettings(s.copy(vibration=it))}};item{SettingSwitch("Не гасить экран","Экран остаётся включённым во время поездки",s.keepScreenOn){model.updateSettings(s.copy(keepScreenOn=it))}};item{SettingSwitch("Демо-режим","Проверка интерфейса без движения",s.demoMode){model.updateSettings(s.copy(demoMode=it))}};item{Card(colors=CardDefaults.cardColors(containerColor=PiketPanel)){Column(Modifier.padding(18.dp)){Text("Дальность предупреждения",fontWeight=FontWeight.Bold);Text("${s.leadM/1000.0} км",color=PiketBlue);Slider(s.leadM.toFloat(),{model.updateSettings(s.copy(leadM=(it/100).roundToInt()*100))},valueRange=1000f..8000f)}}};item{Text("Работает офлайн, данные на телефоне.\nНативное Kotlin-ядро · интерфейс Jetpack Compose",color=Color.Gray,textAlign=TextAlign.Center,modifier=Modifier.fillMaxWidth().padding(20.dp))}}}

@@ -26,7 +26,7 @@ class NativeReferenceData(context: Context) {
     init {
         fun asset(name: String) = context.assets.open("data/$name").bufferedReader().use { it.readText() }
         trains = parseTrains(JSONObject(asset("schedules.json")).getJSONArray("trains"))
-        timingStations = parseStations(JSONObject(asset("timing.json")).getJSONObject("stations"))
+        timingStations = augmentStations(parseStations(JSONObject(asset("timing.json")).getJSONObject("stations")))
         speedRoutes = parseSpeedRoutes(JSONObject(asset("speed-reference.json")).getJSONArray("routes"))
     }
 
@@ -71,15 +71,15 @@ class NativeReferenceData(context: Context) {
 
     companion object {
         private val stationAliases = mapOf(
-            "СПЕТЕРБУРГГЛ" to "САНКТПЕТЕРБУРГГЛАВНЫЙ",
-            "СПЕТЕРБУРГТМ" to "САНКТПЕТЕРБУРГТОВАРНЫЙМОСКОВСКИЙ",
+            "СПЕТЕРБУРГГЛ" to "СПБГЛАВНЫЙ",
+            "СПЕТЕРБУРГТМ" to "СПБТОВАРНЫЙМОСКОВСКИЙ",
             "СПСМПОБУХОВО" to "ОБУХОВО",
-            "ЧУДОВОМОСК" to "ЧУДОВОМОСКОВСКОЕ",
-            "БОЛОГОЕМОСК" to "БОЛОГОЕМОСКОВСКОЕ",
+            "ЧУДОВОМОСК" to "ЧУДОВОМОСК",
+            "БОЛОГОЕМОСК" to "БОЛОГОЕМОСК",
             "МУРМАНСКВОРОТА" to "МУРМАНСКИЕВОРОТА",
             "ОЯТЬВОЛХОВСТР" to "ОЯТЬ",
             "БП284КМ" to "ПОСТ284КМ",
-            "ВЫБОРГПАСС" to "ВЫБОРГПАССАЖИРСКИЙ",
+            "ВЫБОРГПАСС" to "ВЫБОРГПАСС",
             "СППОЛИСТЬ" to "СПАССКАЯПОЛИСТЬ",
             "ПРЕДУЗПАВЛОВСК" to "ПРЕДУЗЛОВАЯПАВЛОВСКАЯ",
             "НОВГОРОДПОСТ" to "НОВГОРОДТРАНСПОРТНЫЙПОСТ",
@@ -105,6 +105,26 @@ class NativeReferenceData(context: Context) {
         val north = timingStations["Горы - Петрозаводск"].orEmpty()
         val northStart = north.indexOfFirst { normalizeStation(it.name).contains("ВОЛХОВСТРОЙ2") }.coerceAtLeast(0)
         return novgorod + volkhov + north.drop(northStart).map { TimingStation(it.name, 171_000.0 + it.meters - 124_400.0) }
+    }
+
+    /** Points that existed as runtime additions in the legacy UI.  They are data,
+     * not presentation details, so keep them in the native reference layer. */
+    private fun augmentStations(source: Map<String, List<TimingStation>>): Map<String, List<TimingStation>> {
+        val additions = mapOf(
+            "СпбГл - Москва" to listOf(
+                TimingStation("Вагонное депо", 4_300.0),
+                TimingStation("Санкт-Петербург-Товарный-Московский", 5_000.0),
+                TimingStation("Лихославль, парк Шлюз", 436_600.0)
+            ),
+            "Горы - Петрозаводск" to listOf(TimingStation("Блок-пост 116 км", 115_700.0)),
+            "Волховстрой - Чудово" to listOf(TimingStation("Блок-пост 60 км", 60_000.0)),
+            "Чудово - Новгород" to listOf(TimingStation("Великий Новгород", 70_000.0))
+        )
+        return source.mapValues { (route, rows) ->
+            (rows + additions[route].orEmpty())
+                .distinctBy { normalizeStation(it.name) }
+                .sortedBy { it.meters }
+        }
     }
 
     private fun dachaThroughStations(): List<TimingStation> {
