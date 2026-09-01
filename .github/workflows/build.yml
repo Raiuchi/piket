@@ -31,29 +31,21 @@ jobs:
         run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
       - name: Restore signing key
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/fix/compose-ui-routes'
         env:
           PIKET_KEYSTORE_B64: ${{ secrets.PIKET_KEYSTORE_B64 }}
         run: echo "$PIKET_KEYSTORE_B64" | base64 --decode > app/piket-release.keystore
 
       - name: Build debug APK
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') && github.ref != 'refs/heads/fix/compose-ui-routes' }}
         env:
           PIKET_KEYSTORE_PASSWORD: ${{ secrets.PIKET_KEYSTORE_PASSWORD }}
           PIKET_KEY_ALIAS: ${{ secrets.PIKET_KEY_ALIAS }}
           PIKET_KEY_PASSWORD: ${{ secrets.PIKET_KEY_PASSWORD }}
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload test APK for Compose preview branch
-        if: github.ref == 'refs/heads/fix/compose-ui-routes'
-        uses: actions/upload-artifact@v4
-        with:
-          name: piket-compose-preview
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 3
-
       - name: Build signed release APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/fix/compose-ui-routes'
         env:
           PIKET_KEYSTORE_PASSWORD: ${{ secrets.PIKET_KEYSTORE_PASSWORD }}
           PIKET_KEY_ALIAS: ${{ secrets.PIKET_KEY_ALIAS }}
@@ -61,8 +53,16 @@ jobs:
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Prepare release APK
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/fix/compose-ui-routes'
         run: cp app/build/outputs/apk/release/app-release.apk piket.apk
+
+      - name: Upload signed test APK for Compose preview branch
+        if: github.ref == 'refs/heads/fix/compose-ui-routes'
+        uses: actions/upload-artifact@v4
+        with:
+          name: piket-compose-preview-signed
+          path: piket.apk
+          retention-days: 3
 
       # Артефакт только на релизный тег, хранится 7 дней
       # На обычных пушах не заливаем — они копились бесполезно (79 штук за день)
