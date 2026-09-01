@@ -71,7 +71,7 @@ fun NativeTimetableScreen(
                             when {
                                 speed == null -> "Километраж уточняется"
                                 speed > 250 -> "Проверь километраж или время — значение недостижимо"
-                                else -> "${"%.1f".format(distanceKm)} км · ${seconds / 60.0} мин · средняя $speed км/ч"
+                                else -> "${"%.1f".format(distanceKm ?: 0.0)} км · ${"%.1f".format((seconds ?: 0) / 60.0)} мин · средняя $speed км/ч"
                             },
                             color = if (speed == null || speed > 250) PiketYellow else PiketBlue
                         )
