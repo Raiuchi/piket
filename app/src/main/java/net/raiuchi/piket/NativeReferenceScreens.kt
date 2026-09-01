@@ -49,7 +49,7 @@ fun NativeTimetableScreen(
             }
         }
         selected?.let { train ->
-            items(train.stops.indices.dropLast(1).toList()) { index ->
+            items((0 until train.stops.lastIndex).toList()) { index ->
                 val from = train.stops[index]
                 val to = train.stops[index + 1]
                 val fromTime = effectiveTime(train, index, "dep", from.departure ?: from.arrival, overrides)
