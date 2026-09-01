@@ -54,35 +54,46 @@ fun NativeTimetableScreen(
         }
         selected?.let { train ->
             val currentJourneyM = NativeJourneyPosition.unifiedMeters(route, currentRoute, currentOfficialM, train.number)
-            items((0 until train.stops.lastIndex).toList()) { index ->
+            items(train.stops.indices.toList()) { index ->
                 val from = train.stops[index]
-                val to = train.stops[index + 1]
+                val to = train.stops.getOrNull(index + 1)
                 val fromTime = effectiveTime(train, index, "dep", from.departure ?: from.arrival, overrides)
-                val toTime = effectiveTime(train, index + 1, "arr", to.arrival ?: to.departure, overrides)
+                val arrivalTime = effectiveTime(train, index, "arr", from.arrival, overrides)
+                val toTime = to?.let { effectiveTime(train, index + 1, "arr", it.arrival ?: it.departure, overrides) }
                 val fromM = data.stationMeters(route, from.station, train.number)
-                val toM = data.stationMeters(route, to.station, train.number)
+                val toM = to?.let { data.stationMeters(route, it.station, train.number) }
                 val calculation = NativeTimetableCalculator.calculate(fromM, toM, fromTime, toTime)
                 val speed = calculation?.averageKmh?.roundToInt()
-                val current = NativeJourneyPosition.isCurrentLeg(currentJourneyM, fromM, toM)
+                val current = to != null && NativeJourneyPosition.isCurrentLeg(currentJourneyM, fromM, toM)
                 Card(
                     modifier = Modifier.then(if (current) Modifier.border(2.dp, PiketRed, RoundedCornerShape(16.dp)) else Modifier),
                     colors = CardDefaults.cardColors(containerColor = PiketPanel),
                     shape = RoundedCornerShape(16.dp)
                 ) {
-                    Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text("${from.station} → ${to.station}", fontWeight = FontWeight.Bold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            ScheduleTimeButton("отпр", fromTime) { editing = TimeEdit(train.number, index, "dep", fromTime) }
-                            ScheduleTimeButton("приб", toTime) { editing = TimeEdit(train.number, index + 1, "arr", toTime) }
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(
+                                buildString { append(from.station); fromM?.let { append(" · "); append(formatChainage(it)) } },
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 16.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                if (arrivalTime != null) ScheduleTimeButton("приб", arrivalTime) { editing = TimeEdit(train.number, index, "arr", arrivalTime) }
+                                if (fromTime != null) ScheduleTimeButton("отпр", fromTime) { editing = TimeEdit(train.number, index, "dep", fromTime) }
+                            }
                         }
-                        Text(
-                            when {
-                                calculation == null -> "Километраж уточняется"
-                                !calculation.plausible -> "Проверь километраж или время — значение недостижимо"
-                                else -> "${"%.1f".format(calculation.distanceM / 1000.0)} км · ${"%.1f".format(calculation.durationSeconds / 60.0)} мин · средняя $speed км/ч"
-                            },
-                            color = if (calculation == null || !calculation.plausible) PiketYellow else PiketBlue
-                        )
+                        if (to != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                when {
+                                    calculation == null -> "до ${to.station} · километраж уточняется"
+                                    !calculation.plausible -> "до ${to.station} · проверь километраж или время"
+                                    else -> "до ${to.station} · ${"%.1f".format(calculation.distanceM / 1000.0)} км · ${"%.1f".format(calculation.durationSeconds / 60.0)} мин"
+                                },
+                                color = Color(0xFF9AA5B2), fontSize = 13.sp, modifier = Modifier.weight(1f)
+                            )
+                            if (calculation?.plausible == true) Text("средняя $speed км/ч", color = PiketRed, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                        }
                     }
                 }
             }
@@ -96,6 +107,11 @@ fun NativeTimetableScreen(
     }
 }
 
+private fun formatChainage(meters: Double): String {
+    val total = meters.roundToInt()
+    return "${total / 1000} км ${(total % 1000) / 100} пк"
+}
+
 private data class TimeEdit(val train: String, val index: Int, val kind: String, val value: String?) {
     val key get() = "$train:$index:$kind"
 }
@@ -105,10 +121,15 @@ private fun effectiveTime(train: TimetableTrain, index: Int, kind: String, origi
 
 @Composable
 private fun ScheduleTimeButton(label: String, value: String?, click: () -> Unit) {
-    OutlinedButton(click, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, fontSize = 9.sp, color = Color.Gray)
-            Text(value ?: "—", fontWeight = FontWeight.Bold)
+    Surface(
+        modifier = Modifier.clickable(onClick = click),
+        color = Color(0xFF202832),
+        shape = RoundedCornerShape(11.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3C4855))
+    ) {
+        Column(Modifier.padding(horizontal = 9.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label.uppercase(), fontSize = 8.sp, color = Color(0xFF9BA8B7))
+            Text(value ?: "—", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
         }
     }
 }

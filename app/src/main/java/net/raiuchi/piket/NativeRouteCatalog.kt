@@ -6,7 +6,9 @@ object NativeRouteCatalog {
         val title: String,
         val tudaStart: String,
         val obratnoStart: String = tudaStart,
-        val members: Set<String> = setOf(tudaStart)
+        val members: Set<String> = setOf(tudaStart),
+        val journey: String? = null,
+        val fixedDirection: String? = null
     ) {
         fun start(direction: String) = if (direction == "obratno") obratnoStart else tudaStart
     }
@@ -27,7 +29,9 @@ object NativeRouteCatalog {
             "СПбФин - Выборг",
             "Выборг - Каменногорск",
             setOf("СПбФин - Выборг", "Выборг - Каменногорск")
-        )
+        ),
+        Choice("Поезд 819 · Чудово — Петрозаводск", "Волховстрой - Чудово", journey = "819", fixedDirection = "obratno"),
+        Choice("Поезд 820 · Петрозаводск — Новгород — Чудово", "Горы - Петрозаводск", journey = "820", fixedDirection = "obratno")
     )
 
     fun forInternalRoute(route: String): Choice = choices.firstOrNull { route in it.members }

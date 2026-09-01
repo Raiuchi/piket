@@ -6,8 +6,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeRouteCatalogTest {
-    @Test fun technicalSegmentsAreHiddenInsideSixUserDirections() {
-        assertEquals(6, NativeRouteCatalog.choices.size)
+    @Test fun technicalSegmentsAreHiddenInsideUserDirectionsAndThroughJourneys() {
+        assertEquals(8, NativeRouteCatalog.choices.size)
         val titles = NativeRouteCatalog.choices.map { it.title }
         assertTrue("Дача Долгорукова — Петрозаводск" in titles)
         assertTrue("Санкт-Петербург-Финляндский — Каменногорск" in titles)
@@ -24,8 +24,15 @@ class NativeRouteCatalogTest {
     }
 
     @Test fun everyTechnicalMemberResolvesBackToOneStableUserDirection() {
-        NativeRouteCatalog.choices.forEach { choice ->
+        NativeRouteCatalog.choices.filter { it.journey == null }.forEach { choice ->
             choice.members.forEach { member -> assertEquals(choice, NativeRouteCatalog.forInternalRoute(member)) }
         }
+    }
+
+    @Test fun trains819And820AreSelectedAsThroughJourneysWithoutExtraTechnicalMenu() {
+        val train819 = NativeRouteCatalog.choices.first { it.journey == "819" }
+        val train820 = NativeRouteCatalog.choices.first { it.journey == "820" }
+        assertEquals("Волховстрой - Чудово", train819.start(train819.fixedDirection!!))
+        assertEquals("Горы - Петрозаводск", train820.start(train820.fixedDirection!!))
     }
 }

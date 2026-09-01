@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
@@ -61,12 +62,14 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
 
     init { viewModelScope.launch { while (isActive) { snapshot = repository.loadSnapshot(); delay(500) } } }
     fun selectRoute(choice: NativeRouteCatalog.Choice) {
+        choice.fixedDirection?.let { direction = it }
         val value = choice.start(direction)
         if (route != value) manualOfficialM = null
         route = value
-        journey = null
+        journey = choice.journey
     }
     fun selectDirection(value: String) {
+        if (journey != null) return
         if (direction == value) return
         val choice = NativeRouteCatalog.forInternalRoute(route)
         manualOfficialM = null
@@ -170,40 +173,53 @@ private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (N
 }
 
 @Composable
-private fun BrandHeader(state: TripSnapshot) = Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    Box(Modifier.size(48.dp).shadow(14.dp, CircleShape).background(Brush.radialGradient(listOf(Color(0xFFFF304C), Color(0xFF830D20))), CircleShape).border(1.dp, Color(0xFFFF5268), CircleShape), contentAlignment = Alignment.Center) { Text("🚄", fontSize = 21.sp) }
-    Column(Modifier.padding(start = 12.dp)) { Text("ПИКЕТ", fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp); Text("КОНТРОЛЬ ОГРАНИЧЕНИЙ", fontSize = 9.sp, letterSpacing = 2.2.sp, color = PiketBlue) }
-    Spacer(Modifier.weight(1f))
-    val color = if (state.source == "native-gps") Color(0xFF31DB83) else PiketYellow
-    Text(if (state.active) "● GPS" else "● GPS выкл", color = color, fontSize = 12.sp)
+private fun BrandHeader(state: TripSnapshot) = Box(
+    Modifier.fillMaxWidth().height(92.dp).clip(RoundedCornerShape(2.dp))
+        .background(Brush.horizontalGradient(listOf(Color(0xFF090B10), Color(0xFF170B10), Color(0xFF25090F))))
+        .border(width = 1.dp, color = Color(0xFF4B111C), shape = RoundedCornerShape(2.dp))
+) {
+    Canvas(Modifier.matchParentSize()) {
+        drawLine(Color(0x332E91FF), Offset(size.width * .30f, 0f), Offset(size.width * .43f, size.height), 2f)
+        drawLine(Color(0x44E71938), Offset(size.width * .62f, 0f), Offset(size.width * .51f, size.height), 3f)
+    }
+    Row(Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(54.dp).shadow(16.dp, RoundedCornerShape(14.dp))
+                .background(Color(0xFF07090D), RoundedCornerShape(14.dp))
+                .border(1.dp, Color(0xFF8E2031), RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center
+        ) { Text("➤", color = PiketRed, fontSize = 28.sp, fontWeight = FontWeight.Black) }
+        Column(Modifier.padding(start = 14.dp)) {
+            Text("ПИКЕТ", fontSize = 23.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
+            Text("КОНТРОЛЬ ОГРАНИЧЕНИЙ", fontSize = 8.sp, letterSpacing = 2.4.sp, color = Color(0xFFB8C6D5))
+        }
+        Spacer(Modifier.weight(1f))
+        val color = if (state.source == "native-gps") Color(0xFF31DB83) else Color(0xFF7E8B9B)
+        Surface(color = Color(0xFF151A22), shape = RoundedCornerShape(22.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF35404C))) {
+            Text(if (state.active) "● GPS вкл" else "● GPS выкл", color = color, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp))
+        }
+    }
 }
 
 @Composable
 private fun RouteSelector(model: PiketViewModel) {
     var expanded by remember { mutableStateOf(false) }
-    var journeyExpanded by remember { mutableStateOf(false) }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Color(0xFF151A22)).border(1.dp, Color(0xFF303844), RoundedCornerShape(16.dp))) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.weight(.82f).clip(RoundedCornerShape(16.dp)).background(Color(0xFF151A22)).border(1.dp, Color(0xFF303844), RoundedCornerShape(16.dp))) {
             listOf("tuda" to "Туда", "obratno" to "Обратно").forEach { (value, title) ->
-                Text(title, modifier = Modifier.weight(1f).clickable { model.selectDirection(value) }.background(if (model.direction == value) Brush.horizontalGradient(listOf(Color(0xFF7B0D20), PiketRed)) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))).padding(vertical = 13.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.ExtraBold)
+                Text(title, modifier = Modifier.weight(1f).clickable(enabled = model.journey == null) { model.selectDirection(value) }.background(if (model.direction == value) Brush.horizontalGradient(listOf(Color(0xFF7B0D20), PiketRed)) else Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))).padding(vertical = 14.dp), textAlign = TextAlign.Center, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
             }
         }
-        Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) { Text(NativeRouteCatalog.forInternalRoute(model.route).title, Modifier.weight(1f), textAlign = TextAlign.Start); Text("⌄") }
-            DropdownMenu(expanded, { expanded = false }, modifier = Modifier.fillMaxWidth(.9f).background(PiketPanel)) {
-                model.routeChoices.forEach { choice -> DropdownMenuItem(text = { Text(choice.title) }, onClick = { model.selectRoute(choice); expanded = false }) }
-            }
-        }
-        Box {
-            OutlinedButton(onClick = { journeyExpanded = true }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp)) {
-                Text(model.journey?.let { "Составной рейс · поезд $it" } ?: "Обычный маршрут", Modifier.weight(1f), textAlign = TextAlign.Start)
+        Box(Modifier.weight(1.18f)) {
+            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth().height(49.dp), shape = RoundedCornerShape(16.dp), contentPadding = PaddingValues(horizontal = 14.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (model.journey == null) "ПЕРЕГОН" else "СКВОЗНОЙ РЕЙС", fontSize = 8.sp, letterSpacing = 1.5.sp, color = PiketBlue)
+                    Text(NativeRouteCatalog.forInternalRoute(model.route).let { choice -> model.routeChoices.firstOrNull { it.journey == model.journey && it.tudaStart == model.route }?.title ?: choice.title }, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
                 Text("⌄")
             }
-            DropdownMenu(journeyExpanded, { journeyExpanded = false }, modifier = Modifier.fillMaxWidth(.9f).background(PiketPanel)) {
-                DropdownMenuItem(text = { Text("Обычный маршрут") }, onClick = { model.selectJourney(null); journeyExpanded = false })
-                listOf("819", "820").forEach { number ->
-                    DropdownMenuItem(text = { Text("Поезд $number · автоматические переходы") }, onClick = { model.selectJourney(number); journeyExpanded = false })
-                }
+            DropdownMenu(expanded, { expanded = false }, modifier = Modifier.fillMaxWidth(.9f).background(PiketPanel)) {
+                model.routeChoices.forEach { choice -> DropdownMenuItem(text = { Text(choice.title) }, onClick = { model.selectRoute(choice); expanded = false }) }
             }
         }
     }
@@ -235,7 +251,18 @@ private fun PositionCard(state: TripSnapshot) {
     }
 }
 
-@Composable private fun NativeStatusCard(s: TripSnapshot) { val title=when { !s.active->"Нет активной поездки";s.recovering->"Восстановление после потери сигнала";s.source=="native-gps"->"Нативная GPS-позиция";else->"Нативное счисление координаты" }; Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF10141A)),shape=RoundedCornerShape(18.dp)){Column(Modifier.fillMaxWidth().padding(18.dp)){Text(title,fontWeight=FontWeight.Bold);Text("Спутники: ${s.satellites} · C/N₀: ${s.averageCn0.roundToInt()} · точность: ${s.accuracyM?.roundToInt() ?: 0} м",color=Color.Gray,fontSize=12.sp)}} }
+@Composable private fun NativeStatusCard(s: TripSnapshot) {
+    val title=when { !s.active->"Путь свободен";s.recovering->"Восстановление позиции";s.source=="native-gps"->"Позиция подтверждена GPS";else->"Расчётная позиция" }
+    val healthy = !s.active || s.source == "native-gps"
+    Card(
+        colors=CardDefaults.cardColors(containerColor=if (healthy) Color(0xFF0C241C) else Color(0xFF25200F)),
+        shape=RoundedCornerShape(18.dp),
+        border=androidx.compose.foundation.BorderStroke(1.dp, if (healthy) Color(0xFF176943) else Color(0xFF67551C))
+    ) { Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(18.dp).shadow(10.dp, CircleShape).background(if (healthy) Color(0xFF31DB83) else PiketYellow, CircleShape))
+        Column(Modifier.padding(start = 12.dp)) { Text(title.uppercase(),fontWeight=FontWeight.Bold,letterSpacing=1.7.sp,color=if(healthy)Color(0xFF8FE8BD)else PiketYellow);Text(if(!s.active)"Ограничений впереди нет" else "Спутники: ${s.satellites} · C/N₀: ${s.averageCn0.roundToInt()} · точность: ${s.accuracyM?.roundToInt() ?: 0} м",color=Color(0xFF9EABB9),fontSize=12.sp) }
+    } }
+}
 @Composable private fun AlertCard(s: TripSnapshot,r:RestrictionRecord?){Card(colors=CardDefaults.cardColors(containerColor=if(s.alertInZone)Color(0xFF54121C)else Color(0xFF4A3510))){Column(Modifier.fillMaxWidth().padding(18.dp)){Text(if(s.alertInZone)"ОГРАНИЧЕНИЕ" else "ПОДЪЕЗЖАЕШЬ",fontWeight=FontWeight.Bold,color=if(s.alertInZone)PiketRed else PiketYellow);Text("${r?.speed ?: "—"} км/ч · ${r?.reason ?: "Ограничение"}",fontSize=20.sp,fontWeight=FontWeight.Bold);Text("Осталось ${s.alertDistanceM?.roundToInt() ?: 0} м")}}}
 
 @Composable
