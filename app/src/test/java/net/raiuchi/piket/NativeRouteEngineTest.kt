@@ -63,4 +63,25 @@ class NativeRouteEngineTest {
             }
         }
     }
+
+    @Test fun shortMissingRoutePrefixesSnapBackToZeroInsteadOfFirstKilometer() {
+        var checked = 0
+        for (label in engine.labels()) {
+            val route = engine.route(label)!!
+            val a = route.points.first()
+            val b = route.points[1]
+            val span = b.physicalM - a.physicalM
+            if (span <= 0.0 || a.physicalM !in 0.1..5_000.0 ||
+                abs(route.chainageM.first() - a.physicalM) > 2_500.0) continue
+            val fraction = -a.physicalM / span
+            val latitude = a.latitude + fraction * (b.latitude - a.latitude)
+            val longitude = a.longitude + fraction * (b.longitude - a.longitude)
+            val snap = engine.snap(label, latitude, longitude)!!
+            assertEquals("$label physical origin", 0.0, snap.physicalM, 2.0)
+            assertEquals("$label official origin", route.chainageM.first() - a.physicalM,
+                snap.officialM, 2.0)
+            checked++
+        }
+        assertTrue("production data must contain missing short prefixes", checked >= 4)
+    }
 }

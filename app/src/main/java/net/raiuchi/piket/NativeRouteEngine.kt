@@ -80,7 +80,15 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
         for (i in 0 until route.points.lastIndex) {
             val a = route.points[i]
             val b = route.points[i + 1]
-            val projection = project(latitude, longitude, a, b)
+            val physicalSpan = b.physicalM - a.physicalM
+            // Several source maps begin at the first kilometre although the terminal
+            // station lies immediately before that point. Extrapolate only that short
+            // missing prefix; never bridge long technical axis gaps this way.
+            val canReachOrigin = i == 0 && physicalSpan > 0.0 &&
+                a.physicalM in 0.1..5_000.0 &&
+                abs(route.chainageM.first() - a.physicalM) <= 2_500.0
+            val minFraction = if (canReachOrigin) -a.physicalM / physicalSpan else 0.0
+            val projection = project(latitude, longitude, a, b, minFraction, 1.0)
             val physical = a.physicalM + projection.fraction * (b.physicalM - a.physicalM)
             val official = officialMeters(label, physical) ?: continue
             val candidate = Snap(label, physical, official, projection.distanceM, i)
@@ -91,7 +99,14 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
 
     private data class Projection(val fraction: Double, val distanceM: Double)
 
-    private fun project(lat: Double, lon: Double, a: Point, b: Point): Projection {
+    private fun project(
+        lat: Double,
+        lon: Double,
+        a: Point,
+        b: Point,
+        minFraction: Double,
+        maxFraction: Double
+    ): Projection {
         val metersPerDegree = 111_320.0
         val lonScale = cos(Math.toRadians((lat + a.latitude + b.latitude) / 3.0)) * metersPerDegree
         val ax = (a.longitude - lon) * lonScale
@@ -101,7 +116,9 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
         val dx = bx - ax
         val dy = by - ay
         val denominator = dx * dx + dy * dy
-        val fraction = if (denominator > 0.0) (-(ax * dx + ay * dy) / denominator).coerceIn(0.0, 1.0) else 0.0
+        val fraction = if (denominator > 0.0) {
+            (-(ax * dx + ay * dy) / denominator).coerceIn(minFraction, maxFraction)
+        } else 0.0
         val px = ax + fraction * dx
         val py = ay + fraction * dy
         return Projection(fraction, sqrt(px * px + py * py))
