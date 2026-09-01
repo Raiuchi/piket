@@ -113,12 +113,6 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
             return fromArrays(root.getJSONObject("tracks"), root.getJSONArray("chainage"))
         }
 
-        fun fromCoreJs(source: String): NativeRouteEngine {
-            val track = JSONObject(extractAssignment(source, "TRACK"))
-            val chainage = JSONArray(extractAssignment(source, "CHAINAGE"))
-            return fromArrays(track, chainage)
-        }
-
         private fun fromArrays(track: JSONObject, chainage: JSONArray): NativeRouteEngine {
             val labels = track.getJSONArray("labels")
             val segments = track.getJSONArray("segs")
@@ -137,33 +131,6 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
                 )
             }
             return NativeRouteEngine(routes)
-        }
-
-        private fun extractAssignment(source: String, variable: String): String {
-            val marker = "var $variable ="
-            val start = source.indexOf(marker)
-            require(start >= 0) { "$variable is missing" }
-            var index = start + marker.length
-            while (index < source.length && source[index].isWhitespace()) index++
-            val opening = source[index]
-            require(opening == '{' || opening == '[')
-            val closing = if (opening == '{') '}' else ']'
-            var depth = 0
-            var quoted = false
-            var escaped = false
-            for (end in index until source.length) {
-                val char = source[end]
-                if (quoted) {
-                    if (escaped) escaped = false
-                    else if (char == '\\') escaped = true
-                    else if (char == '"') quoted = false
-                    continue
-                }
-                if (char == '"') quoted = true
-                else if (char == opening) depth++
-                else if (char == closing && --depth == 0) return source.substring(index, end + 1)
-            }
-            error("$variable is not terminated")
         }
     }
 }

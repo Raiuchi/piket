@@ -49,14 +49,16 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
     var snapshot by mutableStateOf(repository.loadSnapshot()); private set
     var route by mutableStateOf(snapshot.route); private set
     var direction by mutableStateOf(snapshot.direction); private set
+    var manualOfficialM by mutableStateOf<Double?>(null); private set
     val referenceData = NativeReferenceData(app)
     val routes: List<String> = runCatching {
         app.assets.open("data/routes.json").bufferedReader().use { NativeRouteEngine.fromJson(it.readText()).labels() }
     }.getOrDefault(listOf("СпбГл - Москва"))
 
     init { viewModelScope.launch { while (isActive) { snapshot = repository.loadSnapshot(); delay(500) } } }
-    fun selectRoute(value: String) { route = value }
-    fun selectDirection(value: String) { direction = value }
+    fun selectRoute(value: String) { if (route != value) manualOfficialM = null; route = value }
+    fun selectDirection(value: String) { if (direction != value) manualOfficialM = null; direction = value }
+    fun setManualCalibration(value: Double) { manualOfficialM = value }
     fun add(item: RestrictionRecord): Boolean { val next = restrictions + item; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun remove(id: String): Boolean { val next = restrictions.filterNot { it.id == id }; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun updateSettings(value: PiketSettings) { if (repository.saveSettings(value)) settings = value }
@@ -104,7 +106,8 @@ fun PiketApp(
         }
     }
     if (calibrating) CalibrationDialog(model, { calibrating = false }) { official ->
-        val config = NativeUiConfig(model.route, model.direction, official, model.restrictions, model.settings.leadM)
+        model.setManualCalibration(official)
+        val config = NativeUiConfig(model.route, model.direction, official, model.restrictions, model.settings.leadM, model.settings.sound, model.settings.vibration)
         if (model.snapshot.active) onRecalibrate(config)
         calibrating = false
     }
@@ -124,7 +127,11 @@ private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (N
                 Button(
                     onClick = {
                         if (state.active) onStop()
-                        else onStart(NativeUiConfig(model.route, model.direction, state.officialM ?: 0.0, model.restrictions, model.settings.leadM))
+                        else {
+                            val manual = model.manualOfficialM
+                            if (manual == null) calibrate()
+                            else onStart(NativeUiConfig(model.route, model.direction, manual, model.restrictions, model.settings.leadM, model.settings.sound, model.settings.vibration))
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = if (state.active) Color(0xFF761626) else PiketRed),
                     modifier = Modifier.weight(1f).height(58.dp), shape = RoundedCornerShape(17.dp)
@@ -247,7 +254,7 @@ private fun SettingsScreen(model:PiketViewModel, openReference:(NativeReferenceS
 @Composable private fun SettingSwitch(title:String,subtitle:String,checked:Boolean,on:(Boolean)->Unit){Card(colors=CardDefaults.cardColors(containerColor=PiketPanel),shape=RoundedCornerShape(17.dp)){Row(Modifier.fillMaxWidth().padding(17.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(subtitle,color=Color.Gray,fontSize=12.sp)};Switch(checked,on,colors=SwitchDefaults.colors(checkedThumbColor=Color.White,checkedTrackColor=PiketRed))}}}
 
 @Composable
-private fun CalibrationDialog(model:PiketViewModel,dismiss:()->Unit,save:(Double)->Unit){val current=model.snapshot.officialM?.roundToInt();var km by remember{mutableStateOf(current?.div(1000)?.toString()?:"")};var pk by remember{mutableStateOf(current?.rem(1000)?.div(100)?.toString()?:"")};var meter by remember{mutableStateOf(current?.rem(100)?.toString()?:"")};AlertDialog(onDismissRequest=dismiss,containerColor=PiketPanel,title={Text("Калибровка по столбу",fontWeight=FontWeight.Bold)},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Text("Впиши фактический километр, пикет и метр.",color=Color.LightGray);Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){Box(Modifier.weight(1f)){NativeField("КМ",km){km=it}};Box(Modifier.weight(1f)){NativeField("ПК",pk){pk=it}};Box(Modifier.weight(1f)){NativeField("М",meter){meter=it}}}}},confirmButton={Button({save((km.toIntOrNull()?:0)*1000.0+(pk.toIntOrNull()?:0)*100+(meter.toIntOrNull()?:0))},colors=ButtonDefaults.buttonColors(containerColor=PiketRed)){Text("Установить")}},dismissButton={TextButton(dismiss){Text("Отмена")}})}
+private fun CalibrationDialog(model:PiketViewModel,dismiss:()->Unit,save:(Double)->Unit){val current=(model.manualOfficialM?:model.snapshot.officialM)?.roundToInt();var km by remember{mutableStateOf(current?.div(1000)?.toString()?:"")};var pk by remember{mutableStateOf(current?.rem(1000)?.div(100)?.toString()?:"")};var meter by remember{mutableStateOf(current?.rem(100)?.toString()?:"")};AlertDialog(onDismissRequest=dismiss,containerColor=PiketPanel,title={Text("Калибровка по столбу",fontWeight=FontWeight.Bold)},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)){Text("Впиши фактический километр, пикет и метр.",color=Color.LightGray);Row(horizontalArrangement=Arrangement.spacedBy(7.dp)){Box(Modifier.weight(1f)){NativeField("КМ",km){km=it}};Box(Modifier.weight(1f)){NativeField("ПК",pk){pk=it}};Box(Modifier.weight(1f)){NativeField("М",meter){meter=it}}}}},confirmButton={Button({save((km.toIntOrNull()?:0)*1000.0+(pk.toIntOrNull()?:0)*100+(meter.toIntOrNull()?:0))},colors=ButtonDefaults.buttonColors(containerColor=PiketRed)){Text("Установить")}},dismissButton={TextButton(dismiss){Text("Отмена")}})}
 
 @Composable
 private fun PiketNavigation(selected: PiketTab, on: (PiketTab) -> Unit) {

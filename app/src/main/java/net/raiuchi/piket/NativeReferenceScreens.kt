@@ -59,6 +59,7 @@ fun NativeTimetableScreen(
                 val seconds = secondsBetween(fromTime, toTime)
                 val speed = if (fromM != null && toM != null && seconds != null && seconds > 0)
                     (kotlin.math.abs(toM - fromM) / seconds * 3.6).roundToInt() else null
+                val distanceKm = if (fromM != null && toM != null) kotlin.math.abs(toM - fromM) / 1000.0 else null
                 Card(colors = CardDefaults.cardColors(containerColor = PiketPanel)) {
                     Column(Modifier.fillMaxWidth().padding(15.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text("${from.station} → ${to.station}", fontWeight = FontWeight.Bold)
@@ -67,8 +68,12 @@ fun NativeTimetableScreen(
                             ScheduleTimeButton("приб", toTime) { editing = TimeEdit(train.number, index + 1, "arr", toTime) }
                         }
                         Text(
-                            if (speed == null) "Километраж уточняется" else "Средняя перегонная скорость: $speed км/ч",
-                            color = if (speed == null) PiketYellow else PiketBlue
+                            when {
+                                speed == null -> "Километраж уточняется"
+                                speed > 250 -> "Проверь километраж или время — значение недостижимо"
+                                else -> "${"%.1f".format(distanceKm)} км · ${seconds / 60.0} мин · средняя $speed км/ч"
+                            },
+                            color = if (speed == null || speed > 250) PiketYellow else PiketBlue
                         )
                     }
                 }

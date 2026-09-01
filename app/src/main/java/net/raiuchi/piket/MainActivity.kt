@@ -79,18 +79,19 @@ data class NativeUiConfig(
     val manualOfficialM: Double,
     val restrictions: List<RestrictionRecord>,
     val leadM: Int,
+    val sound: Boolean,
+    val vibration: Boolean,
     val active: Boolean = true
 ) {
     fun toJson() = JSONObject().apply {
         put("route", route); put("direction", direction); put("manualOfficialM", manualOfficialM)
-        put("lead", leadM); put("active", active)
+        put("lead", leadM); put("active", active); put("sound", sound); put("vibration", vibration)
         put("restrictions", JSONArray().apply {
             restrictions.forEach { item -> put(JSONObject().apply {
                 put("id", item.id); put("peregon", item.route); put("dir", item.direction)
                 put("km", item.km); put("pk", item.pk); put("m", item.meter)
-                put("lead", item.leadM)
+                put("lead", item.leadM); put("speed", item.speed); put("reason", item.reason)
             }) }
         })
     }
 }
-

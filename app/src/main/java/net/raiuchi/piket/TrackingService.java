@@ -40,7 +40,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -84,6 +86,11 @@ public class TrackingService extends Service {
     private Vibrator vibrator;
     private Handler mainHandler;
     private Runnable nativeTripTicker;
+    private boolean nativeSoundEnabled = true;
+    private boolean nativeVibrationEnabled = true;
+    private final Map<String, String> nativeAlertSpeech = new HashMap<>();
+    private String lastNativeAlertId = null;
+    private boolean lastNativeAlertInZone = false;
 
     public static void updateNotificationText(Context ctx, String text) {
         Intent open = new Intent(ctx, MainActivity.class);
@@ -173,9 +180,7 @@ public class TrackingService extends Service {
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "piket_say");
     }
 
-    /** Нативная вибрация — гарантированно работает в фоне, в отличие от navigator.vibrate()
-     * из JS, который может не сработать в скрытом (headless) WebView. pattern — массив
-     * длительностей в мс, как в браузерном Vibration API (даже индексы — паузы). */
+    /** Нативная вибрация фоновой службы. */
     private void vibrateNative(String kind) {
         if (vibrator == null || !vibrator.hasVibrator()) return;
         long[] timings = "danger".equals(kind)
@@ -188,9 +193,7 @@ public class TrackingService extends Service {
         }
     }
 
-    /** Нативный звуковой сигнал через ToneGenerator - в отличие от Web Audio API (AudioContext)
-     *  в JS, это надёжно работает в headless-службе (фоновый WebView без видимого окна не
-     *  всегда подключён к аудио-выходу системы так же надёжно, как обычная Activity). */
+    /** Нативный звуковой сигнал фоновой службы через ToneGenerator. */
     private void beepNative(String kind) {
         try {
             android.media.ToneGenerator tg = new android.media.ToneGenerator(
@@ -257,13 +260,7 @@ public class TrackingService extends Service {
                     locationUnavailableSince = System.currentTimeMillis();
                     nativeMotionFilter.markSignalUnavailable();
                     if (nativeTripEngine != null) nativeTripEngine.markSignalUnavailable();
-                    // КРИТИЧНО: раньше эта ветка только устанавливала Java-переменную и
-                    // НИКОГДА не сообщала об этом JS-коду внутри headless WebView - значит
-                    // вся защита "плавное снижение скорости при потере сигнала" (функция
-                    // onErr в index.html) физически не могла сработать через основной путь
-                    // на реальном Android-телефоне (она работала только в веб-версии, где
-                    // браузер сам вызывает onErr через стандартный geolocation API).
-                    // Добавлен явный мост в JS, аналогичный onNativeLocation ниже.
+                    // Снимок сразу фиксирует потерю сигнала; счисление продолжает нативное ядро.
                     persistNativeSnapshot(null, 999f);
                 } else {
                     locationUnavailableSince = 0;
@@ -418,7 +415,7 @@ public class TrackingService extends Service {
         networkBackupCallback = null;
     }
 
-    /** Полностью нативная обработка фикса без WebView и JavaScript. */
+    /** Полностью нативная обработка фикса. */
     private boolean isFreshRealFix(Location loc) {
         long ageMs = Math.max(0L, (SystemClock.elapsedRealtimeNanos()
                 - loc.getElapsedRealtimeNanos()) / 1_000_000L);
@@ -454,6 +451,7 @@ public class TrackingService extends Service {
                     nativeResult.getAccepted(), shadowSnap)) : null;
         if (nativeTripEngine != null) persistNativeTripState(nativeTripEngine.save());
         persistNativeSnapshot(nativeTrip, accuracy);
+        handleNativeAlert(nativeTrip);
         if (nativeTrip != null && nativeTrip.getOfficialM() != null) {
             int official = (int) Math.round(nativeTrip.getOfficialM());
             updateNotificationText(this, (official / 1000) + " км " + ((official % 1000) / 100) + " пк");
@@ -506,6 +504,9 @@ public class TrackingService extends Service {
         try {
             JSONObject root = new JSONObject(raw);
             nativeRouteLabel = root.optString("route", "Все участки");
+            nativeSoundEnabled = root.optBoolean("sound", true);
+            nativeVibrationEnabled = root.optBoolean("vibration", true);
+            nativeAlertSpeech.clear();
             List<NativeTripEngine.Restriction> parsed = new ArrayList<>();
             JSONArray items = root.optJSONArray("restrictions");
             if (items != null) for (int i = 0; i < items.length(); i++) {
@@ -516,12 +517,34 @@ public class TrackingService extends Service {
                         + item.optDouble("pkE", 0) * 100.0 + item.optDouble("mE", 0) : start;
                 parsed.add(new NativeTripEngine.Restriction(item.optString("id", String.valueOf(i)),
                         item.optString("peregon", "Все участки"), item.optString("dir", "both"),
-                        start, end, item.optDouble("lead", root.optDouble("lead", 3000))));
+                         start, end, item.optDouble("lead", root.optDouble("lead", 3000))));
+                String id = item.optString("id", String.valueOf(i));
+                nativeAlertSpeech.put(id, item.optInt("speed", 0) + " километров в час. " + item.optString("reason", "Ограничение"));
             }
             if (nativeTripEngine != null) nativeTripEngine.configure(nativeRouteLabel,
                     root.optString("direction", "tuda"), root.optDouble("manualOfficialM", 0),
                     root.optBoolean("active", false), parsed);
         } catch (Exception ignored) { }
+    }
+
+    private void handleNativeAlert(NativeTripEngine.Output output) {
+        String id = output != null ? output.getAlertId() : null;
+        boolean inZone = output != null && output.getAlertInZone();
+        if (id == null) {
+            lastNativeAlertId = null;
+            lastNativeAlertInZone = false;
+            return;
+        }
+        boolean newApproach = !id.equals(lastNativeAlertId);
+        boolean entered = inZone && (!id.equals(lastNativeAlertId) || !lastNativeAlertInZone);
+        if (newApproach || entered) {
+            String details = nativeAlertSpeech.getOrDefault(id, "Ограничение");
+            String phrase = entered ? "Ограничение. " + details : "Впереди ограничение. " + details;
+            if (nativeSoundEnabled) { beepNative(entered ? "danger" : "warning"); speakNative(phrase); }
+            if (nativeVibrationEnabled) vibrateNative(entered ? "danger" : "warning");
+        }
+        lastNativeAlertId = id;
+        lastNativeAlertInZone = inZone;
     }
 
     private void restoreNativeTripState() {
@@ -544,6 +567,7 @@ public class TrackingService extends Service {
                             SystemClock.elapsedRealtime(), null, false, null));
                     if (output.getActive()) persistNativeTripState(nativeTripEngine.save());
                     persistNativeSnapshot(output, 999f);
+                    handleNativeAlert(output);
                 }
                 if (mainHandler != null) mainHandler.postDelayed(this, 1000L);
             }
@@ -582,21 +606,7 @@ public class TrackingService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // КРИТИЧНЫЙ ФИКС: видимый экран (MainActivity) вызывает Android.startTracking(), который
-        // бьёт в СВОЙ собственный PiketBridge (определённый в MainActivity.java, а не здесь) —
-        // тот лишь делает startForegroundService(...), что и приводит сюда, в onStartCommand.
-        // Если служба уже жива (обычный случай - служба не пересоздаётся), Android вызывает
-        // именно onStartCommand, а НЕ onCreate(). Раньше здесь ничего не происходило -
-        // headless-копия не получала команду перечитать калибровку, и счётчик не двигался.
-        // forceHeadlessStart() (TrackingService.PiketBridge.startTracking()) физически
-        // никогда не вызывался реальным потоком выполнения - тот bridge принадлежит ДРУГОМУ
-        // WebView (headless), а не видимому экрану, который и инициирует "Старт".
-        // Здесь - единственная реальная точка, куда долетает команда от нажатия "Старт".
-        //
-        // ACTION_RECALIBRATE - отдельный путь для перекалибровки НА ХОДУ (машинист поправил
-        // км/пикет/метр прямо во время поездки, не нажимая «Стоп»). Полный forceHeadlessStart()
-        // здесь не подходит - он сбросил бы звук/тикер/wake lock без необходимости, когда
-        // трекинг и так уже активен. Нужна только лёгкая перечитка калибровки.
+        // Нативная конфигурация приходит при старте и при перекалибровке на ходу.
         if (intent != null && ACTION_CONFIGURE_NATIVE.equals(intent.getAction()))
             applyNativeTripConfig(intent.getStringExtra(EXTRA_NATIVE_CONFIG));
         return START_STICKY;
