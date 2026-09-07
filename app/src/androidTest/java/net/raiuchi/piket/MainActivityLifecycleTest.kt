@@ -66,7 +66,9 @@ class MainActivityLifecycleTest {
     @Test fun premiumWebViewSelectsUnifiedRouteAndSavesCalibration() {
         val context = getApplicationContext<Context>()
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
-            val readyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+            // A cold CI emulator may spend tens of seconds compiling the sizeable offline
+            // timetable/track bundle. Real interaction starts only after HTML says it is ready.
+            val readyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
             var ready = false
             while (!ready && System.nanoTime() < readyDeadline) {
                 scenario.onActivity { ready = it.isUiReadyForTest() }

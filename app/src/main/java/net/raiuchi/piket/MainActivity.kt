@@ -107,7 +107,7 @@ class MainActivity : Activity() {
     fun isUiReadyForTest(): Boolean = uiReady
 
     private fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit, attempt: Int) {
-        if ((!pageReady || !uiReady) && attempt < 150) {
+        if ((!pageReady || !uiReady) && attempt < 600) {
             handler.postDelayed({ evaluateJavascriptForTest(script, callback, attempt + 1) }, 100)
             return
         }
