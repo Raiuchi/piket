@@ -34,6 +34,8 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("syncNativeRouteContext();") && html.contains("window.Android.startTracking();"))
         assertTrue(html.contains("manualOfficialM:manual") && html.contains("m:+r.m||0") && html.contains("journey:nativeJourney"))
         assertTrue(html.contains("return 128900+rt.posM"))
+        assertTrue(html.contains("r.kmE!=null?metersOf(r.kmE,r.pkE):start+100"))
+        assertFalse(html.contains("+r.spd>0&&r.kmE!=null"))
         assertTrue(service.contains("optDouble(\"pk\", 1.0) - 1.0"))
     }
 
