@@ -25,6 +25,7 @@ class MainActivity : Activity() {
     private var web: WebView? = null
     private var pageReady = false
     @Volatile private var uiReady = false
+    @Volatile private var uiStartupError: String? = null
     private var pendingConfig: String? = null
     private val handler = Handler(Looper.getMainLooper())
     private val repository by lazy { PiketRepository(this) }
@@ -84,6 +85,7 @@ class MainActivity : Activity() {
 
     inner class PiketBridge{
         @JavascriptInterface fun notifyUiReady() { uiReady = true }
+        @JavascriptInterface fun notifyUiStartupError(message: String) { uiStartupError = message }
         @JavascriptInterface fun configureNativeTrip(json:String)=runOnUiThread{configureRunning(json)}
         @JavascriptInterface fun startTracking()=runOnUiThread{if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)startNative(pendingConfig)else{requestPermissionsIfNeeded();web?.evaluateJavascript("if(window.toast)toast('Разреши точную геолокацию')",null)}}
         @JavascriptInterface fun stopTracking()=runOnUiThread{stopService(Intent(this@MainActivity,TrackingService::class.java))}
@@ -105,6 +107,7 @@ class MainActivity : Activity() {
         evaluateJavascriptForTest(script, callback, 0)
 
     fun isUiReadyForTest(): Boolean = uiReady
+    fun uiStartupErrorForTest(): String? = uiStartupError
 
     private fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit, attempt: Int) {
         if ((!pageReady || !uiReady) && attempt < 600) {

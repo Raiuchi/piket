@@ -70,8 +70,10 @@ class MainActivityLifecycleTest {
             // timetable/track bundle. Real interaction starts only after HTML says it is ready.
             val readyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
             var ready = false
+            var startupError: String? = null
             while (!ready && System.nanoTime() < readyDeadline) {
-                scenario.onActivity { ready = it.isUiReadyForTest() }
+                scenario.onActivity { ready = it.isUiReadyForTest(); startupError = it.uiStartupErrorForTest() }
+                assertTrue("Premium HTML startup error: $startupError", startupError == null)
                 if (!ready) Thread.sleep(100)
             }
             assertTrue("Premium HTML UI did not report readiness", ready)
