@@ -24,6 +24,7 @@ class MainActivity : Activity() {
     }
     private var web: WebView? = null
     private var pageReady = false
+    @Volatile private var uiReady = false
     private var pendingConfig: String? = null
     private val handler = Handler(Looper.getMainLooper())
     private val repository by lazy { PiketRepository(this) }
@@ -82,6 +83,7 @@ class MainActivity : Activity() {
     private fun initTts(){tts=TextToSpeech(this){status->if(status==TextToSpeech.SUCCESS){val r=tts?.setLanguage(Locale("ru","RU"))?:TextToSpeech.LANG_NOT_SUPPORTED;ttsReady=r!=TextToSpeech.LANG_MISSING_DATA&&r!=TextToSpeech.LANG_NOT_SUPPORTED}}}
 
     inner class PiketBridge{
+        @JavascriptInterface fun notifyUiReady() { uiReady = true }
         @JavascriptInterface fun configureNativeTrip(json:String)=runOnUiThread{configureRunning(json)}
         @JavascriptInterface fun startTracking()=runOnUiThread{if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)startNative(pendingConfig)else{requestPermissionsIfNeeded();web?.evaluateJavascript("if(window.toast)toast('Разреши точную геолокацию')",null)}}
         @JavascriptInterface fun stopTracking()=runOnUiThread{stopService(Intent(this@MainActivity,TrackingService::class.java))}
@@ -102,12 +104,14 @@ class MainActivity : Activity() {
     fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit) =
         evaluateJavascriptForTest(script, callback, 0)
 
+    fun isUiReadyForTest(): Boolean = uiReady
+
     private fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit, attempt: Int) {
-        if (!pageReady && attempt < 100) {
+        if ((!pageReady || !uiReady) && attempt < 150) {
             handler.postDelayed({ evaluateJavascriptForTest(script, callback, attempt + 1) }, 100)
             return
         }
-        if (!pageReady) { callback("\"page-not-ready\""); return }
+        if (!pageReady || !uiReady) { callback("\"page-not-ready\""); return }
         web?.evaluateJavascript(script, callback) ?: callback("\"webview-missing\"")
     }
     override fun onBackPressed(){if(web?.canGoBack()==true)web?.goBack()else moveTaskToBack(true)}

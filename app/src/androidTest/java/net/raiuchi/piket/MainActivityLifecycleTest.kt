@@ -66,6 +66,13 @@ class MainActivityLifecycleTest {
     @Test fun premiumWebViewSelectsUnifiedRouteAndSavesCalibration() {
         val context = getApplicationContext<Context>()
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+            val readyDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+            var ready = false
+            while (!ready && System.nanoTime() < readyDeadline) {
+                scenario.onActivity { ready = it.isUiReadyForTest() }
+                if (!ready) Thread.sleep(100)
+            }
+            assertTrue("Premium HTML UI did not report readiness", ready)
             val result = AtomicReference("")
             val completed = CountDownLatch(1)
             scenario.onActivity { activity ->

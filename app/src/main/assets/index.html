@@ -2792,6 +2792,7 @@
   } else if(window.Android && window.Android.isServiceTracking && (function(){try{return window.Android.isServiceTracking();}catch(e){return false;}})()){
     IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
   }
+  try{ if(window.Android&&window.Android.notifyUiReady)window.Android.notifyUiReady(); }catch(e){}
 })();
 </script>
 <script>
