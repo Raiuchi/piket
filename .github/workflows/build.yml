@@ -164,4 +164,12 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+          script: |
+            set +e
+            ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+            RESULT=$?
+            if [ "$RESULT" -ne 0 ]; then
+              adb logcat -d '*:E' || true
+              find app/build/outputs/androidTest-results -type f -maxdepth 8 -print -exec cat {} \; || true
+            fi
+            exit "$RESULT"

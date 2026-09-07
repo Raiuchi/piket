@@ -82,6 +82,7 @@ class MainActivityLifecycleTest {
                 """.trimIndent()) { value -> result.set(value); completed.countDown() }
             }
             assertTrue("WebView did not finish the interaction", completed.await(15, TimeUnit.SECONDS))
+            println("PIKET_WEB_TEST_RESULT=${result.get()}")
             assertTrue("Unified route or calibration did not persist: ${result.get()}", result.get().contains("СПбФин - Каменногорск|128|9|42"))
         }
     }
