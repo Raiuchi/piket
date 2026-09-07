@@ -77,6 +77,9 @@
   .gps.live .dot{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite}
   .gps.weak .dot{background:var(--amber);box-shadow:0 0 8px var(--amber)}
   .gps.dead .dot{background:var(--rsig);box-shadow:0 0 8px var(--rsig);animation:pulse .6s infinite}
+  .telemetry{display:flex;align-items:flex-end;flex-direction:column;gap:6px}
+  .sat{display:flex;align-items:center;gap:5px;min-height:25px;padding:4px 9px;border:1px solid rgba(126,151,174,.24);border-radius:999px;background:linear-gradient(180deg,rgba(24,32,42,.8),rgba(8,12,17,.9));color:#82909d;font-size:9px;letter-spacing:.1em;text-transform:uppercase;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+  .sat svg{width:12px;height:12px;stroke:currentColor}.sat b{min-width:12px;color:#c9d3dc;font-size:11px;font-variant-numeric:tabular-nums;text-align:center}.sat.good{color:#45dda2;border-color:rgba(69,221,162,.3)}.sat.good b{color:#8ff4c8}.sat.weak{color:#e8b449;border-color:rgba(232,180,73,.3)}.sat.demo{color:#e93b60;border-color:rgba(233,59,96,.3)}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   .train{position:relative;z-index:2;margin-top:10px;height:74px;display:flex;align-items:flex-end}
   .train svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 10px 20px rgba(0,0,0,.4))}
@@ -505,7 +508,7 @@
         </div>
         <div class="t"><b>ПИКЕТ</b><span>контроль ограничений</span></div>
       </div>
-      <div class="gps" id="gps"><span class="dot"></span><span id="gpsTxt">GPS выкл</span></div>
+      <div class="telemetry"><div class="gps" id="gps"><span class="dot"></span><span id="gpsTxt">GPS выкл</span></div><div class="sat" id="sat"><svg viewBox="0 0 24 24" fill="none"><path d="M7 17l-3 3m6-6l-2 2m8-12l4 4-7 7-4-4 7-7zm-9 7c-2.8 2.8-2.8 7.2 0 10m4-6c-.6.6-.6 1.4 0 2" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><b id="satCount">—</b><span>спутн.</span></div></div>
     </div>
     <div class="train">
       <svg viewBox="0 0 420 80" preserveAspectRatio="xMidYMax meet">
@@ -1561,7 +1564,18 @@ window.addEventListener("error",function(e){
   function updateAndroidNotification(){
     try{ var m=rt.posM; if(m==null)return; var txt=kmFrom(m)+" км · ПК"+pkFrom(m)+" · "+Math.round(rt.speed)+" км/ч"; if(window.Android&&window.Android.updatePosition)window.Android.updatePosition(txt); }catch(e){}
   }
+  function renderSatellites(count,available,demo){
+    var el=document.getElementById("sat"),num=document.getElementById("satCount"); if(!el||!num)return;
+    if(demo){el.className="sat demo";num.textContent="SIM";el.title="Демонстрационный режим";return;}
+    if(!available){el.className="sat";num.textContent="—";el.title="Количество спутников пока недоступно";return;}
+    count=Math.max(0,Math.round(+count||0)); el.className="sat "+(count>=6?"good":(count>0?"weak":"")); num.textContent=String(count); el.title="Спутников используется: "+count;
+  }
+  function renderDemoStatus(){
+    $("#gps").className="gps live"; $("#gpsTxt").textContent="ДЕМО";
+    $("#spdSrc").textContent="ДЕМО · симуляция"; $("#spdSrc").className="src"; renderSatellites(0,false,true);
+  }
   function onPos(p,fromBackup){ var c=p.coords,acc=c.accuracy||999; rt.lastAccuracy=acc;
+    if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(state.calib&&c.heading!=null&&(+c.speed||0)>5){
       var dsi=TRACK.labels.indexOf(state.ctx.peregon),dtm=currentTrackMeters();
       if(dsi>=0&&dtm!=null){var db=expectedTrackBearing(TRACK.segs[dsi],dtm);if(db!=null){var wanted=dirDown()?(db+180)%360:db,wrong=bearingDiff(c.heading,wanted)>110;rt.directionMismatchCount=Math.max(0,(rt.directionMismatchCount||0)+(wrong?1:-1));var was=rt.directionWarning;rt.directionWarning=rt.directionMismatchCount>=3;if(rt.directionWarning&&!was){toast("⚠️ Движение не совпадает с выбранным направлением");say("Проверь выбранное направление движения");}}}
@@ -1969,6 +1983,7 @@ window.addEventListener("error",function(e){
     updateAndroidNotification();
     renderTrip(); evalAlerts(); }
   function onErr(e){ rt.lastBrowserCallAt=Date.now(); rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; // watchdog подписки - см. tickerStep
+    if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
       // КРИТИЧНО: при полной потере сигнала скорость раньше оставалась ЗАСТЫВШЕЙ на
       // последнем известном значении - если перед самой потерей был случайный шумовой
@@ -2088,6 +2103,7 @@ window.addEventListener("error",function(e){
     return {gps:"live", txt:"GPS вкл", src:"GPS — фоновая служба", srcCls:"src live"};
   }
   function mirrorTick(graceMs,gen){
+    if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(gen!==rt.mirrorGen) return; // зеркало уже остановлено/перезапущено — этот отложенный вызов устарел, игнорируем
     var snap=readTrackSnapshot();
     var fresh = snap && snap.tracking && (Date.now()-snap.ts)<=5000;
@@ -2148,12 +2164,12 @@ window.addEventListener("error",function(e){
 
 
   function startTrack(){
+    if(state.settings.demo){ startSim(); return; }
     if(state.calib==null || state.calib._manual!==true){
       toast("Сначала обязательная калибровка по километровому столбу");
       openCal();
       return;
     }
-    if(state.settings.demo){ startSim(); return; }
     rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0; rt.zoneWarnedKey=null; rt.trackingSince=Date.now();
     // Старт разрешён только после ручной калибровки. Автоматической остаётся именно
     // дорожная GPS-коррекция уже начатой поездки — она исправляет дрейф после РЭБ.
@@ -2199,6 +2215,8 @@ window.addEventListener("error",function(e){
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
   window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection,nativeFrequentInterference){
     if(!rt.tracking)return;
+    if(state.settings.demo){renderDemoStatus();return;}
+    renderSatellites(satellitesUsed,gnssTelemetry===true,false);
     if(nativeRoute&&nativeRoute!==state.ctx.peregon){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
     // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
     if(nativeOfficialM!=null){
@@ -2217,6 +2235,12 @@ window.addEventListener("error",function(e){
     onPos(fakePos); };
 
   function startSim(){
+    rt.mirrorGen=(rt.mirrorGen||0)+1; IS_MIRROR=false; stopTicker();
+    if(rt.watchId!=null){try{navigator.geolocation.clearWatch(rt.watchId);}catch(e){}rt.watchId=null;}
+    if(rt.backupWatchId!=null){try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){}rt.backupWatchId=null;}
+    rt.backupActive=false; stopAccelHelper();
+    try{if(window.Android&&window.Android.stopTracking)window.Android.stopTracking();}catch(e){}
+    if(rt.simTimer){clearInterval(rt.simTimer);rt.simTimer=null;}
     if(state.calib==null){
       var firstM=null;
       state.restrictions.forEach(function(r){ if(!isActive(r)||!inCtx(r))return; var s=metersOf(r.km,r.pk); if(firstM==null||s<firstM)firstM=s; });
@@ -2226,14 +2250,14 @@ window.addEventListener("error",function(e){
     rt.tracking=true; rt.speed=0; rt.last=null; alertState={}; rt.posM=currentMeters();
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     reqWake(); setTrackBtn(true);
-    $("#gps").className="gps live"; $("#gpsTxt").textContent="ДЕМО";
+    renderDemoStatus();
     var t=Date.now();
     rt.simTimer=setInterval(function(){
       var now=Date.now(),dt=(now-t)/1000; t=now;
       rt.speed=Math.min(140,rt.speed+14*dt);
       rt.odo+=rt.speed/3.6*dt;
       rt.posM=currentMeters();
-      $("#spdSrc").textContent="ДЕМО — симуляция"; $("#spdSrc").className="src";
+      renderDemoStatus();
       renderTrip(); evalAlerts();
     },250);
     // Демо — это чисто визуальная симуляция в видимом экране, ей не нужна настоящая
@@ -2256,7 +2280,7 @@ window.addEventListener("error",function(e){
     relWake(); rt.speed=0;
     try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){}
     if(rt.autoCalib){ state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; }
-    $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
+    $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src"; renderSatellites(0,false,false);
     setTrackBtn(false); renderTrip(); renderList(); }
 
   function currentTrackMeters(){
