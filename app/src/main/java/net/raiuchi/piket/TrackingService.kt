@@ -80,6 +80,8 @@ class TrackingService : Service() {
     private val alertSpeech = mutableMapOf<String, String>()
     private var lastAlertId: String? = null
     private var lastAlertInZone = false
+    private var lastZoneSampleAt = 0L
+    private var frequentInterference = false
 
     override fun onCreate() {
         super.onCreate()
@@ -273,6 +275,7 @@ class TrackingService : Service() {
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
             result.filteredSpeedMps, result.accepted, currentSnap))
         tripEngine?.save()?.let(::persistTripState)
+        updateInterferenceMemory(output, result.quality in setOf("weak", "recovering", "rejected"))
         persistSnapshot(output, accuracy); handleAlert(output)
         output?.officialM?.let { official ->
             val value = official.roundToInt()
@@ -288,6 +291,7 @@ class TrackingService : Service() {
             .put("source", output?.source ?: "unavailable").put("satellites", satellitesUsed)
             .put("averageCn0", averageCn0).put("accuracyM", accuracy)
             .put("alertInZone", output?.alertInZone ?: false)
+            .put("frequentInterference", frequentInterference)
         output?.officialM?.let { json.put("officialM", it) }; output?.physicalM?.let { json.put("physicalM", it) }
         output?.alertId?.let { json.put("alertId", it) }; output?.alertDistanceM?.let { json.put("alertDistanceM", it) }
         getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("snapshot", json.toString()).apply()
@@ -352,12 +356,36 @@ class TrackingService : Service() {
             override fun run() {
                 tripEngine?.let { engine ->
                     val output = engine.update(NativeTripEngine.Input(SystemClock.elapsedRealtime(), null, false, null))
+                    updateInterferenceMemory(output, output.recovering && System.currentTimeMillis() - lastFixReceivedAt > 5_000)
                     if (output.active) persistTripState(engine.save())
                     persistSnapshot(output, 999f); handleAlert(output)
                 }
                 mainHandler.postDelayed(this, 1_000)
             }
         }.also { mainHandler.postDelayed(it, 1_000) }
+    }
+
+    private fun updateInterferenceMemory(output: NativeTripEngine.Output, bad: Boolean) {
+        if (!output.active) { frequentInterference = false; return }
+        val official = output.officialM ?: return
+        if (output.speedMps * 3.6f < 30f) { frequentInterference = false; return }
+        val now = System.currentTimeMillis()
+        val prefs = getSharedPreferences("piket_native_zones", MODE_PRIVATE)
+        if (now - lastZoneSampleAt >= 10_000) {
+            lastZoneSampleAt = now
+            val bucket = kotlin.math.floor(official / 1_000.0).toInt()
+            val key = "${routeLabel}_$bucket"
+            val total = prefs.getInt("${key}_total", 0) + 1
+            val failures = prefs.getInt("${key}_bad", 0) + if (bad) 1 else 0
+            prefs.edit().putInt("${key}_total", total).putInt("${key}_bad", failures).apply()
+        }
+        val sign = if (tripEngine?.save()?.direction == "obratno") -1 else 1
+        val buckets = NativeInterferenceZones.currentAndAheadBuckets(official, sign)
+        frequentInterference = buckets.any { bucket ->
+            val key = "${routeLabel}_$bucket"
+            val total = prefs.getInt("${key}_total", 0)
+            NativeInterferenceZones.isFrequent(total, prefs.getInt("${key}_bad", 0))
+        }
     }
 
     private fun initAccelerometer() {

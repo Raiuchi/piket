@@ -143,6 +143,8 @@
   .odo .v.km{color:var(--blue-l)}
   .odo .u{font-size:10px;color:var(--dim);letter-spacing:.22em;margin-top:4px;font-weight:600}
   .trav{text-align:center;font-size:11px;color:var(--dim2);margin-top:7px;font-family:var(--mono)}
+  .zone-hint{display:none;align-items:center;justify-content:center;gap:7px;width:max-content;max-width:100%;margin:9px auto 0;padding:7px 11px;border:1px solid rgba(245,165,36,.42);border-radius:999px;background:linear-gradient(180deg,rgba(245,165,36,.16),rgba(62,42,8,.18));color:#ffd27a;font-size:11px;font-weight:750;letter-spacing:.02em;box-shadow:0 0 18px rgba(245,165,36,.08)}
+  .zone-hint.on{display:flex}.zone-hint .zh-dot{width:7px;height:7px;border-radius:50%;background:#f5a524;box-shadow:0 0 9px rgba(245,165,36,.9)}
 
   .signal{margin:14px 0 0;border-radius:17px;padding:15px;border:1px solid var(--line);background:var(--panel);
           transition:border-color .4s,background .4s,box-shadow .4s;position:relative;overflow:hidden;
@@ -651,6 +653,7 @@
     </div>
     <div class="trav">пройдено от калибровки: <span class="num" id="oTrav">0 м</span></div>
     <div class="trav" id="autoCalWarn" style="display:none;color:#f5a623;font-weight:600">⚠ Позиция определена автоматически — проверь и поправь при возможности</div>
+    <div class="zone-hint" id="zoneHint"><span class="zh-dot"></span><span>Частая зона помех GPS</span></div>
     <div class="signal clear" id="signal">
       <div class="sig-top"><div class="sig-eb"><span class="lamp"></span><span id="sigState">путь свободен</span></div><div class="sig-dist" id="sigDist"></div></div>
       <div id="sigContent"></div>
@@ -2192,11 +2195,12 @@ window.addEventListener("error",function(e){
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
 
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
-  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection){
+  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection,nativeFrequentInterference){
     if(!rt.tracking)return;
     if(nativeRoute&&nativeRoute!==state.ctx.peregon){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
     // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
     if(nativeOfficialM!=null){
+      var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.toggle("on",nativeFrequentInterference===true);
       rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
       rt.posM=+nativeOfficialM; rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
       rt.fixQuality=nativeTripRecovering?"recovering":(nativeTripSource||"native");
@@ -2240,6 +2244,7 @@ window.addEventListener("error",function(e){
   function setTrackBtn(on){ var b=$("#btnTrack"); if(on){ b.textContent="■ Стоп"; b.classList.remove("primary"); b.classList.add("stop"); } else { b.textContent="▶ Старт"; b.classList.add("primary"); b.classList.remove("stop"); }
     var dirSeg=$("#dirSeg"); if(dirSeg) dirSeg.style.opacity = on ? "0.5" : "1"; }
   function stopTrack(){ rt.tracking=false;
+    var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.remove("on");
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
     if(rt.backupWatchId!=null){ try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){} rt.backupWatchId=null; }
     rt.backupActive=false;

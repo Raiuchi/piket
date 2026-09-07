@@ -72,7 +72,8 @@ class PiketRepository(private val context: Context) {
             accuracyM = json.optNullableDouble("accuracyM")?.toFloat(),
             alertId = json.optString("alertId").takeIf { it.isNotBlank() },
             alertDistanceM = json.optNullableDouble("alertDistanceM"),
-            alertInZone = json.optBoolean("alertInZone")
+            alertInZone = json.optBoolean("alertInZone"),
+            frequentInterference = json.optBoolean("frequentInterference")
         )
     }.getOrDefault(TripSnapshot())
 

@@ -26,7 +26,8 @@ data class TripSnapshot(
     val accuracyM: Float? = null,
     val alertId: String? = null,
     val alertDistanceM: Double? = null,
-    val alertInZone: Boolean = false
+    val alertInZone: Boolean = false,
+    val frequentInterference: Boolean = false
 )
 
 data class PiketSettings(

@@ -61,7 +61,7 @@ class MainActivity : Activity() {
 
     private fun publishSnapshot(s:TripSnapshot){
         val q={v:String->v.replace("\\","\\\\").replace("'","\\'")}
-        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.source)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone},'${q(s.route)}','${q(s.direction)}');"
+        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.source)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone},'${q(s.route)}','${q(s.direction)}',${s.frequentInterference});"
         web?.evaluateJavascript(js,null)
     }
     private fun startNative(rawConfig:String?){
