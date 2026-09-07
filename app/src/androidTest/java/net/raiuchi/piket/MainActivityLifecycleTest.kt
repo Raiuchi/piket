@@ -16,6 +16,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 @LargeTest
@@ -58,5 +61,28 @@ class MainActivityLifecycleTest {
         val info = context.packageManager.getApplicationInfo(
             context.packageName, PackageManager.ApplicationInfoFlags.of(0))
         assertFalse(info.flags and ApplicationInfo.FLAG_ALLOW_BACKUP != 0)
+    }
+
+    @Test fun premiumWebViewSelectsUnifiedRouteAndSavesCalibration() {
+        val context = getApplicationContext<Context>()
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+            val result = AtomicReference("")
+            val completed = CountDownLatch(1)
+            scenario.onActivity { activity ->
+                activity.evaluateJavascriptForTest("""
+                    (function(){
+                      document.getElementById('peregonBtn').click();
+                      var route=Array.from(document.querySelectorAll('#perList [data-p]')).find(function(x){return x.getAttribute('data-p').indexOf('СПбФин - Каменногорск')===0;});
+                      if(!route)return 'route-missing'; route.click();
+                      document.getElementById('btnCalib').click();
+                      document.getElementById('cKm').value='128'; document.getElementById('cPk').value='9'; document.getElementById('cM').value='42';
+                      document.getElementById('calSave').click();
+                      return document.getElementById('peregonVal').textContent+'|'+document.getElementById('oKm').textContent+'|'+document.getElementById('oPk').textContent+'|'+document.getElementById('oM').textContent;
+                    })()
+                """.trimIndent()) { value -> result.set(value); completed.countDown() }
+            }
+            assertTrue("WebView did not finish the interaction", completed.await(15, TimeUnit.SECONDS))
+            assertTrue("Unified route or calibration did not persist: ${result.get()}", result.get().contains("СПбФин - Каменногорск|128|9|42"))
+        }
     }
 }

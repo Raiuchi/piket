@@ -59,7 +59,7 @@ class MainActivity : Activity() {
 
     private fun publishSnapshot(s:TripSnapshot){
         val q={v:String->v.replace("\\","\\\\").replace("'","\\'")}
-        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.source)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone});"
+        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.source)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone},'${q(s.route)}','${q(s.direction)}');"
         web?.evaluateJavascript(js,null)
     }
     private fun startNative(rawConfig:String?){
@@ -98,6 +98,10 @@ class MainActivity : Activity() {
         @JavascriptInterface fun openUrl(url:String)=runOnUiThread{openExternal(Uri.parse(url))}
         @JavascriptInterface fun shareText(subject:String,text:String)=runOnUiThread{runCatching{startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,subject);putExtra(Intent.EXTRA_TEXT,text)},"Экспорт"))}}
         @JavascriptInterface fun openAutostartSettings()=false
+    }
+    fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit) {
+        if (!pageReady) { handler.postDelayed({ evaluateJavascriptForTest(script, callback) }, 100); return }
+        web?.evaluateJavascript(script, callback)
     }
     override fun onBackPressed(){if(web?.canGoBack()==true)web?.goBack()else moveTaskToBack(true)}
     override fun onDestroy(){handler.removeCallbacks(snapshotPump);tts?.stop();tts?.shutdown();web?.let{v->(v.parent as? android.view.ViewGroup)?.removeView(v);v.stopLoading();v.removeJavascriptInterface("Android");v.destroy()};web=null;super.onDestroy()}

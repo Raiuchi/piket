@@ -30,8 +30,10 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("VYBORG_THROUGH=\"СПбФин - Каменногорск\""))
         assertTrue(html.contains("DACHA_THROUGH=\"Дача Долгорукова - Петрозаводск\""))
         assertTrue(html.contains("CHUDOVO_DUTY=\"Чудово - Петрозаводск · 819/820\""))
+        assertTrue(html.contains("label!==\"Все участки\"") && html.contains("state.ctx.peregon===\"Все участки\""))
         assertTrue(html.contains("syncNativeRouteContext();") && html.contains("window.Android.startTracking();"))
-        assertTrue(html.contains("manualOfficialM:manual") && html.contains("m:+r.m||0"))
+        assertTrue(html.contains("manualOfficialM:manual") && html.contains("m:+r.m||0") && html.contains("journey:nativeJourney"))
+        assertTrue(html.contains("return 128900+rt.posM"))
         assertTrue(service.contains("optDouble(\"pk\", 1.0) - 1.0"))
     }
 

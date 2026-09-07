@@ -992,7 +992,7 @@
   function activeThrough(){if(state&&state.ctx&&state.ctx.through)return state.ctx.through;if(isVyborgLeg(state.ctx.peregon))return"vyborg";if(isDachaLeg(state.ctx.peregon))return"dacha";return null;}
   function journeyTowards(){return activeThrough()==="chudovo"?(state.ctx.tripTowards||"tuda"):state.ctx.towards;}
   function contextPeregonLabel(label){var through=activeThrough();return through==="chudovo"?CHUDOVO_DUTY:(through==="vyborg"?VYBORG_THROUGH:(through==="dacha"?DACHA_THROUGH:label));}
-  function contextPeregonChoices(){return PEREGONS.filter(function(label){return !isVyborgLeg(label)&&!isDachaLeg(label)&&label!=="Чудово - Новгород"&&label!=="Волховстрой - Чудово";}).concat([DACHA_THROUGH,CHUDOVO_DUTY,VYBORG_THROUGH]);}
+  function contextPeregonChoices(){return PEREGONS.filter(function(label){return label!=="Все участки"&&!isVyborgLeg(label)&&!isDachaLeg(label)&&label!=="Чудово - Новгород"&&label!=="Волховстрой - Чудово";}).concat([DACHA_THROUGH,CHUDOVO_DUTY,VYBORG_THROUGH]);}
   function contextPeregonValue(label){var dir=journeyTowards();if(label===VYBORG_THROUGH)return dir==="obratno"?"Выборг - Каменногорск":"СПбФин - Выборг";if(label===DACHA_THROUGH)return dir==="obratno"?"Горы - Петрозаводск":"Д. Долг - Павлово";if(label===CHUDOVO_DUTY)return dir==="obratno"?"Горы - Петрозаводск":"Волховстрой - Чудово";return label;}
   var LEADS=[{v:0,t:"в зоне"},{v:500,t:"0.5 км"},{v:1000,t:"1 км"},{v:1500,t:"1.5 км"},{v:2000,t:"2 км"},{v:3000,t:"3 км"},{v:4000,t:"4 км"},{v:5000,t:"5 км"}];
   var REASONS=["— без причины —","Ремонт пути","Путевые работы","Неисправность пути","Дефект рельса","Неисправность стрелочного перевода","Пучина / выплеск / просадка пути","Неисправность искусственного сооружения","Неисправность переездной сигнализации","Неисправность контактной сети","Работы на контактной сети","Подготовиться к опусканию токоприёмника","Опустить токоприёмник","Поднять токоприёмник","Отключить ток","Включить ток","Неисправность средств СЦБ и связи","Неисправность путевых устройств АЛС","Работа путевых машин","Погрузка / выгрузка на соседнем пути","Негабаритный груз","Подвижной состав с ограниченной скоростью","Работа съёмных подвижных единиц","Особая бдительность / особые условия"];
@@ -1045,6 +1045,7 @@
     calib: load("sap_cal",null),
     ctx: Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}))
   };
+  if(state.ctx.peregon==="Все участки") state.ctx={peregon:"СпбГл - Москва",towards:state.ctx.towards||"tuda",through:null,tripTowards:null};
   function syncNativeRouteContext(){
     try{
       if(window.Android&&window.Android.configureNativeTrip){
@@ -1058,9 +1059,12 @@
             lead:r.lead==null?(state.settings.lead||3000):r.lead
           });
         });
+        var trainField=document.getElementById("scheduleTrain"),selectedTrain=trainField&&trainField.value;
+        var nativeJourney=activeThrough()==="chudovo"&&/^(819|820)$/.test(selectedTrain||"")?selectedTrain:(activeThrough()==="chudovo"?(journeyTowards()==="obratno"?"820":"819"):null);
         window.Android.configureNativeTrip(JSON.stringify({
           route:state.ctx.peregon||"Все участки",
           direction:state.ctx.towards||"tuda",
+          journey:nativeJourney,
           manualOfficialM:manual,
           active:!!rt.tracking,
           lead:state.settings.lead||3000,
@@ -1284,7 +1288,7 @@
   function scheduleSourceRoute(){var through=activeThrough();return through==="chudovo"?"Чудово - Новгород":(through==="vyborg"?"СПбФин - Выборг":(through==="dacha"?"Горы - Петрозаводск":state.ctx.peregon));}
   function scheduleRestrictionApplies(r){var through=activeThrough();return through==="chudovo"?(r.peregon==="Все участки"||r.peregon==="Горы - Петрозаводск"||r.peregon==="Волховстрой - Чудово"||r.peregon==="Чудово - Новгород"):(through==="vyborg"?(r.peregon==="Все участки"||isVyborgLeg(r.peregon)):(through==="dacha"?(r.peregon==="Все участки"||isDachaLeg(r.peregon)):inCtx(r)));}
   function scheduleRestrictionM(r,end){var value=end&&r.kmE!=null?metersOf(r.kmE,r.pkE):metersOf(r.km,r.pk),label=r.peregon==="Все участки"?state.ctx.peregon:r.peregon;if(activeThrough()==="chudovo"){if(label==="Чудово - Новгород")return 70000-value;if(label==="Волховстрой - Чудово")return 171000-value;if(label==="Горы - Петрозаводск")return value+46600;}return isVyborgLeg(state.ctx.peregon)&&label==="Выборг - Каменногорск"?128900+value:value;}
-  function scheduleLiveM(){if(rt.posM==null)return null;if(activeThrough()!=="chudovo")return rt.posM;if(state.ctx.peregon==="Чудово - Новгород")return 70000-rt.posM;if(state.ctx.peregon==="Волховстрой - Чудово")return 171000-rt.posM;if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM+46600;return null;}
+  function scheduleLiveM(){if(rt.posM==null)return null;var through=activeThrough();if(through==="vyborg"&&state.ctx.peregon==="Выборг - Каменногорск")return 128900+rt.posM;if(through!=="chudovo")return rt.posM;if(state.ctx.peregon==="Чудово - Новгород")return 70000-rt.posM;if(state.ctx.peregon==="Волховстрой - Чудово")return 171000-rt.posM;if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM+46600;return null;}
   function scheduleRequirement(a,b,totalSec){var lo=Math.min(a,b),hi=Math.max(a,b),cuts=[lo,hi],ranges=[];state.restrictions.filter(function(r){return isActive(r)&&scheduleRestrictionApplies(r)&&+r.spd>0&&r.kmE!=null;}).forEach(function(r){var x=scheduleRestrictionM(r,false),y=scheduleRestrictionM(r,true),rlo=Math.max(lo,Math.min(x,y)),rhi=Math.min(hi,Math.max(x,y));if(rhi>rlo){ranges.push({lo:rlo,hi:rhi,spd:+r.spd});cuts.push(rlo,rhi);}});cuts.sort(function(x,y){return x-y;});var fixedM=0,fixedSec=0;for(var i=0;i<cuts.length-1;i++){var s=cuts[i],e=cuts[i+1],mid=(s+e)/2,limits=ranges.filter(function(r){return mid>=r.lo&&mid<=r.hi;});if(limits.length){var limit=Math.min.apply(null,limits.map(function(r){return r.spd;}));fixedM+=e-s;fixedSec+=(e-s)/(limit/3.6);}}var freeM=(hi-lo)-fixedM,remain=totalSec-fixedSec,req=freeM>0&&remain>0?(freeM/1000)/(remain/3600):(freeM===0&&remain>=0?0:Infinity);return{kmh:req,zones:ranges.length};}
   function openScheduleTimePicker(train,index,kind,original){var key=train.number+":"+index+":"+kind,v=scheduleTime(train,index,kind,original)||"00:00",p=v.split(":"),h=+p[0]||0,m=+p[1]||0,half=p[2]==="30";function draw(){ $("#ppBody").innerHTML='<div class="pp-dials"><div class="pp-col"><button data-step="h1">＋</button><div class="pp-value">'+two(h)+'</div><button data-step="h-1">−</button></div><div class="pp-sep">:</div><div class="pp-col"><button data-step="m1">＋</button><div class="pp-value">'+two(m)+'</div><button data-step="m-1">−</button></div></div><button type="button" class="pp-option'+(half?' on':'')+'" id="scheduleHalf"><span>Полминуты</span><small>'+(half?'включено · :30':'выключено · :00')+'</small></button>';$("#ppBody").onclick=function(e){var s=e.target.getAttribute("data-step");if(s){if(s[0]==="h")h=(h+(s==="h1"?1:23))%24;else m=(m+(s==="m1"?1:59))%60;draw();return;}if(e.target.closest("#scheduleHalf")){half=!half;draw();}};}pickerTitle(kind==="arr"?"Время прибытия":"Время отправления");$("#ppActions").style.display="flex";$("#ppClear").style.display="block";$("#ppClear").onclick=function(){delete scheduleOverrides[key];delete scheduleOverrides[train.number+":"+index];save("sap_schedule_overrides",scheduleOverrides);closePremiumPicker();renderTrainSchedule();};$("#ppApply").onclick=function(){scheduleOverrides[key]=two(h)+":"+two(m)+(half?":30":"");delete scheduleOverrides[train.number+":"+index];save("sap_schedule_overrides",scheduleOverrides);closePremiumPicker();renderTrainSchedule();};draw();}
   function trainsForContext(){var rows=scheduleRowsForContext(),sourceRoute=scheduleSourceRoute(),through=activeThrough();return ((window.PIKET_SCHEDULES&&PIKET_SCHEDULES.trains)||[]).filter(function(t){if(through==="chudovo")return (String(t.number)==="819"||String(t.number)==="820")&&t.stops.filter(function(s){return !!scheduleStation(s.station,rows);}).length>=2;return t.route===sourceRoute&&t.direction===journeyTowards()&&t.stops.filter(function(s){return !!scheduleStation(s.station,rows);}).length>=2;});}
@@ -2183,8 +2187,9 @@
     setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
 
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
-  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone){
+  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection){
     if(!rt.tracking)return;
+    if(nativeRoute&&nativeRoute!==state.ctx.peregon){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
     // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
     if(nativeOfficialM!=null){
       rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
@@ -2319,7 +2324,7 @@
     if(!r){ el.style.display="none"; return; }
     el.className="g-limit "+speedClass(r.spd); el.style.display="flex"; $("#limVal").textContent=r.spd||"—"; }
 
-  function renderTrip(){ renderPositionTrust(); renderTimingStations(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker(); renderTrainPicker();
+  function renderTrip(){ renderPositionTrust(); renderTimingStations(); renderTrainPicker();
     // В режиме зеркала (IS_MIRROR) видимый экран НЕ ведёт свой расчёт позиции - rt.odo
     // здесь всегда 0 (считает только headless-копия в службе). currentMeters() пересчитывал
     // бы позицию через локальный (нулевой) rt.odo и затирал бы правильное значение rt.posM,
@@ -2723,14 +2728,14 @@
   }
   $("#btnJumpOrder").addEventListener("click",jumpToOrderFromTrip);
   $("#timingCalc").addEventListener("click",calculateTiming);
-  $("#scheduleTrainPick").addEventListener("click",function(){var trains=trainsForContext();openChoicePicker("Номер поезда",trains.map(function(t){return{label:"Поезд № "+t.number,meta:t.title,value:t.number};}),$("#scheduleTrain").value,function(v){$("#scheduleTrain").value=v;renderTrainSchedule();});});
+  $("#scheduleTrainPick").addEventListener("click",function(){var trains=trainsForContext();openChoicePicker("Номер поезда",trains.map(function(t){return{label:"Поезд № "+t.number,meta:t.title,value:t.number};}),$("#scheduleTrain").value,function(v){$("#scheduleTrain").value=v;syncNativeRouteContext();renderTrainSchedule();});});
   $("#ppClose").addEventListener("click",closePremiumPicker);$("#ppBackdrop").addEventListener("click",closePremiumPicker);
   $("#timingFromPick").addEventListener("click",function(){openChoicePicker("Станция отправления",timingRows.map(function(x){return{label:x[0],meta:timingStationMark(x),value:x[1]};}),$("#timingFrom").value,function(v){$("#timingFrom").value=v;var x=timingRows.find(function(r){return String(r[1])===String(v);});$("#timingFromText").textContent=x[0]+" · "+timingStationMark(x);});});
   $("#timingStationPick").addEventListener("click",function(){openChoicePicker("Станция назначения",timingRows.map(function(x){return{label:x[0],meta:timingStationMark(x),value:x[1]};}),$("#timingStation").value,function(v){$("#timingStation").value=v;var x=timingRows.find(function(r){return String(r[1])===String(v);});$("#timingStationText").textContent=x[0]+" · "+timingStationMark(x);});});
   $("#timingDeparturePick").addEventListener("click",function(){openTimePicker("#timingDeparture","#timingDepartureText","Время отправления");});$("#timingArrivalPick").addEventListener("click",function(){openTimePicker("#timingArrival","#timingArrivalText","Время прибытия");});
   $("#rFromPick").addEventListener("click",function(){openDatePicker("#rFrom","#rFromText","Начало действия");});$("#rToPick").addEventListener("click",function(){openDatePicker("#rTo","#rToText","Окончание действия");});
 
-  setSeg("#dirSeg",journeyTowards(),"d"); syncSw(); renderTrip(); renderList();
+  persist(); setSeg("#dirSeg",journeyTowards(),"d"); syncSw(); renderTrip(); renderList();
   if(IS_HEADLESS){
     // КРИТИЧНЫЙ ФИКС: раньше headless-копия запускала трекинг сама при ЗАГРУЗКЕ страницы
     // (то есть один раз, в момент создания службы) и больше никогда не перечитывала
