@@ -99,9 +99,16 @@ class MainActivity : Activity() {
         @JavascriptInterface fun shareText(subject:String,text:String)=runOnUiThread{runCatching{startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,subject);putExtra(Intent.EXTRA_TEXT,text)},"Экспорт"))}}
         @JavascriptInterface fun openAutostartSettings()=false
     }
-    fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit) {
-        if (!pageReady) { handler.postDelayed({ evaluateJavascriptForTest(script, callback) }, 100); return }
-        web?.evaluateJavascript(script, callback)
+    fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit) =
+        evaluateJavascriptForTest(script, callback, 0)
+
+    private fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit, attempt: Int) {
+        if (!pageReady && attempt < 100) {
+            handler.postDelayed({ evaluateJavascriptForTest(script, callback, attempt + 1) }, 100)
+            return
+        }
+        if (!pageReady) { callback("\"page-not-ready\""); return }
+        web?.evaluateJavascript(script, callback) ?: callback("\"webview-missing\"")
     }
     override fun onBackPressed(){if(web?.canGoBack()==true)web?.goBack()else moveTaskToBack(true)}
     override fun onDestroy(){handler.removeCallbacks(snapshotPump);tts?.stop();tts?.shutdown();web?.let{v->(v.parent as? android.view.ViewGroup)?.removeView(v);v.stopLoading();v.removeJavascriptInterface("Android");v.destroy()};web=null;super.onDestroy()}
