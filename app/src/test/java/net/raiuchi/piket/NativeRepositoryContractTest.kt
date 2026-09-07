@@ -60,7 +60,7 @@ class NativeRepositoryContractTest {
         val trains = json("schedules.json").getJSONArray("trains")
         assertEquals(66, trains.length())
         val numbers = mutableSetOf<String>(); var passages = 0
-        val expected = mapOf("751" to 49, "754" to 49, "804" to 34, "819" to 61, "820" to 61, "841" to 40, "842" to 39)
+        val expected = mapOf("751" to 49, "754" to 49, "768" to 49, "804" to 34, "819" to 61, "820" to 61, "841" to 40, "842" to 39)
         repeat(trains.length()) { index ->
             val train = trains.getJSONObject(index); val number = train.getString("number")
             assertTrue("duplicate train $number", numbers.add(number))
@@ -80,6 +80,22 @@ class NativeRepositoryContractTest {
             assertTrue("$number has multiple midnight transitions", wraps <= 1)
         }
         assertEquals(2_712, passages)
+    }
+
+    @Test fun everyTimetableRendersFromItsFirstStopAndProgressesOnlyForward() {
+        val trains = json("schedules.json").getJSONArray("trains")
+        val train768 = (0 until trains.length()).map(trains::getJSONObject)
+            .first { it.getString("number") == "768" }
+        val first = train768.getJSONArray("stops").getJSONObject(0)
+        assertEquals("МОСКВА ПАС.ОКТ.", first.getString("station"))
+        assertEquals("13:30", first.getString("dep"))
+
+        val html = projectFile("app/src/main/assets/index.html").readText()
+        assertTrue(html.contains("\"москвапасокт\":\"москвапассажирская\""))
+        assertTrue(html.contains("if(!rt.tracking||rt.posM==null)return null"))
+        assertTrue(html.contains("if(schedulePos==null){rt.scheduleProgressIndex=0"))
+        assertTrue(html.contains("candidate>rt.scheduleProgressIndex"))
+        assertFalse(html.contains("if(index<first||index>last)return"))
     }
 
     @Test fun speedTimingAndTechnicalJourneysRemainComplete() {
