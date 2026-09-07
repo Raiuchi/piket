@@ -275,7 +275,9 @@ class TrackingService : Service() {
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
             result.filteredSpeedMps, result.accepted, currentSnap))
         tripEngine?.save()?.let(::persistTripState)
-        updateInterferenceMemory(output, result.quality in setOf("weak", "recovering", "rejected"))
+        output?.let {
+            updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))
+        }
         persistSnapshot(output, accuracy); handleAlert(output)
         output?.officialM?.let { official ->
             val value = official.roundToInt()
