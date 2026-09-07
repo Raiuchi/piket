@@ -990,7 +990,7 @@ window.addEventListener("error",function(e){
     "Горы - Петрозаводск","Броневая - Луга","Чудово - Новгород","Волховстрой - Чудово","Выборг - Каменногорск","СПбФин - Выборг"];
   var VYBORG_THROUGH="СПбФин - Каменногорск";
   var DACHA_THROUGH="Дача Долгорукова - Петрозаводск";
-  var CHUDOVO_DUTY="Чудово - Петрозаводск · 819/820";
+  var CHUDOVO_DUTY="Чудово - Петрозаводск";
   function isVyborgLeg(label){return label==="СПбФин - Выборг"||label==="Выборг - Каменногорск";}
   function isDachaLeg(label){return label==="Д. Долг - Павлово"||label==="Павлово - Горы II путь"||label==="Горы - Павлово I путь"||label==="Горы - Петрозаводск";}
   function activeThrough(){if(state&&state.ctx&&state.ctx.through)return state.ctx.through;if(isVyborgLeg(state.ctx.peregon))return"vyborg";if(isDachaLeg(state.ctx.peregon))return"dacha";return null;}

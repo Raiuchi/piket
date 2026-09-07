@@ -29,7 +29,7 @@ class NativeRepositoryContractTest {
         assertTrue(projectFile("app/src/main/assets/assets/piket-schedules.js").length() > 100_000)
         assertTrue(html.contains("VYBORG_THROUGH=\"СПбФин - Каменногорск\""))
         assertTrue(html.contains("DACHA_THROUGH=\"Дача Долгорукова - Петрозаводск\""))
-        assertTrue(html.contains("CHUDOVO_DUTY=\"Чудово - Петрозаводск · 819/820\""))
+        assertTrue(html.contains("CHUDOVO_DUTY=\"Чудово - Петрозаводск\""))
         assertTrue(html.contains("label!==\"Все участки\"") && html.contains("state.ctx.peregon===\"Все участки\""))
         assertTrue(html.contains("syncNativeRouteContext();") && html.contains("window.Android.startTracking();"))
         assertTrue(html.contains("manualOfficialM:manual") && html.contains("m:+r.m||0") && html.contains("journey:nativeJourney"))
