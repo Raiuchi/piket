@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.hardware.*
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationManager
@@ -19,7 +18,6 @@ import org.json.JSONObject
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /**
  * Полностью нативная фоновая служба. Получение координат, фильтрация движения,
@@ -59,10 +57,6 @@ class TrackingService : Service() {
     @Volatile private var averageCn0 = 0f
     @Volatile private var gnssTelemetrySeen = false
 
-    private var sensorManager: SensorManager? = null
-    private var accelListener: SensorEventListener? = null
-    private var accelMagnitude = 0f
-
     private val motionFilter = NativeMotionFilter()
     private var routeEngine: NativeRouteEngine? = null
     private var tripEngine: NativeTripEngine? = null
@@ -82,6 +76,10 @@ class TrackingService : Service() {
     private var lastAlertInZone = false
     private var lastZoneSampleAt = 0L
     private var frequentInterference = false
+    private var lastSnapshotPersistAt = 0L
+    private var lastTripPersistAt = 0L
+    private var lastNotificationText = ""
+    private var lastNotificationAt = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -106,7 +104,6 @@ class TrackingService : Service() {
         else getSystemService(VIBRATOR_SERVICE) as? Vibrator
         initTts()
         startFusedLocation()
-        initAccelerometer()
     }
 
     private fun startAsForeground() {
@@ -281,11 +278,17 @@ class TrackingService : Service() {
         persistSnapshot(output, accuracy); handleAlert(output)
         output?.officialM?.let { official ->
             val value = official.roundToInt()
-            updateNotificationText(this, "${value / 1000} км ${(value % 1000) / 100} пк")
+            val text="${value / 1000} км ${(value % 1000) / 100} пк"
+            val now=SystemClock.elapsedRealtime()
+            if(text!=lastNotificationText||now-lastNotificationAt>=5_000){
+                lastNotificationText=text;lastNotificationAt=now;updateNotificationText(this,text)
+            }
         }
     }
 
-    private fun persistSnapshot(output: NativeTripEngine.Output?, accuracy: Float) = runCatching {
+    private fun persistSnapshot(output: NativeTripEngine.Output?, accuracy: Float, force:Boolean=false) = runCatching {
+        val now=SystemClock.elapsedRealtime();if(!force&&now-lastSnapshotPersistAt<750)return@runCatching
+        lastSnapshotPersistAt=now
         val saved = tripEngine?.save()
         val json = JSONObject().put("active", output?.active ?: saved?.active ?: false)
             .put("route", saved?.route ?: routeLabel).put("direction", saved?.direction ?: "tuda")
@@ -299,7 +302,9 @@ class TrackingService : Service() {
         getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("snapshot", json.toString()).apply()
     }
 
-    private fun persistTripState(state: NativeTripEngine.SavedState) = runCatching {
+    private fun persistTripState(state: NativeTripEngine.SavedState, force:Boolean=false) = runCatching {
+        val now=SystemClock.elapsedRealtime();if(!force&&now-lastTripPersistAt<5_000)return@runCatching
+        lastTripPersistAt=now
         val json = JSONObject().put("active", state.active).put("route", state.route)
             .put("direction", state.direction).put("manualOfficialM", state.manualOfficialM)
             .put("offsetM", state.offsetM).put("speedMps", state.speedMps)
@@ -390,18 +395,6 @@ class TrackingService : Service() {
         }
     }
 
-    private fun initAccelerometer() {
-        sensorManager = getSystemService(SENSOR_SERVICE) as? SensorManager
-        val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) ?: return
-        accelListener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent) {
-                val magnitude = sqrt(event.values[0] * event.values[0] + event.values[1] * event.values[1] + event.values[2] * event.values[2])
-                accelMagnitude = accelMagnitude * .7f + magnitude * .3f
-            }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-        }.also { sensorManager?.registerListener(it, sensor, SensorManager.SENSOR_DELAY_NORMAL) }
-    }
-
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(CHANNEL_ID, "ПИКЕТ", NotificationManager.IMPORTANCE_LOW).apply {
@@ -426,12 +419,11 @@ class TrackingService : Service() {
         tripTicker?.let(mainHandler::removeCallbacks); watchdog?.let(mainHandler::removeCallbacks)
         tripTicker = null; watchdog = null; stopNetworkBackup()
         mainLocationCallback?.let { fusedClient?.removeLocationUpdates(it) }
-        accelListener?.let { sensorManager?.unregisterListener(it) }
         gnssCallback?.let { locationManager?.unregisterGnssStatusCallback(it) }
         wakeLock?.takeIf { it.isHeld }?.release()
         tts?.stop(); tts?.shutdown(); tts = null
-        tripEngine?.let { it.stop(); persistTripState(it.save()) }
-        persistSnapshot(null, 999f)
+        tripEngine?.let { it.stop(); persistTripState(it.save(),true) }
+        persistSnapshot(null, 999f,true)
         super.onDestroy()
     }
 

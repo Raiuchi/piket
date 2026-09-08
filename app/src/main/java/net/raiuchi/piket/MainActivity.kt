@@ -12,6 +12,8 @@ import android.view.WindowManager
 import android.webkit.*
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.Locale
 
 /** The restored premium HTML is a view. GPS, routes, recovery and alerts stay native. */
@@ -32,8 +34,9 @@ class MainActivity : Activity() {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private val snapshotPump = object : Runnable {
-        override fun run() { if (pageReady) publishSnapshot(repository.loadSnapshot()); handler.postDelayed(this, 500) }
+        override fun run() { if (pageReady) publishSnapshot(repository.loadSnapshot()); handler.postDelayed(this, 1_000) }
     }
+    @Volatile private var updateCheckStarted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +49,7 @@ class MainActivity : Activity() {
                 mediaPlaybackRequiresUserGesture=false;cacheMode=WebSettings.LOAD_NO_CACHE
             }
             view.webViewClient=object:WebViewClient(){
-                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot())}
+                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot());checkForUpdate()}
                 override fun shouldOverrideUrlLoading(v:WebView,r:WebResourceRequest)=openExternal(r.url)
                 override fun shouldOverrideUrlLoading(v:WebView,url:String)=openExternal(Uri.parse(url))
             }
@@ -81,6 +84,42 @@ class MainActivity : Activity() {
         if(need.isNotEmpty())requestPermissions(need.toTypedArray(),REQUEST_PERMISSIONS)
     }
     private fun openExternal(uri:Uri?):Boolean{if(uri==null||uri.toString()==APP_URL)return false;if(uri.scheme in listOf("http","https"))runCatching{startActivity(Intent(Intent.ACTION_VIEW,uri))};return true}
+    private fun checkForUpdate(){
+        if(updateCheckStarted)return
+        updateCheckStarted=true
+        Thread{
+            runCatching{
+                val connection=(URL("https://api.github.com/repos/Raiuchi/piket/releases/latest").openConnection() as HttpURLConnection).apply{
+                    connectTimeout=7_000;readTimeout=7_000
+                    setRequestProperty("Accept","application/vnd.github+json")
+                    setRequestProperty("User-Agent","Piket-Android-Update-Check")
+                }
+                val payload=connection.inputStream.bufferedReader().use{it.readText()}
+                connection.disconnect()
+                val release=JSONObject(payload)
+                val latest=release.optString("tag_name").removePrefix("v")
+                val current=packageManager.getPackageInfo(packageName,0).versionName?:"0.0.0"
+                if(isNewerVersion(latest,current)){
+                    var download=release.optString("html_url","https://github.com/Raiuchi/piket/releases/latest")
+                    val assets=release.optJSONArray("assets")
+                    if(assets!=null)for(i in 0 until assets.length()){
+                        val asset=assets.optJSONObject(i)?:continue
+                        if(asset.optString("name")=="piket.apk"){
+                            download=asset.optString("browser_download_url",download);break
+                        }
+                    }
+                    handler.post{web?.evaluateJavascript("if(window.showUpdateBanner)window.showUpdateBanner('${jsQuote(latest)}','${jsQuote(download)}')",null)}
+                }
+            }
+        }.start()
+    }
+    private fun jsQuote(value:String)=value.replace("\\","\\\\").replace("'","\\'")
+    private fun isNewerVersion(latest:String,current:String):Boolean{
+        val a=latest.split('.').map{it.takeWhile(Char::isDigit).toIntOrNull()?:0}
+        val b=current.split('.').map{it.takeWhile(Char::isDigit).toIntOrNull()?:0}
+        for(i in 0 until maxOf(a.size,b.size)){val av=a.getOrElse(i){0};val bv=b.getOrElse(i){0};if(av!=bv)return av>bv}
+        return false
+    }
     private fun initTts(){tts=TextToSpeech(this){status->if(status==TextToSpeech.SUCCESS){val r=tts?.setLanguage(Locale("ru","RU"))?:TextToSpeech.LANG_NOT_SUPPORTED;ttsReady=r!=TextToSpeech.LANG_MISSING_DATA&&r!=TextToSpeech.LANG_NOT_SUPPORTED}}}
 
     inner class PiketBridge{

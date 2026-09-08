@@ -27,7 +27,6 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     private var recovering = false
     private var recoveryCandidateM: Double? = null
     private var recoveryConfirmations = 0
-    private var trustedCalibrationFixes = 0
     private var restrictions = emptyList<Restriction>()
 
     fun configure(route: String, direction: String, manualOfficialM: Double,
@@ -44,7 +43,6 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
             officialOffsetM = 0.0
             recoveryCandidateM = null
             recoveryConfirmations = 0
-            trustedCalibrationFixes = 0
         }
     }
 
@@ -69,7 +67,6 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
             physicalM = snap.physicalM
             val base = routes.officialMeters(route, snap.physicalM) ?: manualOfficialM
             officialOffsetM = (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
-            trustedCalibrationFixes = 0
             recovering = false
             return output("native-gps")
         }
@@ -79,19 +76,16 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
                 physicalM = physicalM!! * 0.35 + snap.physicalM * 0.65
                 recoveryCandidateM = null
                 recoveryConfirmations = 0
-                trustedCalibrationFixes++
-                // Ручной столб нужен только для надёжного старта. Раньше эта поправка
-                // (часто ровно ±1 км) сохранялась навсегда и переживала автокоррекцию.
-                // После трёх согласованных точных GPS-фиксов принимаем маршрутную ось.
-                if (trustedCalibrationFixes >= 3) officialOffsetM = 0.0
+                // GPS уточняет физическое место на пути, но не имеет права стирать
+                // поправку, заданную по реальному километровому столбу. Именно её
+                // обнуление после хорошего сигнала давало повторный сдвиг примерно на 1 км.
             } else {
                 val candidate = recoveryCandidateM
                 if (candidate != null && abs(candidate - snap.physicalM) <= 150.0) recoveryConfirmations++
                 else { recoveryCandidateM = snap.physicalM; recoveryConfirmations = 1 }
                 if (recoveryConfirmations >= 2) {
                     physicalM = snap.physicalM
-                    officialOffsetM = 0.0
-                    trustedCalibrationFixes = 3
+                    // Сохраняем ручную поправку официальной оси и после РЭБ/потери GPS.
                     recovering = false
                     recoveryCandidateM = null
                     recoveryConfirmations = 0
@@ -108,7 +102,6 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         active = saved.active; route = saved.route; direction = saved.direction
         manualOfficialM = saved.manualOfficialM; physicalM = saved.physicalM
         officialOffsetM = saved.offsetM; speedMps = saved.speedMps; lastElapsedMs = saved.lastElapsedMs
-        trustedCalibrationFixes = 0
         recovering = true
     }
 
@@ -121,7 +114,6 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         officialOffsetM = 0.0
         recoveryCandidateM = null
         recoveryConfirmations = 0
-        trustedCalibrationFixes = 3
         recovering = false
     }
 
