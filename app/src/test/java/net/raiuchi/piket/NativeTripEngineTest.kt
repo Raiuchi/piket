@@ -97,15 +97,18 @@ class NativeTripEngineTest {
         assertFalse(restored.update(NativeTripEngine.Input(2_000, null, false, null)).active)
     }
 
-    @Test fun manualOneKilometerOffsetSurvivesTrustedGpsAndRecoveryOnEveryRoute() {
+    @Test fun manualOneKilometerOffsetSurvivesProjectionLossRecoveryAndRestartAtEveryRoutePoint() {
         routes.labels().forEach { label ->
             val testedRoute = routes.route(label)!!
             listOf("tuda", "obratno").forEach { direction ->
-                listOf(0, testedRoute.points.lastIndex / 2, testedRoute.points.lastIndex).distinct().forEach { pointIndex ->
+                testedRoute.points.indices.forEach { pointIndex ->
                     listOf(-1_000.0, 1_000.0).forEach { offset ->
                         val tested = NativeTripEngine(routes)
-                        val routeSnap = NativeRouteEngine.Snap(label, testedRoute.points[pointIndex].physicalM,
-                            testedRoute.chainageM[pointIndex], 3.0, pointIndex.coerceAtMost(testedRoute.points.lastIndex - 1))
+                        val point = testedRoute.points[pointIndex]
+                        val routeSnap = routes.snap(label, point.latitude, point.longitude)!!
+                        assertEquals("$label point $pointIndex GPS projection", testedRoute.chainageM[pointIndex],
+                            routeSnap.officialM, 0.01)
+                        assertEquals("$label point $pointIndex distance", 0.0, routeSnap.distanceM, 0.01)
                         val expected = testedRoute.chainageM[pointIndex] + offset
                         tested.configure(label, direction, expected, true, emptyList())
                         assertEquals("$label $direction point $pointIndex initial", expected,
