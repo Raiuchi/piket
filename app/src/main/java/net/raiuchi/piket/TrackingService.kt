@@ -27,6 +27,7 @@ import kotlin.math.roundToInt
 class TrackingService : Service() {
     companion object {
         private const val CHANNEL_ID = "piket_tracking"
+        @Volatile internal var latestSnapshotJson: String? = null
         const val ACTION_RECALIBRATE = "net.raiuchi.piket.ACTION_RECALIBRATE"
         const val ACTION_CONFIGURE_NATIVE = "net.raiuchi.piket.ACTION_CONFIGURE_NATIVE"
         const val EXTRA_NATIVE_CONFIG = "net.raiuchi.piket.extra.NATIVE_CONFIG"
@@ -42,7 +43,6 @@ class TrackingService : Service() {
         }
     }
 
-    private var wakeLock: PowerManager.WakeLock? = null
     private var fusedClient: FusedLocationProviderClient? = null
     private var mainLocationCallback: LocationCallback? = null
     private var networkCallback: LocationCallback? = null
@@ -77,6 +77,7 @@ class TrackingService : Service() {
     private var lastZoneSampleAt = 0L
     private var frequentInterference = false
     private var lastSnapshotPersistAt = 0L
+    private var lastSnapshotDiskAt = 0L
     private var lastTripPersistAt = 0L
     private var lastNotificationText = ""
     private var lastNotificationAt = 0L
@@ -96,9 +97,6 @@ class TrackingService : Service() {
             startTripTicker()
         }.onFailure { routeEngine = null; journeyRouter = null; tripEngine = null }
 
-        (getSystemService(POWER_SERVICE) as? PowerManager)?.let { manager ->
-            wakeLock = manager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "piket:tracking").apply { acquire() }
-        }
         vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             (getSystemService(VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator
         else getSystemService(VIBRATOR_SERVICE) as? Vibrator
@@ -280,7 +278,7 @@ class TrackingService : Service() {
             val value = official.roundToInt()
             val text="${value / 1000} км ${(value % 1000) / 100} пк"
             val now=SystemClock.elapsedRealtime()
-            if(text!=lastNotificationText||now-lastNotificationAt>=5_000){
+            if(lastNotificationText.isEmpty()||now-lastNotificationAt>=10_000){
                 lastNotificationText=text;lastNotificationAt=now;updateNotificationText(this,text)
             }
         }
@@ -299,7 +297,11 @@ class TrackingService : Service() {
             .put("frequentInterference", frequentInterference)
         output?.officialM?.let { json.put("officialM", it) }; output?.physicalM?.let { json.put("physicalM", it) }
         output?.alertId?.let { json.put("alertId", it) }; output?.alertDistanceM?.let { json.put("alertDistanceM", it) }
-        getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("snapshot", json.toString()).apply()
+        val raw=json.toString();latestSnapshotJson=raw
+        if(force||now-lastSnapshotDiskAt>=10_000){
+            lastSnapshotDiskAt=now
+            getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("snapshot",raw).apply()
+        }
     }
 
     private fun persistTripState(state: NativeTripEngine.SavedState, force:Boolean=false) = runCatching {
@@ -420,7 +422,6 @@ class TrackingService : Service() {
         tripTicker = null; watchdog = null; stopNetworkBackup()
         mainLocationCallback?.let { fusedClient?.removeLocationUpdates(it) }
         gnssCallback?.let { locationManager?.unregisterGnssStatusCallback(it) }
-        wakeLock?.takeIf { it.isHeld }?.release()
         tts?.stop(); tts?.shutdown(); tts = null
         tripEngine?.let { it.stop(); persistTripState(it.save(),true) }
         persistSnapshot(null, 999f,true)

@@ -59,7 +59,7 @@ class PiketRepository(private val context: Context) {
     }.getOrDefault(false)
 
     fun loadSnapshot(): TripSnapshot = runCatching {
-        val raw = context.getSharedPreferences("piket_native", Context.MODE_PRIVATE)
+        val raw = TrackingService.latestSnapshotJson ?: context.getSharedPreferences("piket_native", Context.MODE_PRIVATE)
             .getString("snapshot", null) ?: return TripSnapshot()
         val json = JSONObject(raw)
         TripSnapshot(

@@ -100,22 +100,28 @@ class NativeTripEngineTest {
     @Test fun manualOneKilometerOffsetSurvivesTrustedGpsAndRecoveryOnEveryRoute() {
         routes.labels().forEach { label ->
             val testedRoute = routes.route(label)!!
-            val tested = NativeTripEngine(routes)
-            val routeSnap = NativeRouteEngine.Snap(label, testedRoute.points.first().physicalM,
-                testedRoute.chainageM.first(), 3.0, 0)
-            tested.configure(label, "tuda", testedRoute.chainageM.first() - 1_000.0, true, emptyList())
-            val initial = tested.update(NativeTripEngine.Input(1_000, 0f, true, routeSnap))
-            assertEquals("$label must initially honor manual calibration",
-                testedRoute.chainageM.first() - 1_000.0, initial.officialM!!, 0.01)
-            var corrected = initial
-            repeat(3) { index ->
-                corrected = tested.update(NativeTripEngine.Input(2_000L + index * 1_000L, 0f, true, routeSnap))
+            listOf("tuda", "obratno").forEach { direction ->
+                listOf(0, testedRoute.points.lastIndex / 2, testedRoute.points.lastIndex).distinct().forEach { pointIndex ->
+                    listOf(-1_000.0, 1_000.0).forEach { offset ->
+                        val tested = NativeTripEngine(routes)
+                        val routeSnap = NativeRouteEngine.Snap(label, testedRoute.points[pointIndex].physicalM,
+                            testedRoute.chainageM[pointIndex], 3.0, pointIndex.coerceAtMost(testedRoute.points.lastIndex - 1))
+                        val expected = testedRoute.chainageM[pointIndex] + offset
+                        tested.configure(label, direction, expected, true, emptyList())
+                        assertEquals("$label $direction point $pointIndex initial", expected,
+                            tested.update(NativeTripEngine.Input(1_000, 0f, true, routeSnap)).officialM!!, 0.01)
+                        tested.markSignalUnavailable()
+                        tested.update(NativeTripEngine.Input(20_000, null, false, null))
+                        tested.update(NativeTripEngine.Input(21_000, 0f, true, routeSnap))
+                        val recovered = tested.update(NativeTripEngine.Input(22_000, 0f, true, routeSnap))
+                        assertEquals("$label $direction point $pointIndex recovery", expected, recovered.officialM!!, 0.01)
+                        val restored = NativeTripEngine(routes).also { it.restore(tested.save()) }
+                        restored.update(NativeTripEngine.Input(23_000, 0f, true, routeSnap))
+                        val afterRestart = restored.update(NativeTripEngine.Input(24_000, 0f, true, routeSnap))
+                        assertEquals("$label $direction point $pointIndex restart", expected, afterRestart.officialM!!, 0.01)
+                    }
+                }
             }
-            tested.markSignalUnavailable()
-            tested.update(NativeTripEngine.Input(6_000L, 0f, true, routeSnap))
-            corrected = tested.update(NativeTripEngine.Input(7_000L, 0f, true, routeSnap))
-            assertEquals("$label must retain the real kilometer-post calibration",
-                testedRoute.chainageM.first() - 1_000.0, corrected.officialM!!, 0.01)
         }
     }
 }
