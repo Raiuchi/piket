@@ -95,7 +95,10 @@ class NativeMotionFilter {
 
         if (speed != null) {
             if (speed > 83.34f) speed = null // 300 км/ч — выше рабочего диапазона составов
-            if (speed != null && !stationary && prior != null && dt > 0.0) {
+            // During cold start/recovery the first sample is only a candidate, so
+            // compare two candidates with each other below rather than with the
+            // stale pre-outage speed.
+            if (speed != null && !stationary && !recovering && prior != null && dt > 0.0) {
                 val maxChangeKmh = min(12.0 * maxOf(dt, 0.5) + 5.0, 45.0)
                 if (abs(speed * 3.6f - lastSpeedMps * 3.6f) > maxChangeKmh) speed = null
             }
