@@ -36,7 +36,9 @@ class MainActivity : Activity() {
     private val snapshotPump = object : Runnable {
         override fun run() { if (pageReady) publishSnapshot(repository.loadSnapshot()); handler.postDelayed(this, 1_000) }
     }
-    @Volatile private var updateCheckStarted = false
+    @Volatile private var updateCheckRunning = false
+    @Volatile private var lastUpdateCheckAt = 0L
+    private var updateRetryCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,7 +51,7 @@ class MainActivity : Activity() {
                 mediaPlaybackRequiresUserGesture=false;cacheMode=WebSettings.LOAD_NO_CACHE
             }
             view.webViewClient=object:WebViewClient(){
-                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot());checkForUpdate()}
+                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot());checkForUpdate(true)}
                 override fun shouldOverrideUrlLoading(v:WebView,r:WebResourceRequest)=openExternal(r.url)
                 override fun shouldOverrideUrlLoading(v:WebView,url:String)=openExternal(Uri.parse(url))
             }
@@ -84,16 +86,20 @@ class MainActivity : Activity() {
         if(need.isNotEmpty())requestPermissions(need.toTypedArray(),REQUEST_PERMISSIONS)
     }
     private fun openExternal(uri:Uri?):Boolean{if(uri==null||uri.toString()==APP_URL)return false;if(uri.scheme in listOf("http","https"))runCatching{startActivity(Intent(Intent.ACTION_VIEW,uri))};return true}
-    private fun checkForUpdate(){
-        if(updateCheckStarted)return
-        updateCheckStarted=true
+    private fun checkForUpdate(force:Boolean=false){
+        val now=System.currentTimeMillis()
+        if(updateCheckRunning||(!force&&now-lastUpdateCheckAt<60_000))return
+        updateCheckRunning=true;lastUpdateCheckAt=now
         Thread{
-            runCatching{
+            val success=runCatching{
                 val connection=(URL("https://api.github.com/repos/Raiuchi/piket/releases/latest").openConnection() as HttpURLConnection).apply{
                     connectTimeout=7_000;readTimeout=7_000
+                    useCaches=false
                     setRequestProperty("Accept","application/vnd.github+json")
                     setRequestProperty("User-Agent","Piket-Android-Update-Check")
                 }
+                val code=connection.responseCode
+                if(code !in 200..299)throw java.io.IOException("GitHub update check HTTP $code")
                 val payload=connection.inputStream.bufferedReader().use{it.readText()}
                 connection.disconnect()
                 val release=JSONObject(payload)
@@ -110,9 +116,16 @@ class MainActivity : Activity() {
                     }
                     handler.post{web?.evaluateJavascript("if(window.showUpdateBanner)window.showUpdateBanner('${jsQuote(latest)}','${jsQuote(download)}')",null)}
                 }
+            }.isSuccess
+            updateCheckRunning=false
+            if(success)updateRetryCount=0 else if(updateRetryCount<3){
+                updateRetryCount++
+                handler.postDelayed({checkForUpdate(true)},15_000L*updateRetryCount)
             }
         }.start()
     }
+
+    override fun onResume(){super.onResume();if(pageReady)checkForUpdate()}
     private fun jsQuote(value:String)=value.replace("\\","\\\\").replace("'","\\'")
     private fun isNewerVersion(latest:String,current:String):Boolean{
         val a=latest.split('.').map{it.takeWhile(Char::isDigit).toIntOrNull()?:0}
@@ -157,5 +170,5 @@ class MainActivity : Activity() {
         web?.evaluateJavascript(script, callback) ?: callback("\"webview-missing\"")
     }
     override fun onBackPressed(){if(web?.canGoBack()==true)web?.goBack()else moveTaskToBack(true)}
-    override fun onDestroy(){handler.removeCallbacks(snapshotPump);tts?.stop();tts?.shutdown();web?.let{v->(v.parent as? android.view.ViewGroup)?.removeView(v);v.stopLoading();v.removeJavascriptInterface("Android");v.destroy()};web=null;super.onDestroy()}
+    override fun onDestroy(){handler.removeCallbacksAndMessages(null);tts?.stop();tts?.shutdown();web?.let{v->(v.parent as? android.view.ViewGroup)?.removeView(v);v.stopLoading();v.removeJavascriptInterface("Android");v.destroy()};web=null;super.onDestroy()}
 }
