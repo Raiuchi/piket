@@ -91,7 +91,7 @@ class NativeMotionFilter {
         // while fresh coordinates clearly show another motion state. Require two
         // consistent positional samples, then replace the stale value.
         if (speed != null && prior != null && dt in 0.5..5.0 && !weakSatellites) {
-            val movementFloor = maxOf(10.0, fix.accuracyM + prior.accuracyM)
+            val movementFloor = maxOf(10.0, (fix.accuracyM + prior.accuracyM).toDouble())
             val positionalSpeed = if (distance >= movementFloor) (distance / dt).toFloat() else 0f
             if (abs(speed - positionalSpeed) >= 5.0f) {
                 val candidate = mismatchCandidate
