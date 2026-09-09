@@ -129,7 +129,8 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("function updateScheduleLivePace"))
         assertTrue(html.contains("var distance=Math.abs(to-pos)"))
         assertTrue(html.contains("scheduleRequirement(pos,to,left)"))
-        assertTrue(html.contains("требуемая скорость"))
-        assertTrue(html.contains("максимально разрешённая"))
+        assertTrue(html.contains("ориентир по графику"))
+        assertTrue(html.contains("максимальная допустимая скорость"))
+        assertTrue(html.contains("график недостижим · расчёт"))
     }
 }
