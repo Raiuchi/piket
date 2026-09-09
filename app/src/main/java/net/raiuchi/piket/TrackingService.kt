@@ -49,6 +49,7 @@ class TrackingService : Service() {
     private var networkBackupActive = false
     private var lastFixReceivedAt = 0L
     private var lastFusedRestartAt = 0L
+    private var signalUnavailableMarked = false
     private var watchdog: Runnable? = null
 
     private var locationManager: LocationManager? = null
@@ -166,10 +167,8 @@ class TrackingService : Service() {
                 processLocation(location)
             }
             override fun onLocationAvailability(value: LocationAvailability) {
-                if (!value.isLocationAvailable) {
-                    motionFilter.markSignalUnavailable(); tripEngine?.markSignalUnavailable()
-                    persistSnapshot(null, 999f)
-                }
+                // Android may toggle this flag for a fraction of a second even while
+                // fixes continue. The watchdog below confirms a real silence first.
             }
         }
         lastFixReceivedAt = System.currentTimeMillis()
@@ -201,6 +200,11 @@ class TrackingService : Service() {
             override fun run() {
                 val now = System.currentTimeMillis()
                 val silence = now - lastFixReceivedAt
+                if (silence > 8_000 && !signalUnavailableMarked) {
+                    signalUnavailableMarked = true
+                    motionFilter.markSignalUnavailable(); tripEngine?.markSignalUnavailable()
+                    persistSnapshot(null, 999f)
+                } else if (silence <= 3_000) signalUnavailableMarked = false
                 if (silence > 10_000 && !networkBackupActive) startNetworkBackup()
                 else if (silence <= 10_000 && networkBackupActive) stopNetworkBackup()
                 if (silence > 15_000 && now - lastFusedRestartAt > 15_000) restartFused(now)
@@ -267,8 +271,9 @@ class TrackingService : Service() {
                 currentSnap = nextSnap
             }
         }
+        val positionAccepted = result.accepted && result.filteredSpeedMps != null
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
-            result.filteredSpeedMps, result.accepted, currentSnap))
+            result.filteredSpeedMps, positionAccepted, currentSnap, result.stationary))
         tripEngine?.save()?.let(::persistTripState)
         output?.let {
             updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))

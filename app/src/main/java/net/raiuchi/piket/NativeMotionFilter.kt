@@ -39,7 +39,9 @@ class NativeMotionFilter {
     private var lastSpeedMps = 0f
     private var stationaryAnchor: Fix? = null
     private var stationarySinceMs = 0L
-    private var recovering = false
+    // A single cold-start Doppler sample is often a false 5–15 km/h while the
+    // receiver is still settling. Require the same confirmation as after an outage.
+    private var recovering = true
     private var recoveryCandidate: Float? = null
     private var recoveryCount = 0
 
@@ -48,7 +50,7 @@ class NativeMotionFilter {
         lastSpeedMps = 0f
         stationaryAnchor = null
         stationarySinceMs = 0L
-        recovering = false
+        recovering = true
         recoveryCandidate = null
         recoveryCount = 0
     }
@@ -66,6 +68,10 @@ class NativeMotionFilter {
             fix.latitude !in -90.0..90.0 || fix.longitude !in -180.0..180.0) {
             return rejected("coordinates")
         }
+        // A poor fix can still lie close to a long straight railway and move the
+        // along-track position by hundreds of metres. Count from speed until GPS
+        // becomes accurate again instead of snapping to that point.
+        if (!fix.accuracyM.isFinite() || fix.accuracyM > 50f) return rejected("accuracy")
 
         val prior = previous
         val dt = prior?.let { (fix.elapsedMs - it.elapsedMs).coerceAtLeast(0L) / 1000.0 } ?: 0.0
@@ -80,7 +86,12 @@ class NativeMotionFilter {
         val stationary = stationaryAnchor != null &&
             fix.elapsedMs - stationarySinceMs >= 10_000L &&
             distanceMeters(stationaryAnchor!!.latitude, stationaryAnchor!!.longitude, fix.latitude, fix.longitude) <= 25.0
-        if (stationary) speed = 0f
+        if (stationary) {
+            speed = 0f
+            recovering = false
+            recoveryCandidate = null
+            recoveryCount = 0
+        }
 
         if (speed != null) {
             if (speed > 83.34f) speed = null // 300 км/ч — выше рабочего диапазона составов

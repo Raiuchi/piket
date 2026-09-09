@@ -16,8 +16,22 @@ class NativeMotionFilterTest {
 
     @Test fun suppressesImpossibleAcceleration() {
         val filter = NativeMotionFilter()
-        assertEquals(0f, filter.process(fix(0)).filteredSpeedMps)
+        assertNull(filter.process(fix(0)).filteredSpeedMps)
+        assertEquals(0f, filter.process(fix(1_000)).filteredSpeedMps)
         assertNull(filter.process(fix(2_000, speed = 27.78f)).filteredSpeedMps)
+    }
+
+    @Test fun rejectsPoorAccuracyThatCouldShiftPositionAlongTrack() {
+        val filter = NativeMotionFilter()
+        val poor = fix(0).copy(accuracyM = 120f)
+        assertFalse(filter.process(poor).accepted)
+        assertEquals("accuracy", filter.process(poor).reason)
+    }
+
+    @Test fun coldStartRequiresTwoConsistentSpeedSamples() {
+        val filter = NativeMotionFilter()
+        assertNull(filter.process(fix(0, speed = 2.8f)).filteredSpeedMps)
+        assertEquals(0f, filter.process(fix(1_000, speed = 0f)).filteredSpeedMps)
     }
 
     @Test fun confirmsSpeedTwiceAfterSignalLoss() {

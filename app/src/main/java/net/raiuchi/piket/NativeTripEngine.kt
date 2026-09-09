@@ -8,7 +8,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     data class Restriction(val id: String, val route: String, val direction: String,
                            val startOfficialM: Double, val endOfficialM: Double, val leadM: Double)
     data class Input(val elapsedMs: Long, val speedMps: Float?, val acceptedFix: Boolean,
-                     val snap: NativeRouteEngine.Snap?)
+                     val snap: NativeRouteEngine.Snap?, val stationary: Boolean = false)
     data class Output(val active: Boolean, val physicalM: Double?, val officialM: Double?,
                       val speedMps: Float, val recovering: Boolean, val source: String,
                       val alertId: String?, val alertDistanceM: Double?, val alertInZone: Boolean)
@@ -71,6 +71,12 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
             return output("native-gps")
         }
         if (snap != null && physicalM != null) {
+            // Do not let harmless GPS drift move the kilometre while the train is
+            // stopped. A recovery after a real outage is still confirmed below.
+            if (!recovering && (input.stationary || (input.speedMps != null && input.speedMps <= 0.8f))) {
+                speedMps = 0f
+                return output("native-gps")
+            }
             val difference = abs(snap.physicalM - physicalM!!)
             if (difference <= 50.0 && !recovering) {
                 physicalM = physicalM!! * 0.35 + snap.physicalM * 0.65

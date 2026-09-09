@@ -127,4 +127,13 @@ class NativeTripEngineTest {
             }
         }
     }
+
+    @Test fun stationaryGpsDriftDoesNotMoveCalibratedPosition() {
+        engine.update(NativeTripEngine.Input(1_000, 0f, true, snap(0), true))
+        val drifted = snap(1)
+        val output = engine.update(NativeTripEngine.Input(2_000, 0f, true, drifted, true))
+        assertEquals(route.points.first().physicalM, output.physicalM!!, 0.01)
+        assertEquals(route.chainageM.first(), output.officialM!!, 0.01)
+        assertEquals(0f, output.speedMps)
+    }
 }
