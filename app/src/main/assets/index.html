@@ -716,6 +716,11 @@
     <div class="card speed-ref-entry">
       <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><span class="ref-kicker">Путевой норматив</span><div class="t">Справочник скоростей · ОКТ-10 и ОКТ-54</div><div class="d">Редакция от 29.06.2026</div></div><div style="color:#68BFF5;font-size:24px">›</div></div>
     </div>
+    <div class="card" id="diagnosticsCard" style="padding:14px;display:none">
+      <div class="row" style="border-bottom:none;padding:4px 2px 12px"><div><div class="t">Диагностика поездки</div><div class="d">Локальный журнал GPS и автокоррекций. Никуда не отправляется сам.</div></div></div>
+      <button class="lb" id="btnShareDiagnostics" style="width:100%;margin-bottom:9px">Поделиться диагностикой</button>
+      <button class="lb danger" id="btnClearDiagnostics" style="width:100%">Очистить журнал</button>
+    </div>
     <div class="card" style="padding:14px">
       <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
     </div>
@@ -2625,6 +2630,11 @@ window.addEventListener("error",function(e){
   $("#leadDn").addEventListener("click",function(){ state.settings.lead=Math.max(300,state.settings.lead-500); persist(); syncSw(); renderTrip(); });
 
   $("#btnWipe").addEventListener("click",async function(){ if(!state.restrictions.length){ toast("Список и так пуст"); return; } if(await showConfirm("Удалить все ограничения?",{okText:"Удалить",title:"Очистить список"})){ state.restrictions=[]; alertState={}; persist(); renderList(); renderTrip(); toast("Список очищен"); } });
+  if(window.Android&&window.Android.shareDiagnostics){
+    $("#diagnosticsCard").style.display="block";
+    $("#btnShareDiagnostics").addEventListener("click",function(){window.Android.shareDiagnostics();});
+    $("#btnClearDiagnostics").addEventListener("click",async function(){if(await showConfirm("Очистить диагностический журнал?",{okText:"Очистить",title:"Диагностика"}))window.Android.clearDiagnostics();});
+  }
 
   $("#listBox").addEventListener("click",function(e){ var del=e.target.closest("[data-del]");
     if(del){ var id=del.getAttribute("data-del"); state.restrictions=state.restrictions.filter(function(x){return x.id!==id;}); persist(); renderList(); renderTrip(); toast("Удалено"); return; }

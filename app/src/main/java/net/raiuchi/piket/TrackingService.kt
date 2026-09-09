@@ -83,10 +83,15 @@ class TrackingService : Service() {
     private var lastTripPersistAt = 0L
     private var lastNotificationText = ""
     private var lastNotificationAt = 0L
+    private lateinit var diagnostics: DiagnosticsLogger
+    private var lastDiagnosticSampleAt = 0L
+    private var lastDiagnosticQuality = ""
 
     override fun onCreate() {
         super.onCreate()
         mainHandler = Handler(Looper.getMainLooper())
+        diagnostics = DiagnosticsLogger(this)
+        diagnostics.event("service_started", mapOf("version" to packageManager.getPackageInfo(packageName, 0).versionName))
         createChannel()
         startAsForeground()
 
@@ -281,14 +286,38 @@ class TrackingService : Service() {
             updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))
         }
         persistSnapshot(output, accuracy); handleAlert(output)
+        recordDiagnosticSample(location, result, currentSnap, output)
         output?.officialM?.let { official ->
-            val value = official.roundToInt()
-            val text="${value / 1000} км ${(value % 1000) / 100} пк"
+            val text=NativePositionLabel.kmPk(official)
             val now=SystemClock.elapsedRealtime()
-            if(lastNotificationText.isEmpty()||now-lastNotificationAt>=10_000){
+            if(text!=lastNotificationText||now-lastNotificationAt>=10_000){
                 lastNotificationText=text;lastNotificationAt=now;updateNotificationText(this,text)
             }
         }
+    }
+
+    private fun recordDiagnosticSample(location: Location, result: NativeMotionFilter.Result,
+        snap: NativeRouteEngine.Snap?, output: NativeTripEngine.Output?) {
+        val now = SystemClock.elapsedRealtime()
+        val qualityChanged = result.quality != lastDiagnosticQuality
+        if (!qualityChanged && now - lastDiagnosticSampleAt < 5_000) return
+        lastDiagnosticSampleAt = now; lastDiagnosticQuality = result.quality
+        diagnostics.event(if (qualityChanged) "gps_quality_changed" else "gps_sample", mapOf(
+            "route" to routeLabel, "journey" to journeyId,
+            "direction" to tripEngine?.save()?.direction,
+            "lat" to location.latitude, "lon" to location.longitude,
+            "accuracy_m" to location.accuracy,
+            "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
+            "filtered_speed_kmh" to result.filteredSpeedMps?.times(3.6f),
+            "accepted" to result.accepted, "stationary" to result.stationary,
+            "quality" to result.quality, "reason" to result.reason,
+            "satellites" to satellitesUsed, "average_cn0" to averageCn0,
+            "distance_to_route_m" to snap?.distanceM,
+            "snapped_physical_m" to snap?.physicalM,
+            "engine_physical_m" to output?.physicalM,
+            "official_m" to output?.officialM,
+            "source" to output?.source, "recovering" to output?.recovering
+        ))
     }
 
     private fun persistSnapshot(output: NativeTripEngine.Output?, accuracy: Float, force:Boolean=false) = runCatching {
@@ -357,6 +386,9 @@ class TrackingService : Service() {
             previousState?.direction != nextDirection) completedAlertIds.clear()
         tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
             nextActive, restrictions)
+        diagnostics.event("trip_configured", mapOf("route" to routeLabel, "journey" to journeyId,
+            "direction" to nextDirection, "active" to nextActive,
+            "manual_official_m" to root.optDouble("manualOfficialM"), "restrictions" to restrictions.size))
     }
 
     private fun handleAlert(output: NativeTripEngine.Output?) {
@@ -436,6 +468,9 @@ class TrackingService : Service() {
     }
 
     override fun onDestroy() {
+        diagnostics.event("service_stopped", mapOf("route" to routeLabel,
+            "physical_m" to tripEngine?.save()?.physicalM,
+            "manual_official_m" to tripEngine?.save()?.manualOfficialM))
         tripTicker?.let(mainHandler::removeCallbacks); watchdog?.let(mainHandler::removeCallbacks)
         tripTicker = null; watchdog = null; stopNetworkBackup()
         mainLocationCallback?.let { fusedClient?.removeLocationUpdates(it) }

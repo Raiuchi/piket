@@ -11,6 +11,7 @@ import android.speech.tts.TextToSpeech
 import android.view.WindowManager
 import android.webkit.*
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -31,6 +32,7 @@ class MainActivity : Activity() {
     private var pendingConfig: String? = null
     private val handler = Handler(Looper.getMainLooper())
     private val repository by lazy { PiketRepository(this) }
+    private val diagnostics by lazy { DiagnosticsLogger(this) }
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private val snapshotPump = object : Runnable {
@@ -153,6 +155,19 @@ class MainActivity : Activity() {
         @JavascriptInterface fun updatePosition(text:String){}
         @JavascriptInterface fun openUrl(url:String)=runOnUiThread{openExternal(Uri.parse(url))}
         @JavascriptInterface fun shareText(subject:String,text:String)=runOnUiThread{runCatching{startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,subject);putExtra(Intent.EXTRA_TEXT,text)},"Экспорт"))}}
+        @JavascriptInterface fun shareDiagnostics()=runOnUiThread{
+            runCatching {
+                val file=diagnostics.exportFile()
+                val uri=FileProvider.getUriForFile(this@MainActivity,"$packageName.files",file)
+                startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{
+                    type="text/plain";putExtra(Intent.EXTRA_SUBJECT,"ПИКЕТ — диагностика GPS")
+                    putExtra(Intent.EXTRA_STREAM,uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                },"Поделиться диагностикой"))
+            }.onFailure{web?.evaluateJavascript("if(window.toast)toast('Не удалось подготовить журнал')",null)}
+        }
+        @JavascriptInterface fun clearDiagnostics()=runOnUiThread{
+            diagnostics.clear();web?.evaluateJavascript("if(window.toast)toast('Диагностический журнал очищен')",null)
+        }
         @JavascriptInterface fun openAutostartSettings()=false
     }
     fun evaluateJavascriptForTest(script: String, callback: (String) -> Unit) =
