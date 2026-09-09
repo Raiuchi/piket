@@ -70,4 +70,18 @@ class NativeMotionFilterTest {
         assertNotNull(corrected.filteredSpeedMps)
         assertTrue(corrected.filteredSpeedMps!! > 15f)
     }
+
+    @Test fun accurateDopplerAndCoordinatesUnlockAfterLongBadAccuracyPeriod() {
+        val filter = NativeMotionFilter()
+        filter.process(fix(0, speed = 1f))
+        filter.process(fix(1_000, speed = 1f))
+        repeat(20) { index ->
+            filter.process(fix(2_000L + index * 1_000L, speed = null).copy(accuracyM = 500f))
+        }
+        val first = filter.process(fix(22_000, lat = 59.90039, speed = 43f))
+        val second = filter.process(fix(23_000, lat = 59.90078, speed = 43f))
+        assertNull(first.filteredSpeedMps)
+        assertNotNull(second.filteredSpeedMps)
+        assertEquals(43f, second.filteredSpeedMps!!, 0.5f)
+    }
 }

@@ -84,6 +84,7 @@ class NativeMotionFilter {
         val poorDoppler = (fix.speedAccuracyMps ?: -1f) > 8f
 
         var speedReconciled = false
+        var positionCorroborated = false
         var speed = if (!poorDoppler) fix.speedMps?.takeIf { it >= 0f } else null
         if (speed == null && dt >= 0.5 && !weakSatellites) speed = (distance / dt).toFloat()
 
@@ -102,6 +103,11 @@ class NativeMotionFilter {
             } else {
                 mismatchCandidate = null
                 mismatchCount = 0
+                // Doppler and movement between two accurate fixes independently
+                // confirm the same speed. Accept it even after a long period where
+                // the receiver supplied only stale/low-accuracy fixes; otherwise
+                // the old near-zero speed can permanently lock out a moving train.
+                positionCorroborated = distance >= movementFloor
             }
         }
 
@@ -121,7 +127,8 @@ class NativeMotionFilter {
             // During cold start/recovery the first sample is only a candidate, so
             // compare two candidates with each other below rather than with the
             // stale pre-outage speed.
-            if (speed != null && !stationary && !recovering && !speedReconciled && prior != null && dt > 0.0) {
+            if (speed != null && !stationary && !recovering && !speedReconciled &&
+                !positionCorroborated && prior != null && dt > 0.0) {
                 val maxChangeKmh = min(12.0 * maxOf(dt, 0.5) + 5.0, 45.0)
                 if (abs(speed * 3.6f - lastSpeedMps * 3.6f) > maxChangeKmh) speed = null
             }

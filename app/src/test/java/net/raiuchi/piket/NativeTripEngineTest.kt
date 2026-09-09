@@ -136,4 +136,15 @@ class NativeTripEngineTest {
         assertEquals(route.chainageM.first(), output.officialM!!, 0.01)
         assertEquals(0f, output.speedMps)
     }
+
+    @Test fun confirmedPositionCanRecoverWhileDopplerSpeedIsUnavailable() {
+        engine.update(NativeTripEngine.Input(1_000, 40f, true, snap(0)))
+        engine.markSignalUnavailable()
+        val first = engine.update(NativeTripEngine.Input(2_000, null, true, snap(1)))
+        assertTrue(first.recovering)
+        val second = engine.update(NativeTripEngine.Input(3_000, null, true, snap(1)))
+        assertFalse(second.recovering)
+        assertEquals(snap(1).physicalM, second.physicalM!!, 0.1)
+        assertEquals(40f, second.speedMps)
+    }
 }

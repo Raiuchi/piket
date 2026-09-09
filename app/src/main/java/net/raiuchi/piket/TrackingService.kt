@@ -50,6 +50,8 @@ class TrackingService : Service() {
     private var lastFixReceivedAt = 0L
     private var lastFusedRestartAt = 0L
     private var signalUnavailableMarked = false
+    private var lastUsableFixAt = 0L
+    private var unusableFixMarked = false
     private var watchdog: Runnable? = null
 
     private var locationManager: LocationManager? = null
@@ -178,6 +180,7 @@ class TrackingService : Service() {
             }
         }
         lastFixReceivedAt = System.currentTimeMillis()
+        lastUsableFixAt = lastFixReceivedAt
         runCatching { fusedClient?.requestLocationUpdates(locationRequest(), mainLocationCallback!!, Looper.getMainLooper()) }
         startWatchdog()
         startGnssMonitor()
@@ -260,6 +263,20 @@ class TrackingService : Service() {
             location.speed.takeIf { location.hasSpeed() },
             location.speedAccuracyMetersPerSecond.takeIf { location.hasSpeedAccuracy() },
             location.isMock, satellitesUsed, averageCn0, gnssTelemetrySeen))
+        val wallNow = System.currentTimeMillis()
+        if (result.accepted && result.quality in setOf("good", "stationary")) {
+            lastUsableFixAt = wallNow
+            unusableFixMarked = false
+        } else if (!unusableFixMarked && wallNow - lastUsableFixAt > 8_000) {
+            // FusedLocation can keep sending fresh but useless fixes with an
+            // accuracy radius of hundreds or thousands of metres. The old
+            // watchdog treated those callbacks as a healthy signal.
+            unusableFixMarked = true
+            motionFilter.markSignalUnavailable()
+            tripEngine?.markSignalUnavailable()
+            diagnostics.event("usable_gps_lost", mapOf("accuracy_m" to accuracy,
+                "quality" to result.quality, "reason" to result.reason))
+        }
         var currentSnap = routeEngine?.snap(routeLabel, location.latitude, location.longitude)
         val state = tripEngine?.save()
         if (state != null) {
@@ -277,8 +294,12 @@ class TrackingService : Service() {
                 currentSnap = nextSnap
             }
         }
-        val positionAccepted = result.accepted && result.filteredSpeedMps != null
-        val engineSpeed = result.filteredSpeedMps ?: if (result.accepted) 0f else null
+        // Position and Doppler speed are independent measurements. Previously a
+        // filtered speed also discarded an accurate on-track position, leaving
+        // both speed and kilometre frozen until Stop/Start. NativeTripEngine has
+        // its own two-fix recovery confirmation, so a good position remains safe.
+        val positionAccepted = result.accepted && result.quality in setOf("good", "stationary")
+        val engineSpeed = result.filteredSpeedMps
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
             engineSpeed, positionAccepted, currentSnap, result.stationary))
         tripEngine?.save()?.let(::persistTripState)
