@@ -60,4 +60,14 @@ class NativeMotionFilterTest {
         assertTrue(result.stationary)
         assertEquals(0f, result.filteredSpeedMps)
     }
+
+    @Test fun replacesStuckZeroWithConfirmedCoordinateSpeed() {
+        val filter = NativeMotionFilter()
+        filter.process(fix(0, speed = 0f))
+        filter.process(fix(1_000, speed = 0f))
+        assertNull(filter.process(fix(2_000, lat = 59.90020, speed = 0f)).filteredSpeedMps)
+        val corrected = filter.process(fix(3_000, lat = 59.90040, speed = 0f))
+        assertNotNull(corrected.filteredSpeedMps)
+        assertTrue(corrected.filteredSpeedMps!! > 15f)
+    }
 }

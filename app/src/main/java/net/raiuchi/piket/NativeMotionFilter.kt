@@ -44,6 +44,8 @@ class NativeMotionFilter {
     private var recovering = true
     private var recoveryCandidate: Float? = null
     private var recoveryCount = 0
+    private var mismatchCandidate: Float? = null
+    private var mismatchCount = 0
 
     fun reset() {
         previous = null
@@ -53,6 +55,8 @@ class NativeMotionFilter {
         recovering = true
         recoveryCandidate = null
         recoveryCount = 0
+        mismatchCandidate = null
+        mismatchCount = 0
     }
 
     fun markSignalUnavailable() {
@@ -79,8 +83,27 @@ class NativeMotionFilter {
         val weakSatellites = fix.hasGnssTelemetry && (fix.satellitesUsed < 4 || fix.averageCn0 < 12f)
         val poorDoppler = (fix.speedAccuracyMps ?: -1f) > 8f
 
+        var speedReconciled = false
         var speed = if (!poorDoppler) fix.speedMps?.takeIf { it >= 0f } else null
         if (speed == null && dt >= 0.5 && !weakSatellites) speed = (distance / dt).toFloat()
+
+        // Some receivers keep reporting a stale Doppler speed (including zero)
+        // while fresh coordinates clearly show another motion state. Require two
+        // consistent positional samples, then replace the stale value.
+        if (speed != null && prior != null && dt in 0.5..5.0 && !weakSatellites) {
+            val movementFloor = maxOf(10.0, fix.accuracyM + prior.accuracyM)
+            val positionalSpeed = if (distance >= movementFloor) (distance / dt).toFloat() else 0f
+            if (abs(speed - positionalSpeed) >= 5.0f) {
+                val candidate = mismatchCandidate
+                if (candidate != null && abs(candidate - positionalSpeed) <= 3.0f) mismatchCount++
+                else { mismatchCandidate = positionalSpeed; mismatchCount = 1 }
+                speedReconciled = mismatchCount >= 2
+                speed = if (speedReconciled) positionalSpeed else null
+            } else {
+                mismatchCandidate = null
+                mismatchCount = 0
+            }
+        }
 
         updateStationary(fix)
         val stationary = stationaryAnchor != null &&
@@ -98,7 +121,7 @@ class NativeMotionFilter {
             // During cold start/recovery the first sample is only a candidate, so
             // compare two candidates with each other below rather than with the
             // stale pre-outage speed.
-            if (speed != null && !stationary && !recovering && prior != null && dt > 0.0) {
+            if (speed != null && !stationary && !recovering && !speedReconciled && prior != null && dt > 0.0) {
                 val maxChangeKmh = min(12.0 * maxOf(dt, 0.5) + 5.0, 45.0)
                 if (abs(speed * 3.6f - lastSpeedMps * 3.6f) > maxChangeKmh) speed = null
             }

@@ -75,6 +75,7 @@ class TrackingService : Service() {
     private val alertSpeech = mutableMapOf<String, String>()
     private var lastAlertId: String? = null
     private var lastAlertInZone = false
+    private val completedAlertIds = mutableSetOf<String>()
     private var lastZoneSampleAt = 0L
     private var frequentInterference = false
     private var lastSnapshotPersistAt = 0L
@@ -272,8 +273,9 @@ class TrackingService : Service() {
             }
         }
         val positionAccepted = result.accepted && result.filteredSpeedMps != null
+        val engineSpeed = result.filteredSpeedMps ?: if (result.accepted) 0f else null
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
-            result.filteredSpeedMps, positionAccepted, currentSnap, result.stationary))
+            engineSpeed, positionAccepted, currentSnap, result.stationary))
         tripEngine?.save()?.let(::persistTripState)
         output?.let {
             updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))
@@ -332,6 +334,7 @@ class TrackingService : Service() {
 
     private fun applyConfig(raw: String?) = runCatching {
         val root = JSONObject(raw ?: return@runCatching)
+        val previousState = tripEngine?.save()
         routeLabel = root.optString("route", "Все участки")
         journeyId = root.optString("journey").ifBlank { null }
         soundEnabled = root.optBoolean("sound", true); vibrationEnabled = root.optBoolean("vibration", true)
@@ -341,20 +344,29 @@ class TrackingService : Service() {
             repeat(items.length()) { index ->
                 val item = items.optJSONObject(index) ?: return@repeat
                 val start = item.optDouble("km") * 1_000 + (item.optDouble("pk", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("m", 0.0)
-                val end = if (item.has("kmE")) item.optDouble("kmE") * 1_000 + (item.optDouble("pkE", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("mE", 0.0) else start
+                val end = if (item.has("kmE")) item.optDouble("kmE") * 1_000 + (item.optDouble("pkE", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("mE", 0.0) else start + 100.0
                 val id = item.optString("id", index.toString())
                 add(NativeTripEngine.Restriction(id, item.optString("peregon", "Все участки"),
                     item.optString("dir", "both"), start, end, item.optDouble("lead", root.optDouble("lead", 3_000.0))))
                 alertSpeech[id] = "${item.optInt("speed")} километров в час. ${item.optString("reason", "Ограничение")}" 
             }
         }
-        tripEngine?.configure(routeLabel, root.optString("direction", "tuda"), root.optDouble("manualOfficialM"),
-            root.optBoolean("active"), restrictions)
+        val nextDirection = root.optString("direction", "tuda")
+        val nextActive = root.optBoolean("active")
+        if ((previousState?.active != true && nextActive) || previousState?.route != routeLabel ||
+            previousState?.direction != nextDirection) completedAlertIds.clear()
+        tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
+            nextActive, restrictions)
     }
 
     private fun handleAlert(output: NativeTripEngine.Output?) {
         val id = output?.alertId
         if (id == null) { lastAlertId = null; lastAlertInZone = false; return }
+        val completedKey = "$routeLabel|${tripEngine?.save()?.direction}|$id"
+        if (completedKey in completedAlertIds) {
+            lastAlertId = id; lastAlertInZone = output.alertInZone
+            return
+        }
         val entered = output.alertInZone && (id != lastAlertId || !lastAlertInZone)
         if (id != lastAlertId || entered) {
             val kind = if (entered) "danger" else "warning"
@@ -362,6 +374,7 @@ class TrackingService : Service() {
             if (soundEnabled) { beep(kind); speak(phrase) }
             if (vibrationEnabled) vibrate(kind)
         }
+        if (entered) completedAlertIds += completedKey
         lastAlertId = id; lastAlertInZone = output.alertInZone
     }
 
