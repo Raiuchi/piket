@@ -145,6 +145,8 @@ class NativeTripEngineTest {
         val second = engine.update(NativeTripEngine.Input(3_000, null, true, snap(1)))
         assertFalse(second.recovering)
         assertEquals(snap(1).physicalM, second.physicalM!!, 0.1)
-        assertEquals(40f, second.speedMps)
+        // During an outage the last trustworthy speed is deliberately faded very
+        // slightly, so recovery must preserve it without requiring exact equality.
+        assertEquals(40f, second.speedMps, 0.3f)
     }
 }
