@@ -45,4 +45,32 @@ class NativeJourneyPositionTest {
             assertTrue(NativeJourneyPosition.isCurrentLeg(boundary, boundary, boundary + 10_000.0))
         }
     }
+
+    @Test fun zanevskyAxisResetKeepsDachaTimetableMovingForward() {
+        val beforeReset = NativeJourneyPosition.unifiedMeters(
+            "Д. Долг - Павлово", "Д. Долг - Павлово", 4_900.0, "804", 4_900.0
+        )
+        val afterReset = NativeJourneyPosition.unifiedMeters(
+            "Д. Долг - Павлово", "Д. Долг - Павлово", 2_000.0, "804", 6_074.0
+        )
+        assertEquals(4_900.0, beforeReset!!, 0.01)
+        assertEquals(6_074.0, afterReset!!, 0.01)
+        assertTrue("the 5 km → 2 km official reset must not rewind the timetable", afterReset > beforeReset)
+        assertTrue(NativeJourneyPosition.isCurrentLeg(afterReset, 4_800.0, 10_900.0))
+    }
+
+    @Test fun dachaTechnicalLegsMeetTimetableAtPavlovoAndGory() {
+        assertEquals(29_200.0, NativeJourneyPosition.unifiedMeters(
+            "Д. Долг - Павлово", "Павлово - Горы II путь", 19_000.0, "804", 21_199.0
+        )!!, 0.01)
+        assertEquals(42_000.0, NativeJourneyPosition.unifiedMeters(
+            "Д. Долг - Павлово", "Павлово - Горы II путь", 42_000.0, "804", 33_500.0
+        )!!, 0.01)
+        assertEquals(42_000.0, NativeJourneyPosition.unifiedMeters(
+            "Горы - Петрозаводск", "Горы - Павлово I путь", 52_000.0, "803", 52_000.0
+        )!!, 0.01)
+        assertEquals(29_200.0, NativeJourneyPosition.unifiedMeters(
+            "Горы - Петрозаводск", "Горы - Павлово I путь", 29_000.0, "803", 28_200.0
+        )!!, 0.01)
+    }
 }

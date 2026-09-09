@@ -130,7 +130,7 @@ fun PiketApp(
             when (referenceScreen) {
                 NativeReferenceScreen.TIMETABLE -> NativeTimetableScreen(
                     model.referenceData, model.route, model.direction, model.scheduleOverrides,
-                    model.snapshot.route, model.snapshot.officialM,
+                    model.snapshot.route, model.snapshot.officialM, model.snapshot.physicalM,
                     model::updateScheduleTime, model::resetSchedule
                 ) { referenceScreen = null }
                 NativeReferenceScreen.SPEEDS -> NativeSpeedReferenceScreen(model.referenceData) { referenceScreen = null }

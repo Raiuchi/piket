@@ -32,6 +32,7 @@ fun NativeTimetableScreen(
     overrides: Map<String, String>,
     currentRoute: String,
     currentOfficialM: Double?,
+    currentPhysicalM: Double?,
     updateTime: (String, String?) -> Unit,
     resetTrain: (String) -> Unit,
     close: () -> Unit
@@ -45,7 +46,9 @@ fun NativeTimetableScreen(
     NativeReferenceScaffold("Расписание и время хода", close) {
         item { PremiumSelector("НОМЕР ПОЕЗДА", selected?.let { "Поезд ${it.number} · ${it.title}" } ?: "Для участка поездов нет") { expanded = true } }
         selected?.let { train ->
-            val currentJourneyM = NativeJourneyPosition.unifiedMeters(route, currentRoute, currentOfficialM, train.number)
+            val currentJourneyM = NativeJourneyPosition.unifiedMeters(
+                route, currentRoute, currentOfficialM, train.number, currentPhysicalM
+            )
             items(train.stops.indices.toList()) { index ->
                 val from = train.stops[index]
                 val to = train.stops.getOrNull(index + 1)

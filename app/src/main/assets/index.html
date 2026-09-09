@@ -1296,7 +1296,8 @@ window.addEventListener("error",function(e){
   function scheduleSourceRoute(){var through=activeThrough();return through==="chudovo"?"Чудово - Новгород":(through==="vyborg"?"СПбФин - Выборг":(through==="dacha"?"Горы - Петрозаводск":state.ctx.peregon));}
   function scheduleRestrictionApplies(r){var through=activeThrough();return through==="chudovo"?(r.peregon==="Все участки"||r.peregon==="Горы - Петрозаводск"||r.peregon==="Волховстрой - Чудово"||r.peregon==="Чудово - Новгород"):(through==="vyborg"?(r.peregon==="Все участки"||isVyborgLeg(r.peregon)):(through==="dacha"?(r.peregon==="Все участки"||isDachaLeg(r.peregon)):inCtx(r)));}
   function scheduleRestrictionM(r,end){var start=metersOf(r.km,r.pk),value=end?(r.kmE!=null?metersOf(r.kmE,r.pkE):start+100):start,label=r.peregon==="Все участки"?state.ctx.peregon:r.peregon;if(activeThrough()==="chudovo"){if(label==="Чудово - Новгород")return 70000-value;if(label==="Волховстрой - Чудово")return 171000-value;if(label==="Горы - Петрозаводск")return value+46600;}return isVyborgLeg(state.ctx.peregon)&&label==="Выборг - Каменногорск"?128900+value:value;}
-  function scheduleLiveM(){if(!rt.tracking||rt.posM==null)return null;var through=activeThrough();if(through==="vyborg"&&state.ctx.peregon==="Выборг - Каменногорск")return 128900+rt.posM;if(through!=="chudovo")return rt.posM;if(state.ctx.peregon==="Чудово - Новгород")return 70000-rt.posM;if(state.ctx.peregon==="Волховстрой - Чудово")return 171000-rt.posM;if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM+46600;return null;}
+  function scheduleScale(value,a,b,x,y){var f=Math.max(0,Math.min(1,(value-a)/(b-a)));return x+f*(y-x);}
+  function scheduleLiveM(){if(!rt.tracking||rt.posM==null)return null;var through=activeThrough();if(through==="dacha"&&rt.physicalM!=null){if(state.ctx.peregon==="Д. Долг - Павлово")return rt.physicalM;if(state.ctx.peregon==="Павлово - Горы II путь")return scheduleScale(rt.physicalM,21199,33500,29200,42000);if(state.ctx.peregon==="Горы - Павлово I путь")return scheduleScale(rt.physicalM,28200,52000,29200,42000);}if(through==="vyborg"&&state.ctx.peregon==="Выборг - Каменногорск")return 128900+rt.posM;if(through!=="chudovo")return rt.posM;if(state.ctx.peregon==="Чудово - Новгород")return 70000-rt.posM;if(state.ctx.peregon==="Волховстрой - Чудово")return 171000-rt.posM;if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM+46600;return null;}
   function scheduleLiveIndex(mapped,train){
     var key=train.number+":"+train.direction+":"+activeThrough(),schedulePos=scheduleLiveM();
     if(rt.scheduleProgressKey!==key){rt.scheduleProgressKey=key;rt.scheduleProgressIndex=0;rt.scheduleProgressStarted=false;}
@@ -2230,7 +2231,7 @@ window.addEventListener("error",function(e){
     if(nativeOfficialM!=null){
       var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.toggle("on",nativeFrequentInterference===true);
       rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
-      rt.posM=+nativeOfficialM; rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
+      rt.posM=+nativeOfficialM; rt.physicalM=nativeTripPhysicalM==null?null:+nativeTripPhysicalM; rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
       rt.fixQuality=nativeTripRecovering?"recovering":(nativeTripSource||"native");
       rt.gpsState=nativeTripRecovering?"checking":"precise"; rt.satellitesUsed=+satellitesUsed||0; rt.averageCn0=+averageCn0||0;
       $("#gps").className="gps "+(nativeTripRecovering?"weak":"live");
