@@ -120,4 +120,12 @@ class NativeRepositoryContractTest {
         val journeys = json("journeys.json").getJSONObject("journeys")
         assertTrue(journeys.getJSONArray("819").length() > 1); assertTrue(journeys.getJSONArray("820").length() > 1)
     }
+
+    @Test fun timetableLivePaceUsesActualPositionAndRemainingTime() {
+        val html = projectFile("app/src/main/assets/index.html").readText()
+        assertTrue(html.contains("function updateScheduleLivePace"))
+        assertTrue(html.contains("var distance=Math.abs(to-pos)"))
+        assertTrue(html.contains("scheduleRequirement(pos,to,left)"))
+        assertTrue(html.contains("расчётный темп"))
+    }
 }
