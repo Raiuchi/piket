@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd(), target=process.argv[2];
+if(!target)throw new Error('Pass the checked-out piket-web directory');
+const version=fs.readFileSync('app/build.gradle','utf8').match(/versionName "([^"]+)"/)[1];
+const assets='app/src/main/assets';
+let html=fs.readFileSync(`${assets}/index.html`,'utf8').replaceAll('?v=1.5.0',`?v=${version}`);
+html=html.replace("register('./sw.js')","register('./sw.js', {updateViaCache:'none'})");
+fs.writeFileSync(path.join(target,'index.html'),html);
+for(const name of ['piket-core.js','piket-schedules.js'])fs.copyFileSync(`${assets}/assets/${name}`,path.join(target,'assets',name));
+let sw=fs.readFileSync(path.join(target,'sw.js'),'utf8').replace(/const CACHE_VERSION = '[^']+';/,`const CACHE_VERSION = 'piket-web-v${version}';`).replace(/\?v=[^']+/g,`?v=${version}`);
+fs.writeFileSync(path.join(target,'sw.js'),sw);
+fs.copyFileSync('README.md',path.join(target,'README.md'));
+console.log(`Web synchronized to ${version}`);

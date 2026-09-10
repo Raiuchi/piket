@@ -1583,7 +1583,23 @@ window.addEventListener("error",function(e){
     $("#gps").className="gps live"; $("#gpsTxt").textContent="ДЕМО";
     $("#spdSrc").textContent="ДЕМО · симуляция"; $("#spdSrc").className="src"; renderSatellites(0,false,true);
   }
-  function onPos(p,fromBackup){ var c=p.coords,acc=c.accuracy||999; rt.lastAccuracy=acc;
+  var diagnosticKey="piket_web_diagnostics", diagnosticLast=0;
+  function webLog(event, fields){
+    if(window.Android) return;
+    try {
+      var rows=JSON.parse(localStorage.getItem(diagnosticKey)||"[]");
+      rows.push(Object.assign({time:Date.now(),event:event,source:"browser",route:state.ctx.peregon,official_m:rt.posM,speed_kmh:rt.speed,quality:rt.fixQuality},fields||{}));
+      while(rows.length>1500)rows.shift();
+      localStorage.setItem(diagnosticKey,JSON.stringify(rows));
+    } catch(e){ if(!diagnosticLast)toast("Не удалось сохранить журнал браузера"); }
+  }
+  function onPos(p,fromBackup){
+    try { return processBrowserPosition(p,fromBackup); }
+    finally { if(Date.now()-diagnosticLast>=5000){
+      webLog("gps_sample",{lat:p.coords.latitude,lon:p.coords.longitude,accuracy_m:p.coords.accuracy,provider_speed_mps:p.coords.speed,fix_time:p.timestamp,backup:!!fromBackup}); diagnosticLast=Date.now();
+    } }
+  }
+  function processBrowserPosition(p,fromBackup){ var c=p.coords,acc=c.accuracy||999; rt.lastAccuracy=acc;
     if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(state.calib&&c.heading!=null&&(+c.speed||0)>5){
       var dsi=TRACK.labels.indexOf(state.ctx.peregon),dtm=currentTrackMeters();
@@ -2173,6 +2189,7 @@ window.addEventListener("error",function(e){
 
 
   function startTrack(){
+    webLog("trip_started");
     if(state.settings.demo){ startSim(); return; }
     if(state.calib==null || state.calib._manual!==true){
       toast("Сначала обязательная калибровка по километровому столбу");
@@ -2278,7 +2295,7 @@ window.addEventListener("error",function(e){
 
   function setTrackBtn(on){ var b=$("#btnTrack"); if(on){ b.textContent="■ Стоп"; b.classList.remove("primary"); b.classList.add("stop"); } else { b.textContent="▶ Старт"; b.classList.add("primary"); b.classList.remove("stop"); }
     var dirSeg=$("#dirSeg"); if(dirSeg) dirSeg.style.opacity = on ? "0.5" : "1"; }
-  function stopTrack(){ rt.tracking=false;
+  function stopTrack(){ webLog("trip_stopped"); rt.tracking=false;
     var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.remove("on");
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
     if(rt.backupWatchId!=null){ try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){} rt.backupWatchId=null; }
@@ -2635,6 +2652,17 @@ window.addEventListener("error",function(e){
     $("#diagnosticsCard").style.display="block";
     $("#btnShareDiagnostics").addEventListener("click",function(){window.Android.shareDiagnostics();});
     $("#btnClearDiagnostics").addEventListener("click",async function(){if(await showConfirm("Очистить диагностический журнал?",{okText:"Очистить",title:"Диагностика"}))window.Android.clearDiagnostics();});
+  } else {
+    $("#diagnosticsCard").style.display="block";
+    $("#btnShareDiagnostics").textContent="Скачать журнал";
+    $("#btnShareDiagnostics").addEventListener("click",function(){
+      try {
+        var rows=JSON.parse(localStorage.getItem(diagnosticKey)||"[]");
+        var blob=new Blob(["ПИКЕТ — журнал браузера. Содержит GPS-координаты.\n"+rows.map(function(x){return JSON.stringify(x);}).join("\n")],{type:"text/plain;charset=utf-8"});
+        var url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="piket-web-diagnostics.txt";a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);
+      }catch(e){toast("Не удалось скачать журнал");}
+    });
+    $("#btnClearDiagnostics").addEventListener("click",async function(){if(await showConfirm("Очистить диагностический журнал?",{okText:"Очистить",title:"Диагностика"})){try{localStorage.removeItem(diagnosticKey);toast("Журнал очищен");}catch(e){toast("Не удалось очистить журнал");}}});
   }
 
   $("#listBox").addEventListener("click",function(e){ var del=e.target.closest("[data-del]");
