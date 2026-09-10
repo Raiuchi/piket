@@ -63,12 +63,19 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
             val oa = route.chainageM[i]
             val ob = route.chainageM[i + 1]
             val official = ob - oa
-            if (official <= 0.0 || abs(official - physical) > 3_000.0) continue
+            if (official <= 0.0 || abs(official - physical) > 3_000.0) {
+                // Before the reset, officialMeters advances along the old axis.
+                if (officialM >= oa && officialM < oa + physical - 1.0) {
+                    candidates += Candidate(a + officialM - oa, 0.0)
+                }
+                continue
+            }
             if (officialM in minOf(oa, ob)..maxOf(oa, ob)) {
                 candidates += Candidate(a + (officialM - oa) / official * physical, 0.0)
             }
         }
-        return candidates.minWithOrNull(compareBy<Candidate> { it.error }.thenBy {
+        // Never clamp a remote restriction to the closest endpoint of this route.
+        return candidates.filter { it.error <= 0.01 }.minWithOrNull(compareBy<Candidate> { it.error }.thenBy {
             if (nearPhysicalM == null) it.physical else abs(it.physical - nearPhysicalM)
         })?.physical
     }

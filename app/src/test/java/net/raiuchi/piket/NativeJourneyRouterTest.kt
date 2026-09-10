@@ -52,12 +52,20 @@ class NativeJourneyRouterTest {
             val nextSnap = routes.snap(nextLabel, probe.latitude, probe.longitude)!!
             val boundaryM = boundaryPoint.physicalM
             val freshRouter = NativeJourneyRouter.fromTimingJson(timingSource, journeySource)
-            assertNull(freshRouter.consider(null, currentLabel, direction, boundaryM, boundaryM,
+            assertNull(freshRouter.consider("null", currentLabel, direction, boundaryM, boundaryM,
                 currentSnap.distanceM, nextSnap.distanceM, currentSnap.physicalM))
-            val switched = freshRouter.consider(null, currentLabel, direction, boundaryM, boundaryM,
+            val switched = freshRouter.consider("null", currentLabel, direction, boundaryM, boundaryM,
                 currentSnap.distanceM, nextSnap.distanceM, currentSnap.physicalM)
             assertEquals("$currentLabel → $nextLabel", nextLabel, switched?.route)
             assertEquals(direction, switched?.direction)
+        }
+    }
+
+    @Test fun endpointProjectionRecoversMissedTransitionAfterCountingDrift() {
+        repeat(2) { index ->
+            val result = router.consider("null", "Павлово - Горы II путь", "tuda",
+                40_000.0, 33_500.0, 120.0, 10.0, 33_500.0)
+            if (index == 0) assertNull(result) else assertEquals("Горы - Петрозаводск", result?.route)
         }
     }
 

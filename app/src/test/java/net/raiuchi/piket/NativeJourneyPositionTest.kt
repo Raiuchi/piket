@@ -59,15 +59,24 @@ class NativeJourneyPositionTest {
         assertTrue(NativeJourneyPosition.isCurrentLeg(afterReset, 4_800.0, 10_900.0))
     }
 
+    @Test fun pavlovoGoryMidpointHasHalfTheTimetableDistanceInBothDirections() {
+        assertEquals(31_600.0, NativeJourneyPosition.unifiedMeters(
+            "Д. Долг - Павлово", "Павлово - Горы II путь", 31_000.0, "804", (29_807.0 + 33_500.0) / 2
+        )!!, 0.01)
+        assertEquals(31_600.0, NativeJourneyPosition.unifiedMeters(
+            "Горы - Петрозаводск", "Горы - Павлово I путь", 31_000.0, "803", (28_200.0 + 33_500.0) / 2
+        )!!, 0.01)
+    }
+
     @Test fun dachaTechnicalLegsMeetTimetableAtPavlovoAndGory() {
         assertEquals(29_200.0, NativeJourneyPosition.unifiedMeters(
-            "Д. Долг - Павлово", "Павлово - Горы II путь", 19_000.0, "804", 21_199.0
+            "Д. Долг - Павлово", "Павлово - Горы II путь", 29_000.0, "804", 29_807.0
         )!!, 0.01)
         assertEquals(34_000.0, NativeJourneyPosition.unifiedMeters(
             "Д. Долг - Павлово", "Павлово - Горы II путь", 42_000.0, "804", 33_500.0
         )!!, 0.01)
         assertEquals(34_000.0, NativeJourneyPosition.unifiedMeters(
-            "Горы - Петрозаводск", "Горы - Павлово I путь", 52_000.0, "803", 52_000.0
+            "Горы - Петрозаводск", "Горы - Павлово I путь", 42_000.0, "803", 33_500.0
         )!!, 0.01)
         assertEquals(34_000.0, NativeJourneyPosition.unifiedMeters(
             "Д. Долг - Павлово", "Горы - Петрозаводск", 42_000.0, "804", 42_000.0

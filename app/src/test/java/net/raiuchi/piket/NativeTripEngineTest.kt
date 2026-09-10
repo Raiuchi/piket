@@ -56,6 +56,19 @@ class NativeTripEngineTest {
         assertTrue(output.alertDistanceM!! in 0.0..1_500.0)
     }
 
+    @Test fun remoteRestrictionDoesNotAnnounceAtPavlovoEndpoint() {
+        val label = "Д. Долг - Павлово"
+        val end = routes.route(label)!!.points.last()
+        val fix = routes.snap(label, end.latitude, end.longitude)!!
+        for (direction in listOf("tuda", "obratno")) {
+            val local = NativeTripEngine(routes)
+            local.configure(label, direction, fix.officialM, true, listOf(
+                NativeTripEngine.Restriction("remote", "Все участки", direction, 190_000.0, 190_100.0, 3_000.0)))
+            val output = local.update(NativeTripEngine.Input(1_000, 0f, true, fix))
+            assertNull(output.alertId)
+        }
+    }
+
     @Test fun reportsWhenNativePositionIsInsideRestriction() {
         val restriction = NativeTripEngine.Restriction("zone", route.label, "tuda",
             route.chainageM.first(), route.chainageM[1], 1_500.0)

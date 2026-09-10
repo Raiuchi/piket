@@ -279,7 +279,7 @@ class TrackingService : Service() {
         }
         var currentSnap = routeEngine?.snap(routeLabel, location.latitude, location.longitude)
         val state = tripEngine?.save()
-        if (state != null) {
+        if (state != null && result.accepted && result.quality in setOf("good", "stationary")) {
             val next = journeyRouter?.nextLeg(journeyId, routeLabel, state.direction)
             val nextSnap = next?.let { routeEngine?.snap(it.route, location.latitude, location.longitude) }
             val route = routeEngine?.route(routeLabel)
@@ -289,6 +289,9 @@ class TrackingService : Service() {
             val transition = journeyRouter?.consider(journeyId, routeLabel, state.direction,
                 state.physicalM, boundary, currentSnap?.distanceM, nextSnap?.distanceM, currentSnap?.physicalM)
             if (transition != null && nextSnap != null) {
+                diagnostics.event("route_transition", mapOf("from" to routeLabel,
+                    "to" to transition.route, "direction" to transition.direction,
+                    "physical_m" to nextSnap.physicalM, "official_m" to nextSnap.officialM))
                 routeLabel = transition.route
                 tripEngine?.switchRoute(transition.route, transition.direction, nextSnap)
                 currentSnap = nextSnap
@@ -386,7 +389,7 @@ class TrackingService : Service() {
         val root = JSONObject(raw ?: return@runCatching)
         val previousState = tripEngine?.save()
         routeLabel = root.optString("route", "Все участки")
-        journeyId = root.optString("journey").ifBlank { null }
+        journeyId = root.optString("journey").takeUnless { it.isBlank() || it == "null" }
         soundEnabled = root.optBoolean("sound", true); vibrationEnabled = root.optBoolean("vibration", true)
         alertSpeech.clear()
         val restrictions = buildList {
@@ -422,6 +425,9 @@ class TrackingService : Service() {
         }
         val entered = output.alertInZone && (id != lastAlertId || !lastAlertInZone)
         if (id != lastAlertId || entered) {
+            diagnostics.event("restriction_alert", mapOf("id" to id, "route" to routeLabel,
+                "distance_m" to output.alertDistanceM, "in_zone" to entered,
+                "official_m" to output.officialM))
             val kind = if (entered) "danger" else "warning"
             val phrase = (if (entered) "Ограничение. " else "Впереди ограничение. ") + (alertSpeech[id] ?: "Ограничение")
             if (soundEnabled) { beep(kind); speak(phrase) }

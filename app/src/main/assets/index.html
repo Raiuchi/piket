@@ -1297,7 +1297,7 @@ window.addEventListener("error",function(e){
   function scheduleRestrictionApplies(r){var through=activeThrough();return through==="chudovo"?(r.peregon==="Все участки"||r.peregon==="Горы - Петрозаводск"||r.peregon==="Волховстрой - Чудово"||r.peregon==="Чудово - Новгород"):(through==="vyborg"?(r.peregon==="Все участки"||isVyborgLeg(r.peregon)):(through==="dacha"?(r.peregon==="Все участки"||isDachaLeg(r.peregon)):inCtx(r)));}
   function scheduleRestrictionM(r,end){var start=metersOf(r.km,r.pk),value=end?(r.kmE!=null?metersOf(r.kmE,r.pkE):start+100):start,label=r.peregon==="Все участки"?state.ctx.peregon:r.peregon;if(activeThrough()==="chudovo"){if(label==="Чудово - Новгород")return 70000-value;if(label==="Волховстрой - Чудово")return 171000-value;if(label==="Горы - Петрозаводск")return value+46600;}return isVyborgLeg(state.ctx.peregon)&&label==="Выборг - Каменногорск"?128900+value:value;}
   function scheduleScale(value,a,b,x,y){var f=Math.max(0,Math.min(1,(value-a)/(b-a)));return x+f*(y-x);}
-  function scheduleLiveM(){if(!rt.tracking||rt.posM==null)return null;var through=activeThrough();if(through==="dacha"){if(rt.physicalM!=null&&state.ctx.peregon==="Д. Долг - Павлово")return rt.physicalM;if(rt.physicalM!=null&&state.ctx.peregon==="Павлово - Горы II путь")return scheduleScale(rt.physicalM,21199,33500,29200,34000);if(rt.physicalM!=null&&state.ctx.peregon==="Горы - Павлово I путь")return scheduleScale(rt.physicalM,28200,52000,29200,34000);if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM-8000;}if(through==="vyborg"&&state.ctx.peregon==="Выборг - Каменногорск")return 128900+rt.posM;if(through!=="chudovo")return rt.posM;if(state.ctx.peregon==="Чудово - Новгород")return 70000-rt.posM;if(state.ctx.peregon==="Волховстрой - Чудово")return 171000-rt.posM;if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM+46600;return null;}
+  function scheduleLiveM(){if(!rt.tracking||rt.posM==null)return null;var through=activeThrough();if(through==="dacha"){if(rt.physicalM!=null&&state.ctx.peregon==="Д. Долг - Павлово")return rt.physicalM;if(rt.physicalM!=null&&state.ctx.peregon==="Павлово - Горы II путь")return scheduleScale(rt.physicalM,29807,33500,29200,34000);if(rt.physicalM!=null&&state.ctx.peregon==="Горы - Павлово I путь")return scheduleScale(rt.physicalM,28200,33500,29200,34000);if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM-8000;}if(through==="vyborg"&&state.ctx.peregon==="Выборг - Каменногорск")return 128900+rt.posM;if(through!=="chudovo")return rt.posM;if(state.ctx.peregon==="Чудово - Новгород")return 70000-rt.posM;if(state.ctx.peregon==="Волховстрой - Чудово")return 171000-rt.posM;if(state.ctx.peregon==="Горы - Петрозаводск")return rt.posM+46600;return null;}
   function scheduleLiveIndex(mapped,train){
     var key=train.number+":"+train.direction+":"+activeThrough(),schedulePos=scheduleLiveM();
     if(rt.scheduleProgressKey!==key){rt.scheduleProgressKey=key;rt.scheduleProgressIndex=0;rt.scheduleProgressStarted=false;}
@@ -2320,7 +2320,10 @@ window.addEventListener("error",function(e){
     for(var i=0;i<pts.length;i++) candidates.push({track:pts[i][2],error:Math.abs(ids[i]-officialM)});
     for(var j=0;j<pts.length-1;j++){
       var a=pts[j][2],b=pts[j+1][2],physical=b-a,oa=ids[j],ob=ids[j+1],official=ob-oa;
-      if(official<=0 || Math.abs(official-physical)>3000) continue;
+      if(official<=0 || Math.abs(official-physical)>3000){
+        if(officialM>=oa&&officialM<oa+physical-1)candidates.push({track:a+officialM-oa,error:0});
+        continue;
+      }
       if(officialM>=Math.min(oa,ob) && officialM<=Math.max(oa,ob)){
         candidates.push({track:a+(officialM-oa)/official*physical,error:0});
       }
@@ -2330,7 +2333,7 @@ window.addEventListener("error",function(e){
       if(nearTrackM==null)return x.track-y.track;
       return Math.abs(x.track-nearTrackM)-Math.abs(y.track-nearTrackM);
     });
-    return candidates.length?candidates[0].track:null;
+    return candidates.length&&candidates[0].error<=0.01?candidates[0].track:null;
   }
   function restrictionTrackRange(r,nearTrackM){
     var label=(r.peregon&&r.peregon!=="Все участки")?r.peregon:state.ctx.peregon;
@@ -2343,7 +2346,7 @@ window.addEventListener("error",function(e){
   function nextRestriction(){ if(state.calib==null||rt.posM==null)return null;
     var up=!dirDown(),trackPos=currentTrackMeters(),pos=trackPos!=null?trackPos:rt.posM,best=null,bestA=Infinity,inzone=null;
     state.restrictions.forEach(function(r){ if(!isActive(r)||!inCtx(r))return;
-      var tr=trackPos!=null?restrictionTrackRange(r,trackPos):null;
+      var tr=trackPos!=null?restrictionTrackRange(r,trackPos):null;if(trackPos!=null&&!tr)return;
       var s=tr?tr.start:metersOf(r.km,r.pk),e=tr?tr.end:((r.kmE!=null)?metersOf(r.kmE,r.pkE):s),lo=Math.min(s,e),hi=Math.max(s,e);
       if(pos>=lo-5&&pos<=hi+5){ inzone=r; r._ahead=0; r._zone=true; return; }
       var a=up?(s-pos):(pos-s); r._ahead=a; r._zone=false; if(a>0&&a<bestA){ bestA=a; best=r; } });
@@ -2454,7 +2457,7 @@ window.addEventListener("error",function(e){
     state.restrictions.forEach(function(r){ if(!isActive(r)||!inCtx(r))return;
       var lead=r.lead||state.settings.lead,tr=trackPos!=null?restrictionTrackRange(r,trackPos):null,s=tr?tr.start:metersOf(r.km,r.pk),e=tr?tr.end:((r.kmE!=null)?metersOf(r.kmE,r.pkE):s),lo=Math.min(s,e),hi=Math.max(s,e),up=!dirDown();
       var key=r.id||(r.km+"_"+r.pk),st=alertState[key]||(alertState[key]={a:false,z:false});
-      var inzone=pos>=lo-5&&pos<=hi+5,ahead=up?(s-pos):(pos-s);
+      if(trackPos!=null&&!tr)return;var inzone=pos>=lo-5&&pos<=hi+5,ahead=up?(s-pos):(pos-s);
       if(ahead>lead*1.3)st.a=false; if(pos<lo-50||pos>hi+50)st.z=false;
       if(inzone&&!st.z){ st.z=true; st.a=true; fireAlert("danger",r,0); }
       else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); }

@@ -22,7 +22,7 @@ class NativeJourneyRouter private constructor(
     }
 
     fun nextLeg(journey: String?, current: String, direction: String): Transition? {
-        if (journey != null) {
+        if (!journey.isNullOrBlank() && journey != "null") {
             val legs = journeys[journey].orEmpty()
             val index = legs.indexOfFirst { it.route == current && it.direction == direction }
             return legs.getOrNull(index + 1)?.let { Transition(it.route, it.direction) }
@@ -42,7 +42,9 @@ class NativeJourneyRouter private constructor(
     ): Transition? {
         val next = nextLeg(journey, current, direction) ?: return reset()
         if (currentPhysicalM == null || currentEndM == null || nextDistanceM == null) return reset()
-        val nearBoundary = kotlin.math.abs(currentPhysicalM - currentEndM) <= 800.0
+        val nearBoundary = kotlin.math.abs(currentPhysicalM - currentEndM) <= 800.0 ||
+            (observedPhysicalM != null && kotlin.math.abs(observedPhysicalM - currentEndM) <= 80.0 &&
+                currentDistanceM != null && currentDistanceM <= 800.0)
         val neighborReliable = nextDistanceM <= 80.0
         val sameGeometryTurn = next.route == current && next.direction != direction
         val previousObserved = lastObservedPhysicalM

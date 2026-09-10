@@ -7,6 +7,10 @@ import java.io.File
 import kotlin.math.abs
 
 class NativeRouteEngineTest {
+    @Test fun remoteKilometerCannotBecomeRouteEndpoint() {
+        assertNull(engine.physicalMeters("Д. Долг - Павлово", 190_000.0))
+        assertNull(engine.physicalMeters("Павлово - Горы II путь", 190_000.0))
+    }
     companion object {
         private lateinit var engine: NativeRouteEngine
 
