@@ -57,6 +57,7 @@ fun NativeTimetableScreen(
                 val toTime = to?.let { effectiveTime(train, index + 1, "arr", it.arrival ?: it.departure, overrides) }
                 val fromM = data.stationMeters(route, from.station, train.number)
                 val toM = to?.let { data.stationMeters(route, it.station, train.number) }
+                val fromDisplayM = data.stationDisplayMeters(route, from.station, train.number)
                 val calculation = NativeTimetableCalculator.calculate(fromM, toM, fromTime, toTime)
                 val speed = calculation?.averageKmh?.roundToInt()
                 val current = to != null && NativeJourneyPosition.isCurrentLeg(currentJourneyM, fromM, toM)
@@ -68,7 +69,7 @@ fun NativeTimetableScreen(
                     Column(Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(Color(0xFF1A202A),Color(0xFF0B0D12))),RoundedCornerShape(19.dp)).border(1.dp,if(current)PiketRed else Color(0xFF303946),RoundedCornerShape(19.dp)).padding(17.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(verticalAlignment = Alignment.Top) {
                             Text(
-                                buildString { append(from.station); fromM?.let { append(" · "); append(formatChainage(it)) } },
+                                buildString { append(from.station); fromDisplayM?.let { append(" · "); append(formatChainage(it)) } },
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = 16.sp,
                                 modifier = Modifier.weight(1f)

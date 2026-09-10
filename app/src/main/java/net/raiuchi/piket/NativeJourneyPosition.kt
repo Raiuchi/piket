@@ -21,9 +21,10 @@ object NativeJourneyPosition {
             selectedRoute in dachaRoutes && actualRoute == "Д. Долг - Павлово" && physicalM != null ->
                 physicalM
             selectedRoute in dachaRoutes && actualRoute == "Павлово - Горы II путь" && physicalM != null ->
-                interpolate(physicalM, 21_199.0, 33_500.0, 29_200.0, 42_000.0)
+                interpolate(physicalM, 21_199.0, 33_500.0, 29_200.0, 34_000.0)
             selectedRoute in dachaRoutes && actualRoute == "Горы - Павлово I путь" && physicalM != null ->
-                interpolate(physicalM, 28_200.0, 52_000.0, 29_200.0, 42_000.0)
+                interpolate(physicalM, 28_200.0, 52_000.0, 29_200.0, 34_000.0)
+            selectedRoute in dachaRoutes && actualRoute == "Горы - Петрозаводск" -> value - 8_000.0
             selectedRoute in setOf("СПбФин - Выборг", "Выборг - Каменногорск") &&
                 actualRoute == "Выборг - Каменногорск" -> 128_900.0 + value
             // Новгородская ветвь общей оси: Чудово = 70 км, Новгород = 2,4 км.

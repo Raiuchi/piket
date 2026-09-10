@@ -132,5 +132,7 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("ориентир по графику"))
         assertTrue(html.contains("максимальная допустимая скорость"))
         assertTrue(html.contains("график недостижим · расчёт"))
+        assertTrue("Gory axis jump must use 34 km for travel math and 42 km only for display",
+            html.contains("[\"Горы\",34000,42000,goryChange]"))
     }
 }
