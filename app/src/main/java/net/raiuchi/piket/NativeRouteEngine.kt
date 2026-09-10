@@ -53,6 +53,12 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
         if (!officialM.isFinite()) return null
         data class Candidate(val physical: Double, val error: Double)
         val candidates = mutableListOf<Candidate>()
+        val first = route.points.firstOrNull()
+        if (first != null && first.physicalM in 0.1..5_000.0 &&
+            abs(route.chainageM.first() - first.physicalM) <= 2_500.0) {
+            val prefix = first.physicalM + officialM - route.chainageM.first()
+            if (prefix in 0.0..first.physicalM) candidates += Candidate(prefix, 0.0)
+        }
         route.points.indices.forEach { i ->
             candidates += Candidate(route.points[i].physicalM, abs(route.chainageM[i] - officialM))
         }

@@ -2317,6 +2317,10 @@ window.addEventListener("error",function(e){
     var si=TRACK.labels.indexOf(label);
     if(si<0 || !isFinite(officialM)) return null;
     var pts=TRACK.segs[si],ids=CHAINAGE[si],candidates=[];
+    if(pts.length&&pts[0][2]>0&&pts[0][2]<=5000&&Math.abs(ids[0]-pts[0][2])<=2500){
+      var prefix=pts[0][2]+officialM-ids[0];
+      if(prefix>=0&&prefix<=pts[0][2])candidates.push({track:prefix,error:0});
+    }
     for(var i=0;i<pts.length;i++) candidates.push({track:pts[i][2],error:Math.abs(ids[i]-officialM)});
     for(var j=0;j<pts.length-1;j++){
       var a=pts[j][2],b=pts[j+1][2],physical=b-a,oa=ids[j],ob=ids[j+1],official=ob-oa;

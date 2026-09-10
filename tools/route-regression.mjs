@@ -20,6 +20,8 @@ for (const label of ['Д. Долг - Павлово','Павлово - Горы 
 }
 assert.ok(box.officialToTrackM(33000,'Павлово - Горы II путь',33000) !== null,
   'the old axis immediately before Gory must still resolve');
+assert.equal(box.officialToTrackM(1000,'Д. Долг - Павлово',1000),1000,
+  'the supported short prefix before the first map point remains usable');
 for (const [route,a,b] of [['Павлово - Горы II путь',29807,33500],['Горы - Павлово I путь',28200,33500]]) {
   box.state.ctx.peregon=route;
   for (const [physical,expected] of [[a,29200],[(a+b)/2,31600],[b,34000]]) {
