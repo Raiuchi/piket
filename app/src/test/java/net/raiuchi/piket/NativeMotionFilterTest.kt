@@ -4,6 +4,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NativeMotionFilterTest {
+    @Test fun coordinateUncertaintyDoesNotZeroMovingDoppler() {
+        for (accuracy in listOf(10f, 20f, 30f)) {
+            val filter = NativeMotionFilter()
+            var meters = 0.0
+            for (second in 0..100) {
+                val speed = if (second < 15) 0f else minOf((second - 15) * 0.6f, 25f)
+                meters += speed
+                val result = filter.process(fix(second * 1000L,
+                    lat = 59.9 + meters / 111195.0, speed = speed).copy(accuracyM = accuracy))
+                if (second >= 30) {
+                    assertFalse(result.stationary)
+                    assertNotNull("speed lost at $second, accuracy $accuracy", result.filteredSpeedMps)
+                    assertEquals(speed, result.filteredSpeedMps!!, 0.01f)
+                }
+            }
+        }
+    }
     private fun fix(t: Long, lat: Double = 59.9, lon: Double = 30.3, speed: Float? = 0f,
                     speedAccuracy: Float? = 0.5f, mock: Boolean = false, age: Long = 0L) =
         NativeMotionFilter.Fix(lat, lon, t, age, 5f, speed, speedAccuracy, mock, 12, 32f, true)

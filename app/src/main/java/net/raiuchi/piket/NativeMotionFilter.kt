@@ -46,6 +46,7 @@ class NativeMotionFilter {
     private var recoveryCount = 0
     private var mismatchCandidate: Float? = null
     private var mismatchCount = 0
+    private var wasStationary = false
 
     fun reset() {
         previous = null
@@ -57,6 +58,7 @@ class NativeMotionFilter {
         recoveryCount = 0
         mismatchCandidate = null
         mismatchCount = 0
+        wasStationary = false
     }
 
     fun markSignalUnavailable() {
@@ -93,8 +95,11 @@ class NativeMotionFilter {
         // consistent positional samples, then replace the stale value.
         if (speed != null && prior != null && dt in 0.5..5.0 && !weakSatellites) {
             val movementFloor = maxOf(10.0, (fix.accuracyM + prior.accuracyM).toDouble())
-            val positionalSpeed = if (distance >= movementFloor) (distance / dt).toFloat() else 0f
-            if (abs(speed - positionalSpeed) >= 5.0f) {
+            // Below the uncertainty radius displacement is UNKNOWN, not zero.
+            // At 24 km/h a one-second fix moves 6.7 m, often below 20-30 m
+            // coordinate uncertainty. Replacing valid Doppler by zero froze trips.
+            val positionalSpeed = (distance / dt).toFloat()
+            if (distance >= movementFloor && abs(speed - positionalSpeed) >= 5.0f) {
                 val candidate = mismatchCandidate
                 if (candidate != null && abs(candidate - positionalSpeed) <= 3.0f) mismatchCount++
                 else { mismatchCandidate = positionalSpeed; mismatchCount = 1 }
@@ -115,6 +120,8 @@ class NativeMotionFilter {
         val stationary = stationaryAnchor != null &&
             fix.elapsedMs - stationarySinceMs >= 10_000L &&
             distanceMeters(stationaryAnchor!!.latitude, stationaryAnchor!!.longitude, fix.latitude, fix.longitude) <= 25.0
+        if (wasStationary && !stationary) markSignalUnavailable()
+        wasStationary = stationary
         if (stationary) {
             speed = 0f
             recovering = false
