@@ -126,7 +126,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     private fun output(source: String): Output {
         val physical = physicalM
         val official = physical?.let { routes.officialMeters(route, it)?.plus(officialOffsetM) }
-        val alert = if (physical != null) nextRestriction(physical) else null
+        val alert = if (active && physical != null) nextRestriction(physical) else null
         return Output(active, physical, official, speedMps, recovering, source,
             alert?.restriction?.id, alert?.distanceM, alert?.inZone == true)
     }
@@ -136,12 +136,13 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         return restrictions.asSequence()
             .filter { (it.route == "Все участки" || it.route == route) && (it.direction == "both" || it.direction == direction) }
             .mapNotNull { restriction ->
-                val start = routes.physicalMeters(route, restriction.startOfficialM, nowPhysicalM) ?: return@mapNotNull null
-                val end = routes.physicalMeters(route, restriction.endOfficialM, start) ?: start
+                val start = routes.physicalMeters(route, restriction.startOfficialM - officialOffsetM, nowPhysicalM) ?: return@mapNotNull null
+                val end = routes.physicalMeters(route, restriction.endOfficialM - officialOffsetM, start) ?: start
                 val low = minOf(start, end) - 5.0
                 val high = maxOf(start, end) + 5.0
                 val inZone = nowPhysicalM in low..high
-                val ahead = directionSign() * (start - nowPhysicalM)
+                val entry = if (directionSign() > 0) minOf(start, end) else maxOf(start, end)
+                val ahead = directionSign() * (entry - nowPhysicalM)
                 if (inZone) AlertCandidate(restriction, 0.0, true)
                 else if (ahead in 0.0..restriction.leadM) AlertCandidate(restriction, ahead, false) else null
             }.minByOrNull { it.distanceM }

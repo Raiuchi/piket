@@ -63,7 +63,7 @@ class MainActivity : Activity() {
             }
             view.addJavascriptInterface(PiketBridge(),"Android");setContentView(view);view.loadUrl(APP_URL)
         }
-        requestPermissionsIfNeeded();handler.post(snapshotPump)
+        requestPermissionsIfNeeded()
     }
 
     private fun publishSnapshot(s:TripSnapshot){
@@ -127,7 +127,20 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    override fun onResume(){super.onResume();if(pageReady)checkForUpdate()}
+    override fun onResume(){
+        super.onResume()
+        web?.onResume()
+        web?.resumeTimers()
+        handler.removeCallbacks(snapshotPump)
+        if(web != null) handler.post(snapshotPump)
+        if(pageReady)checkForUpdate()
+    }
+    override fun onPause(){
+        handler.removeCallbacks(snapshotPump)
+        web?.onPause()
+        web?.pauseTimers()
+        super.onPause()
+    }
     private fun jsQuote(value:String)=value.replace("\\","\\\\").replace("'","\\'")
     private fun isNewerVersion(latest:String,current:String):Boolean{
         val a=latest.split('.').map{it.takeWhile(Char::isDigit).toIntOrNull()?:0}

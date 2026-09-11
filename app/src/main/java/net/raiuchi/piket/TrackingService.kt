@@ -53,6 +53,8 @@ class TrackingService : Service() {
     private var lastUsableFixAt = 0L
     private var unusableFixMarked = false
     private var watchdog: Runnable? = null
+    private var lastPowerSampleAt = 0L
+    private var lastProcessCpuMs = 0L
 
     private var locationManager: LocationManager? = null
     private var gnssCallback: GnssStatus.Callback? = null
@@ -78,6 +80,7 @@ class TrackingService : Service() {
     private var lastAlertId: String? = null
     private var lastAlertInZone = false
     private val completedAlertIds = mutableSetOf<String>()
+    private val warnedAlertIds = mutableSetOf<String>()
     private var lastZoneSampleAt = 0L
     private var frequentInterference = false
     private var lastSnapshotPersistAt = 0L
@@ -216,7 +219,13 @@ class TrackingService : Service() {
                 } else if (silence <= 3_000) signalUnavailableMarked = false
                 if (silence > 10_000 && !networkBackupActive) startNetworkBackup()
                 else if (silence <= 10_000 && networkBackupActive) stopNetworkBackup()
-                if (silence > 15_000 && now - lastFusedRestartAt > 15_000) restartFused(now)
+                // Fresh network fixes can mask a stalled precise-GPS stream.
+                // Bound retries to avoid continually restarting acquisition in interference.
+                if ((silence > 15_000 || now - lastUsableFixAt > 30_000) && now - lastFusedRestartAt > 120_000) {
+                    diagnostics.event("location_request_restarted", mapOf("silence_ms" to silence,
+                        "unusable_ms" to now - lastUsableFixAt))
+                    restartFused(now)
+                }
                 mainHandler.postDelayed(this, 5_000)
             }
         }.also { mainHandler.postDelayed(it, 5_000) }
@@ -281,11 +290,15 @@ class TrackingService : Service() {
         val state = tripEngine?.save()
         if (state != null && result.accepted && result.quality in setOf("good", "stationary")) {
             val next = journeyRouter?.nextLeg(journeyId, routeLabel, state.direction)
-            val nextSnap = next?.let { routeEngine?.snap(it.route, location.latitude, location.longitude) }
             val route = routeEngine?.route(routeLabel)
             val boundary = route?.points?.takeIf { it.isNotEmpty() }?.let {
                 if (state.direction == "obratno") it.first().physicalM else it.last().physicalM
             }
+            val nearBoundary = boundary != null &&
+                ((state.physicalM?.let { abs(it - boundary) <= 800.0 } == true) ||
+                    (currentSnap?.let { abs(it.physicalM - boundary) <= 80.0 } == true))
+            // Do not scan the entire next route on every fix hundreds of km from its junction.
+            val nextSnap = if (nearBoundary) next?.let { routeEngine?.snap(it.route, location.latitude, location.longitude) } else null
             val transition = journeyRouter?.consider(journeyId, routeLabel, state.direction,
                 state.physicalM, boundary, currentSnap?.distanceM, nextSnap?.distanceM, currentSnap?.physicalM)
             if (transition != null && nextSnap != null) {
@@ -331,6 +344,9 @@ class TrackingService : Service() {
             "direction" to tripEngine?.save()?.direction,
             "lat" to location.latitude, "lon" to location.longitude,
             "accuracy_m" to location.accuracy,
+            "provider" to location.provider,
+            "fix_age_ms" to ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0),
+            "speed_accuracy_mps" to if (location.hasSpeedAccuracy()) location.speedAccuracyMetersPerSecond else null,
             "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
             "filtered_speed_kmh" to result.filteredSpeedMps?.times(3.6f),
             "accepted" to result.accepted, "stationary" to result.stationary,
@@ -400,14 +416,14 @@ class TrackingService : Service() {
                 val end = if (item.has("kmE")) item.optDouble("kmE") * 1_000 + (item.optDouble("pkE", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("mE", 0.0) else start + 100.0
                 val id = item.optString("id", index.toString())
                 add(NativeTripEngine.Restriction(id, item.optString("peregon", "Все участки"),
-                    item.optString("dir", "both"), start, end, item.optDouble("lead", root.optDouble("lead", 3_000.0))))
+                    item.optString("dir", "both"), start, end, root.optDouble("lead", 3_000.0)))
                 alertSpeech[id] = "${item.optInt("speed")} километров в час. ${item.optString("reason", "Ограничение")}" 
             }
         }
         val nextDirection = root.optString("direction", "tuda")
         val nextActive = root.optBoolean("active")
         if ((previousState?.active != true && nextActive) || previousState?.route != routeLabel ||
-            previousState?.direction != nextDirection) completedAlertIds.clear()
+            previousState?.direction != nextDirection) { completedAlertIds.clear(); warnedAlertIds.clear() }
         tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
             nextActive, restrictions)
         diagnostics.event("trip_configured", mapOf("route" to routeLabel, "journey" to journeyId,
@@ -424,12 +440,15 @@ class TrackingService : Service() {
             return
         }
         val entered = output.alertInZone && (id != lastAlertId || !lastAlertInZone)
-        if (id != lastAlertId || entered) {
+        if (entered || (!output.alertInZone && warnedAlertIds.add(completedKey))) {
             diagnostics.event("restriction_alert", mapOf("id" to id, "route" to routeLabel,
                 "distance_m" to output.alertDistanceM, "in_zone" to entered,
                 "official_m" to output.officialM))
             val kind = if (entered) "danger" else "warning"
-            val phrase = (if (entered) "Ограничение. " else "Впереди ограничение. ") + (alertSpeech[id] ?: "Ограничение")
+            val distance = output.alertDistanceM ?: 0.0
+            val ahead = if (distance >= 1_000) String.format(Locale.forLanguageTag("ru"), "Через %.1f километра. ", distance / 1_000)
+                else "Через ${distance.roundToInt()} метров. "
+            val phrase = (if (entered) "Ограничение. " else ahead) + (alertSpeech[id] ?: "Ограничение")
             if (soundEnabled) { beep(kind); speak(phrase) }
             if (vibrationEnabled) vibrate(kind)
         }
@@ -440,6 +459,7 @@ class TrackingService : Service() {
     private fun startTripTicker() {
         tripTicker = object : Runnable {
             override fun run() {
+                recordPowerSample()
                 tripEngine?.let { engine ->
                     val output = engine.update(NativeTripEngine.Input(SystemClock.elapsedRealtime(), null, false, null))
                     updateInterferenceMemory(output, output.recovering && System.currentTimeMillis() - lastFixReceivedAt > 5_000)
@@ -449,6 +469,21 @@ class TrackingService : Service() {
                 mainHandler.postDelayed(this, 1_000)
             }
         }.also { mainHandler.postDelayed(it, 1_000) }
+    }
+
+    private fun recordPowerSample() {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastPowerSampleAt < 60_000L) return
+        val cpu = android.os.Process.getElapsedCpuTime()
+        val battery = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        diagnostics.event("power_sample", mapOf(
+            "sample_ms" to if (lastPowerSampleAt == 0L) null else now - lastPowerSampleAt,
+            "process_cpu_ms" to if (lastPowerSampleAt == 0L) null else cpu - lastProcessCpuMs,
+            "battery_level" to battery?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1),
+            "battery_scale" to battery?.getIntExtra(BatteryManager.EXTRA_SCALE, -1),
+            "battery_temperature_c" to battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)?.takeIf { it >= 0 }?.div(10.0),
+            "plugged" to battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)))
+        lastPowerSampleAt = now; lastProcessCpuMs = cpu
     }
 
     private fun updateInterferenceMemory(output: NativeTripEngine.Output, bad: Boolean) {

@@ -141,6 +141,21 @@ class NativeTripEngineTest {
         }
     }
 
+    @Test fun calibratedReverseRestrictionUsesSameAxisAsDisplayedKilometer() {
+        val label = "Горы - Петрозаводск"
+        val local = NativeTripEngine(routes)
+        val offset = 982.0
+        val at = 100_000.0
+        val fix = NativeRouteEngine.Snap(label, at, routes.officialMeters(label, at)!!, 2.0, 0)
+        val officialEntry = routes.officialMeters(label, at - 2_000)!! + offset
+        val restriction = NativeTripEngine.Restriction("r", label, "obratno", officialEntry - 100, officialEntry, 2_000.0)
+        local.configure(label, "obratno", fix.officialM + offset, true, listOf(restriction))
+        val output = local.update(NativeTripEngine.Input(1_000, 0f, true, fix))
+        assertEquals(2_000.0, output.alertDistanceM!!, 0.01)
+        local.configure(label, "obratno", fix.officialM + offset, false, listOf(restriction))
+        assertNull(local.update(NativeTripEngine.Input(2_000, null, false, null)).alertId)
+    }
+
     @Test fun stationaryGpsDriftDoesNotMoveCalibratedPosition() {
         engine.update(NativeTripEngine.Input(1_000, 0f, true, snap(0), true))
         val drifted = snap(1)

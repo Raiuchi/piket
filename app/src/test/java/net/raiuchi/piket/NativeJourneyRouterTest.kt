@@ -79,6 +79,13 @@ class NativeJourneyRouterTest {
         assertNull(router.consider(null, "СПбФин - Выборг", "tuda", 128_800.0, 128_900.0, 20.0, 18.0, 128_800.0))
     }
 
+    @Test fun missedPavlovoTransitionRecoversWellBeyondOldEndpoint() {
+        val label = "Горы - Павлово I путь"
+        assertNull(router.consider(null, label, "obratno", 22_000.0, 28_200.0, 6_000.0, 15.0, 28_200.0))
+        assertEquals("Д. Долг - Павлово", router.consider(null, label, "obratno",
+            21_980.0, 28_200.0, 6_020.0, 12.0, 28_200.0)?.route)
+    }
+
     @Test fun follows819And820TechnicalDirections() {
         assertEquals(NativeJourneyRouter.Transition("Горы - Петрозаводск", "tuda"),
             router.nextLeg("819", "Волховстрой - Чудово", "obratno"))

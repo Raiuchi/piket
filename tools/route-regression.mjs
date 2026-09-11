@@ -9,12 +9,21 @@ const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
   state:{ctx:{peregon:'Павлово - Горы II путь'}}, rt:{tracking:true,posM:31000,physicalM:0},
   activeThrough:()=> 'dacha'};
 vm.createContext(box);
-for (const name of ['officialToTrackM','scheduleScale','scheduleLiveM']) {
+for (const name of ['officialToTrackM','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = html.indexOf('\n  function ', start + 1);
   vm.runInContext(html.slice(start, end), box);
 }
+box.metersOf=(km,pk=1,m=0)=>km*1000+(pk-1)*100+(m||0);
+box.state.restrictions=[{peregon:'Д. Долг - Павлово',km:216,pk:6,kmE:216,pkE:7},
+  {peregon:'Д. Долг - Павлово',km:19,pk:9}];
+box.normalizeRestrictionRoutes();
+assert.equal(box.state.restrictions[0].peregon,'Горы - Петрозаводск');
+assert.equal(box.state.restrictions[0].previousPeregon,'Д. Долг - Павлово');
+assert.equal(box.state.restrictions[1].peregon,'Д. Долг - Павлово');
+box.normalizeRestrictionRoutes();
+assert.equal(box.state.restrictions[0].peregon,'Горы - Петрозаводск');
 for (const label of ['Д. Долг - Павлово','Павлово - Горы II путь']) {
   assert.equal(box.officialToTrackM(190000,label,28000),null);
 }

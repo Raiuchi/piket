@@ -488,7 +488,10 @@
   .schedule-box{margin-top:12px;display:grid;gap:7px}.schedule-leg{padding:11px 12px;border:1px solid #29323d;border-radius:13px;background:#0d1218}.schedule-leg.live{border-color:#d71934;box-shadow:inset 3px 0 #d71934}.schedule-stop{display:flex;align-items:center;justify-content:space-between;gap:10px}.schedule-stop b{font-size:14px}.schedule-times{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.schedule-time{border:1px solid #3a4654;border-radius:9px;background:#171e26;color:#fff;padding:7px 9px;font-weight:800;font-size:12px}.schedule-time small{display:block;color:#93a0af;font-size:8px;text-transform:uppercase}.schedule-run{display:flex;justify-content:space-between;gap:8px;margin-top:7px;color:#90a0b2;font-size:12px}.schedule-run strong{color:#ff4058;font-size:15px}.schedule-live-pace{margin-top:9px;padding:9px 10px;border:1px solid #304151;border-radius:11px;background:linear-gradient(135deg,#111a23,#0d1117);display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}.schedule-live-pace span{color:#8ea0b3;font-size:10px;text-transform:uppercase;letter-spacing:.08em}.schedule-live-pace b{display:block;margin-top:2px;color:#f4f7fb;font-size:14px}.schedule-live-pace .pace-target b{color:#48d7ff}.schedule-live-pace.late .pace-target b{color:#ff4058}.schedule-empty{padding:12px;text-align:center;color:#8c99a8;border:1px dashed #38424d;border-radius:12px}.schedule-reset{margin-top:9px;background:none;border:0;color:#9ba8b6;text-decoration:underline;font-size:12px}
   .premium-field{width:100%;min-height:50px;padding:10px 13px;border:1px solid #3a424d;border-radius:13px;background:linear-gradient(145deg,#1a2028,#0d1117);color:#f5f5f7;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font:inherit}.premium-field .pf-copy{min-width:0}.premium-field small{display:block;color:#ff7b84;font-size:9px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:3px}.premium-field b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.premium-field .pf-arrow{color:#ff5965;font-size:18px}.premium-field:active{border-color:#ff5965;background:#23151a}
   .premium-picker{position:fixed;inset:0;z-index:500;display:none;align-items:flex-end;justify-content:center}.premium-picker.on{display:flex}.pp-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78)}.pp-card{position:relative;width:min(100%,560px);max-height:86vh;padding:10px 16px calc(14px + env(safe-area-inset-bottom));border:1px solid rgba(255,91,102,.30);border-radius:24px 24px 0 0;background:linear-gradient(165deg,#202027,#09090b 70%);box-shadow:0 -18px 60px rgba(0,0,0,.75);overflow:hidden}.pp-grab{width:46px;height:4px;border-radius:4px;background:#55555e;margin:0 auto 15px}.pp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.pp-head h3{margin:0;font-size:20px}.pp-close{width:38px;height:38px;border-radius:12px;border:1px solid #3a3a42;background:#16161a;color:#ddd;font-size:22px}.pp-body{max-height:62vh;overflow:auto;padding:2px}.pp-list{display:grid;gap:8px}.pp-option{width:100%;min-height:54px;padding:11px 14px;border:1px solid #30323a;border-radius:14px;background:#111218;color:#f2f2f4;text-align:left;font:inherit;display:flex;justify-content:space-between;align-items:center;gap:10px}.pp-option.on{border-color:#ff5360;background:linear-gradient(135deg,#55111a,#191218);box-shadow:inset 3px 0 #ff3848}.pp-option small{color:#a4abba}.pp-option.on small{color:#ff9ba2}.pp-dials{display:grid;grid-template-columns:1fr 28px 1fr;align-items:center;gap:8px;padding:8px 0 16px}.pp-col{text-align:center;border:1px solid #353741;border-radius:18px;background:#101116;padding:10px}.pp-col button{width:100%;height:42px;border:0;border-radius:11px;background:#24262e;color:#ff7780;font-size:24px}.pp-value{font-size:48px;font-weight:800;line-height:1.2;padding:12px 0}.pp-sep{font-size:42px;text-align:center}.pp-date{grid-template-columns:1fr 1fr 1.25fr}.pp-date .pp-value{font-size:30px}.pp-actions{display:flex;gap:10px;margin-top:13px}.pp-actions button{flex:1}.date-pair{display:grid;grid-template-columns:1fr 1fr;gap:9px}
-</style>
+  /* Keep the gauge readable without repainting blurred SVG layers every frame. */
+  .gaugeWrap,.gaugeWrap svg,.g-fg,.g-bezel,.g-bg{filter:none!important}
+  .gps.live .dot{animation:none}
+  </style>
 </head>
 <body>
 <div class="app">
@@ -853,7 +856,7 @@
     </div>
   </div>
   <div class="det" id="alDet"></div>
-  <button class="ack" id="alAck">Принял</button>
+  <div class="hint">Сообщение закроется автоматически</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1064,7 +1067,7 @@ window.addEventListener("error",function(e){
             m:+r.m||0,
             mE:+r.mE||0,
             speed:r.spd==null?r.speed:r.spd,
-            lead:r.lead==null?(state.settings.lead||3000):r.lead
+            lead:state.settings.lead==null?3000:state.settings.lead
           });
         });
         var trainField=document.getElementById("scheduleTrain"),selectedTrain=trainField&&trainField.value;
@@ -1083,7 +1086,16 @@ window.addEventListener("error",function(e){
       }
     }catch(e){}
   }
-  function persist(){ save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); syncNativeRouteContext(); }
+  function normalizeRestrictionRoutes(){
+    state.restrictions.forEach(function(r){
+      if(!isDachaLeg(r.peregon))return;
+      var start=metersOf(r.km,r.pk,r.m),end=r.kmE==null?start:metersOf(r.kmE,r.pkE,r.mE);
+      if(officialToTrackM(start,r.peregon,null)!=null)return;
+      var candidates=TRACK.labels.filter(function(label){return isDachaLeg(label)&&officialToTrackM(start,label,null)!=null&&officialToTrackM(end,label,null)!=null;});
+      if(candidates.length===1){r.previousPeregon=r.peregon;r.peregon=candidates[0];}
+    });
+  }
+  function persist(){ normalizeRestrictionRoutes(); save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); syncNativeRouteContext(); }
 
   // ═══ ПАМЯТЬ ПРОБЛЕМНЫХ ЗОН GPS ═══
   // Машинист ездит одними и теми же маршрутами регулярно - в отличие от обычного
@@ -1259,6 +1271,7 @@ window.addEventListener("error",function(e){
     var box=$("#positionTrust"); if(!box)return; box.className="position-trust "+trust.key; $("#positionTrustText").textContent=trust.label+(rt.directionWarning?" · проверь направление":"");
   }
   function renderTimingStations(){
+    var existing=document.getElementById("timingStation");if(existing&&existing.getAttribute("data-route")===state.ctx.peregon)return;
     var from=$("#timingFrom"),sel=$("#timingStation"),rows=scheduleRowsForContext(); if(!sel||!from)return;
     if(!rows.length){var tsi=TRACK.labels.indexOf(state.ctx.peregon);if(tsi>=0&&CHAINAGE[tsi]&&CHAINAGE[tsi].length){var names=state.ctx.peregon.split(" - "),axis=CHAINAGE[tsi];rows=[[names[0]||"Начало",axis[0]],[names.slice(1).join(" - ")||"Конец",axis[axis.length-1]]];}}
     if(sel.getAttribute("data-route")===state.ctx.peregon)return;
@@ -1291,7 +1304,7 @@ window.addEventListener("error",function(e){
   function scheduleSeconds(v){if(!v)return null;var p=v.split(":"),s=(+p[0])*3600+(+p[1])*60+(+p[2]||0);return isFinite(s)?s:null;}
   function scheduleTime(train,index,kind,original){var specific=train.number+":"+index+":"+kind,legacy=train.number+":"+index;return scheduleOverrides[specific]||scheduleOverrides[legacy]||original;}
   function formatScheduleTime(v){if(!v)return"—";var p=v.split(":");return p[0]+":"+p[1]+(p[2]==="30"?":30":"");}
-  function scheduleRowsForContext(){var rows=(TIMING_STATIONS[state.ctx.peregon]||[]).slice(),through=activeThrough();if(through==="chudovo"){var nov=(TIMING_STATIONS["Чудово - Новгород"]||[]).slice().reverse().map(function(row){return[row[0],70000-row[1],row[1],null];}),volk=TIMING_STATIONS["Волховстрой - Чудово"]||[],north=TIMING_STATIONS["Горы - Петрозаводск"]||[],northStart=north.findIndex(function(row){return row[0]==="Волховстрой-2";});return nov.concat(volk.slice().reverse().map(function(row){return[row[0],70000+(101000-row[1]),row[1],null];})).concat(north.slice(Math.max(0,northStart)).map(function(row){return[row[0],171000+(row[1]-124400),row[1],null];}));}if(through==="dacha"){var dacha=TIMING_STATIONS["Д. Долг - Павлово"]||[],north=TIMING_STATIONS["Горы - Петрозаводск"]||[],postChange=journeyTowards()==="obratno"?"2 км → 5 км":"5 км → 2 км",goryChange=journeyTowards()==="obratno"?"42 км → 34 км":"34 км → 42 км";return dacha.map(function(row){return[row[0],row[1],row[1],/заневский/i.test(row[0])?postChange:null];}).concat([["Горы",34000,42000,goryChange]]).concat(north.slice(1).map(function(row){return[row[0],row[1]-8000,row[1],null];}));}if(through!=="vyborg")return rows;var first=TIMING_STATIONS["СПбФин - Выборг"]||[],second=TIMING_STATIONS["Выборг - Каменногорск"]||[],join=128900,change=journeyTowards()==="obratno"?"0 км → 128 км 9 пк":"128 км 9 пк → 0 км";return first.map(function(row){return[row[0],row[1],row[1],/выборг-пассажирский/i.test(row[0])?change:null];}).concat(second.slice(1).map(function(row){return[row[0],join+row[1],row[1],null];}));}
+  function scheduleRowsForContext(){var rows=(TIMING_STATIONS[state.ctx.peregon]||[]).slice(),through=activeThrough();if(through==="chudovo"){var nov=(TIMING_STATIONS["Чудово - Новгород"]||[]).slice().reverse().map(function(row){return[row[0],70000-row[1],row[1],null];}),volk=TIMING_STATIONS["Волховстрой - Чудово"]||[],north=TIMING_STATIONS["Горы - Петрозаводск"]||[],northStart=north.findIndex(function(row){return row[0]==="Волховстрой-2";});return nov.concat(volk.slice().reverse().map(function(row){return[row[0],70000+(101000-row[1]),row[1],null];})).concat(north.slice(Math.max(0,northStart)).map(function(row){return[row[0],171000+(row[1]-124400),row[1],null];}));}if(through==="dacha"){var dacha=TIMING_STATIONS["Д. Долг - Павлово"]||[],north=TIMING_STATIONS["Горы - Петрозаводск"]||[],postChange=journeyTowards()==="obratno"?"2 км 3 пк → 6 км 4 пк":"7 км 4 пк → 2 км 3 пк",goryChange=journeyTowards()==="obratno"?"42 км 8 пк → 33 км 5 пк":"33 км 5 пк → 42 км 8 пк";return dacha.map(function(row){return[row[0],row[1],row[1],/заневский/i.test(row[0])?postChange:null];}).concat([["Горы",34000,42000,goryChange]]).concat(north.slice(1).map(function(row){return[row[0],row[1]-8000,row[1],null];}));}if(through!=="vyborg")return rows;var first=TIMING_STATIONS["СПбФин - Выборг"]||[],second=TIMING_STATIONS["Выборг - Каменногорск"]||[],join=128900,change=journeyTowards()==="obratno"?"0 км → 128 км 9 пк":"128 км 9 пк → 0 км";return first.map(function(row){return[row[0],row[1],row[1],/выборг-пассажирский/i.test(row[0])?change:null];}).concat(second.slice(1).map(function(row){return[row[0],join+row[1],row[1],null];}));}
   function timingStationMark(row){return row[3]||stationMark(row[2]==null?row[1]:row[2]);}
   function scheduleSourceRoute(){var through=activeThrough();return through==="chudovo"?"Чудово - Новгород":(through==="vyborg"?"СПбФин - Выборг":(through==="dacha"?"Горы - Петрозаводск":state.ctx.peregon));}
   function scheduleRestrictionApplies(r){var through=activeThrough();return through==="chudovo"?(r.peregon==="Все участки"||r.peregon==="Горы - Петрозаводск"||r.peregon==="Волховстрой - Чудово"||r.peregon==="Чудово - Новгород"):(through==="vyborg"?(r.peregon==="Все участки"||isVyborgLeg(r.peregon)):(through==="dacha"?(r.peregon==="Все участки"||isDachaLeg(r.peregon)):inCtx(r)));}
@@ -1321,6 +1334,9 @@ window.addEventListener("error",function(e){
     var rows=scheduleRowsForContext(),mapped=[];
     train.stops.forEach(function(stop,index){var station=scheduleStation(stop.station,rows);mapped.push({stop:stop,index:index,name:station?station[0]:scheduleStationName(stop.station),m:station?station[1]:null,displayM:station?(station[2]==null?station[1]:station[2]):null,mark:station?station[3]:null,arr:scheduleTime(train,index,"arr",stop.arr),dep:scheduleTime(train,index,"dep",stop.dep)});});
     var live=scheduleLiveIndex(mapped,train);
+    var renderKey=JSON.stringify([state.ctx,train.number,live,scheduleOverrides,state.restrictions]);
+    if(rt.scheduleRenderKey===renderKey){updateScheduleLivePace(false);return;}
+    rt.scheduleRenderKey=renderKey;
     box.innerHTML=mapped.map(function(x,i){
       var next=mapped[i+1],run="",buttons="";
       if(x.arr)buttons+='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="arr"><small>'+(x.dep&&x.dep!==x.arr?'приб':'проход')+'</small>'+formatScheduleTime(x.arr)+'</button>';
@@ -2189,6 +2205,7 @@ window.addEventListener("error",function(e){
 
 
   function startTrack(){
+    alertState={};rt.nativeSnapshot=false;
     webLog("trip_started");
     if(state.settings.demo){ startSim(); return; }
     if(state.calib==null || state.calib._manual!==true){
@@ -2246,6 +2263,8 @@ window.addEventListener("error",function(e){
     if(nativeRoute&&nativeRoute!==state.ctx.peregon){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
     // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
     if(nativeOfficialM!=null){
+      rt.nativeSnapshot=true;
+      rt.nativeOfficialOffset=nativeTripPhysicalM==null?0:(+nativeOfficialM-baseOfficialTrackM(+nativeTripPhysicalM,nativeRoute));
       var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.toggle("on",nativeFrequentInterference===true);
       rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
       rt.posM=+nativeOfficialM; rt.physicalM=nativeTripPhysicalM==null?null:+nativeTripPhysicalM; rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
@@ -2255,7 +2274,9 @@ window.addEventListener("error",function(e){
       $("#gpsTxt").textContent=nativeTripRecovering?"позиция восстанавливается":"GPS + Kotlin";
       $("#spdSrc").textContent=nativeTripRecovering?"Расчётная позиция":"Нативная позиция ✓";
       $("#spdSrc").className="src"+(nativeTripRecovering?" dr":"");
-      renderTrip(); renderList(); evalAlerts(); updateAndroidNotification(); return;
+      if(document.getElementById("v-trip").classList.contains("on"))renderTrip();
+      if(document.getElementById("v-list").classList.contains("on"))renderList();
+      evalAlerts(); return;
     }
     var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0 }, timestamp:time };
     onPos(fakePos); };
@@ -2342,8 +2363,9 @@ window.addEventListener("error",function(e){
   function restrictionTrackRange(r,nearTrackM){
     var label=(r.peregon&&r.peregon!=="Все участки")?r.peregon:state.ctx.peregon;
     if(!label || label==="Все участки") return null;
-    var s=officialToTrackM(metersOf(r.km,r.pk),label,nearTrackM);
-    var e=(r.kmE!=null)?officialToTrackM(metersOf(r.kmE,r.pkE),label,s):s;
+    var offset=rt.nativeSnapshot&&label===state.ctx.peregon?(rt.nativeOfficialOffset||0):routeOfficialOffset(label);
+    var s=officialToTrackM(metersOf(r.km,r.pk,r.m)-offset,label,nearTrackM);
+    var e=(r.kmE!=null)?officialToTrackM(metersOf(r.kmE,r.pkE,r.mE)-offset,label,s):s;
     return s==null||e==null?null:{start:s,end:e,lo:Math.min(s,e),hi:Math.max(s,e)};
   }
 
@@ -2353,7 +2375,7 @@ window.addEventListener("error",function(e){
       var tr=trackPos!=null?restrictionTrackRange(r,trackPos):null;if(trackPos!=null&&!tr)return;
       var s=tr?tr.start:metersOf(r.km,r.pk),e=tr?tr.end:((r.kmE!=null)?metersOf(r.kmE,r.pkE):s),lo=Math.min(s,e),hi=Math.max(s,e);
       if(pos>=lo-5&&pos<=hi+5){ inzone=r; r._ahead=0; r._zone=true; return; }
-      var a=up?(s-pos):(pos-s); r._ahead=a; r._zone=false; if(a>0&&a<bestA){ bestA=a; best=r; } });
+      var a=up?(lo-pos):(pos-hi); r._ahead=a; r._zone=false; if(a>0&&a<bestA){ bestA=a; best=r; } });
     return inzone||best; }
 
   function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#gaugeNeedle").style.transform="rotate("+(-135+v/MAXSPD*270).toFixed(2)+"deg)"; $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
@@ -2443,7 +2465,7 @@ window.addEventListener("error",function(e){
     var r=nextRestriction();
     if(!r){ sig.className="signal clear"; stEl.textContent="путь свободен"; distEl.textContent=""; appW.style.display="none"; updateLimitBadge(null); updateGaugeDanger(null);
       content.innerHTML='<div class="sig-empty"><b>Ограничений впереди нет</b>'+(state.restrictions.length?'По текущему участку чисто.':'Добавь ограничения во вкладке «Список».')+'</div>'; return; }
-    var lead=r.lead||state.settings.lead,inzone=r._zone,ahead=r._ahead;
+    var lead=state.settings.lead,inzone=r._zone,ahead=r._ahead;
     updateLimitBadge(r);
     updateGaugeDanger(r,inzone,ahead,lead);
     if(inzone){ sig.className="signal danger"; stEl.textContent="в зоне ограничения"; }
@@ -2456,41 +2478,35 @@ window.addEventListener("error",function(e){
 
   var alertState={};
   function evalAlerts(){ if(!rt.tracking||state.calib==null||rt.posM==null)return;
-    if(rt.activeAlert&&rt.ackedAlertKey!==rt.activeAlert.key&&Date.now()-(rt.alertRepeatAt||0)>20000){rt.alertRepeatAt=Date.now();say("Ограничение не подтверждено");beep("warn");vibe("warn");}
+    // Android owns alert timing and speech. The WebView only displays that event.
+    if(rt.nativeSnapshot){
+      var nativeRestriction=state.restrictions.find(function(r){return r.id===rt.nativeAlertId;});
+      if(!nativeRestriction){$("#alert").className="alert";rt.activeAlert=null;return;}
+      var nativeKey=state.ctx.peregon+"|"+state.ctx.towards+"|"+rt.nativeAlertId;
+      var ns=alertState[nativeKey]||(alertState[nativeKey]={a:false,z:false});
+      if(rt.nativeAlertInZone&&!ns.z){ns.z=true;ns.a=true;fireAlert("danger",nativeRestriction,0);}
+      else if(!rt.nativeAlertInZone&&!ns.a){ns.a=true;fireAlert("warn",nativeRestriction,rt.nativeAlertDistanceM);}
+      return;
+    }
     var trackPos=currentTrackMeters(),pos=trackPos!=null?trackPos:rt.posM;
     state.restrictions.forEach(function(r){ if(!isActive(r)||!inCtx(r))return;
-      var lead=r.lead||state.settings.lead,tr=trackPos!=null?restrictionTrackRange(r,trackPos):null,s=tr?tr.start:metersOf(r.km,r.pk),e=tr?tr.end:((r.kmE!=null)?metersOf(r.kmE,r.pkE):s),lo=Math.min(s,e),hi=Math.max(s,e),up=!dirDown();
+      var lead=state.settings.lead,tr=trackPos!=null?restrictionTrackRange(r,trackPos):null,s=tr?tr.start:metersOf(r.km,r.pk),e=tr?tr.end:((r.kmE!=null)?metersOf(r.kmE,r.pkE):s),lo=Math.min(s,e),hi=Math.max(s,e),up=!dirDown();
       var key=r.id||(r.km+"_"+r.pk),st=alertState[key]||(alertState[key]={a:false,z:false});
-      if(trackPos!=null&&!tr)return;var inzone=pos>=lo-5&&pos<=hi+5,ahead=up?(s-pos):(pos-s);
-      if(ahead>lead*1.3)st.a=false; if(pos<lo-50||pos>hi+50)st.z=false;
+      if(trackPos!=null&&!tr)return;var inzone=pos>=lo-5&&pos<=hi+5,ahead=up?(lo-pos):(pos-hi);
       if(inzone&&!st.z){ st.z=true; st.a=true; fireAlert("danger",r,0); }
       else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); }
-      // ПРЕВЫШЕНИЕ СКОРОСТИ ВНУТРИ ЗОНЫ: разовое предупреждение при входе не спасает,
-      // если машинист разгоняется УЖЕ находясь в зоне ограничения — до сих пор об этом
-      // сигнализировал только цвет гейджа (молча), без звука/голоса. Повторяем каждые 12с
-      // пока скорость держится выше лимита — этого достаточно чтобы точно заметить, и не спамит.
-      if(inzone && r.spd!=null && rt.speed>+r.spd){
-        if(!st.overSpeedAt || (Date.now()-st.overSpeedAt)>12000){
-          st.overSpeedAt=Date.now();
-          fireOverspeedAlert(r);
-        }
-      } else { st.overSpeedAt=null; }
     }); }
-  function fireOverspeedAlert(r){
-    say("Внимание, превышение скорости! Ограничение "+r.spd+", скорость "+Math.round(rt.speed));
-    beep("danger"); vibe("danger");
-  }
   function fireAlert(kind,r,ahead){ var al=$("#alert"); al.className="alert on "+kind; var loc=r.km+" км "+r.pk+" пк";
-    if(kind==="warn"){var audit=PIKET_RELIABILITY.triggerAudit(r.lead||state.settings.lead,ahead),log=load("sap_triggerAudit",[]);log.push({at:Date.now(),id:r.id||null,peregon:state.ctx.peregon,expected:r.lead||state.settings.lead,actual:Math.round(ahead),delta:audit.deltaM,ok:audit.ok});if(log.length>100)log=log.slice(-100);save("sap_triggerAudit",log);}
+    if(kind==="warn"){var audit=PIKET_RELIABILITY.triggerAudit(state.settings.lead,ahead),log=load("sap_triggerAudit",[]);log.push({at:Date.now(),id:r.id||null,peregon:state.ctx.peregon,expected:state.settings.lead,actual:Math.round(ahead),delta:audit.deltaM,ok:audit.ok});if(log.length>100)log=log.slice(-100);save("sap_triggerAudit",log);}
     var detHtml=kind==="danger"?(loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':'')):('<small>через</small> '+fmtM(ahead)+' · '+loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':''));
     $("#alHead").textContent=kind==="danger"?"ОГРАНИЧЕНИЕ — ЗОНА":"ВНИМАНИЕ — ОГРАНИЧЕНИЕ"; $("#alBig").textContent=r.spd||"—";
     $("#alDet").innerHTML=detHtml;
     // Сохраняем для передачи на видимый экран через снэпшот (тот сам звук/голос не дублирует -
     // только показывает то же визуальное окно, что уже отображено здесь в headless)
     rt.activeAlert={ key:(r.id||(r.km+"_"+r.pk))+"_"+kind, kind:kind, spd:r.spd, detHtml:detHtml }; rt.alertRepeatAt=Date.now();
-    say(kind==="danger"? sayPhrase(r) : (distWords(ahead)+", "+sayPhrase(r)));
-    beep(kind); vibe(kind); }
-  $("#alAck").addEventListener("click",function(){ $("#alert").className="alert"; rt.ackedAlertKey=(rt.activeAlert?rt.activeAlert.key:null); rt.activeAlert=null; rt.alertRepeatAt=0; });
+    if(!rt.nativeSnapshot){say(kind==="danger"? sayPhrase(r) : (distWords(ahead)+", "+sayPhrase(r)));beep(kind);vibe(kind);}
+    clearTimeout(rt.alertHideTimer);rt.alertHideTimer=setTimeout(function(){$("#alert").className="alert";rt.activeAlert=null;},5000);
+  }
 
   function renderList(){ var box=$("#listBox"),arr=state.restrictions.slice(); $("#listCount").textContent=arr.length;
     if(!arr.length){ box.innerHTML='<div class="empty"><div class="ico">⬡</div><b>Список пуст</b><p>Добавь предупреждения с бланка:<br>перегон, км/пк, скорость, срок.</p></div>'; return; }

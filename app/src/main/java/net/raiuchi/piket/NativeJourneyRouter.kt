@@ -44,7 +44,7 @@ class NativeJourneyRouter private constructor(
         if (currentPhysicalM == null || currentEndM == null || nextDistanceM == null) return reset()
         val nearBoundary = kotlin.math.abs(currentPhysicalM - currentEndM) <= 800.0 ||
             (observedPhysicalM != null && kotlin.math.abs(observedPhysicalM - currentEndM) <= 80.0 &&
-                currentDistanceM != null && currentDistanceM <= 800.0)
+                currentDistanceM != null)
         val neighborReliable = nextDistanceM <= 80.0
         val sameGeometryTurn = next.route == current && next.direction != direction
         val previousObserved = lastObservedPhysicalM
