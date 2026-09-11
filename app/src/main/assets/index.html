@@ -1088,11 +1088,13 @@ window.addEventListener("error",function(e){
   }
   function normalizeRestrictionRoutes(){
     state.restrictions.forEach(function(r){
-      if(!isDachaLeg(r.peregon))return;
+      if(!r.peregon||r.peregon==="Все участки")return;
       var start=metersOf(r.km,r.pk,r.m),end=r.kmE==null?start:metersOf(r.kmE,r.pkE,r.mE);
-      if(officialToTrackM(start,r.peregon,null)!=null)return;
-      var candidates=TRACK.labels.filter(function(label){return isDachaLeg(label)&&officialToTrackM(start,label,null)!=null&&officialToTrackM(end,label,null)!=null;});
-      if(candidates.length===1){r.previousPeregon=r.peregon;r.peregon=candidates[0];}
+      if(officialToTrackM(start,r.peregon,null)!=null){delete r.routeNeedsReview;return;}
+      var related=new Set();(RAILCHAINS||[]).forEach(function(chain){if(chain.chain.indexOf(r.peregon)>=0)chain.chain.forEach(function(label){related.add(label);});});
+      var candidates=Array.from(related).filter(function(label){return officialToTrackM(start,label,null)!=null&&officialToTrackM(end,label,null)!=null;});
+      if(candidates.length===1){r.previousPeregon=r.peregon;r.peregon=candidates[0];delete r.routeNeedsReview;}
+      else r.routeNeedsReview=true;
     });
   }
   function persist(){ normalizeRestrictionRoutes(); save("sap_res",state.restrictions); save("sap_set",state.settings); save("sap_cal",state.calib); save("sap_ctx",state.ctx); syncNativeRouteContext(); }
@@ -1334,7 +1336,7 @@ window.addEventListener("error",function(e){
     var rows=scheduleRowsForContext(),mapped=[];
     train.stops.forEach(function(stop,index){var station=scheduleStation(stop.station,rows);mapped.push({stop:stop,index:index,name:station?station[0]:scheduleStationName(stop.station),m:station?station[1]:null,displayM:station?(station[2]==null?station[1]:station[2]):null,mark:station?station[3]:null,arr:scheduleTime(train,index,"arr",stop.arr),dep:scheduleTime(train,index,"dep",stop.dep)});});
     var live=scheduleLiveIndex(mapped,train);
-    var renderKey=JSON.stringify([state.ctx,train.number,live,scheduleOverrides,state.restrictions]);
+    var renderKey=JSON.stringify([state.ctx,train.number,live,scheduleOverrides,state.restrictions],function(key,value){return key.charAt(0)==="_"?undefined:value;});
     if(rt.scheduleRenderKey===renderKey){updateScheduleLivePace(false);return;}
     rt.scheduleRenderKey=renderKey;
     box.innerHTML=mapped.map(function(x,i){
@@ -2400,6 +2402,7 @@ window.addEventListener("error",function(e){
   }
 
   function chipsOf(r){ var c="";
+    if(r.routeNeedsReview)c+='<span class="chip">Проверь участок: километр вне его оси</span>';
     if(r.dir)c+='<span class="chip c-dir">'+dirLabel(r.dir)+'</span>';
     if(r.peregon&&r.peregon!=="Все участки")c+='<span class="chip c-per">'+escapeHtml(r.peregon)+'</span>';
     if(r.reason)c+='<span class="chip">'+escapeHtml(r.reason)+'</span>';

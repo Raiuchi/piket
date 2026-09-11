@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 const html = fs.readFileSync('app/src/main/assets/index.html', 'utf8');
 const routes = JSON.parse(fs.readFileSync('app/src/main/assets/data/routes.json', 'utf8'));
 const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
+  RAILCHAINS: JSON.parse(fs.readFileSync('app/src/main/assets/data/timing.json','utf8')).railChains,
   state:{ctx:{peregon:'Павлово - Горы II путь'}}, rt:{tracking:true,posM:31000,physicalM:0},
   activeThrough:()=> 'dacha'};
 vm.createContext(box);
