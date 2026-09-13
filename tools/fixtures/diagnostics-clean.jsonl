@@ -1,0 +1,5 @@
+{"time":1000,"event":"service_started","version":"test"}
+{"time":2000,"event":"gps_sample","provider_speed_kmh":40,"filtered_speed_kmh":40,"snapped_physical_m":1000,"engine_physical_m":1000}
+{"time":7000,"event":"gps_sample","provider_speed_kmh":60,"filtered_speed_kmh":60,"snapped_physical_m":1080,"engine_physical_m":1080}
+{"time":8000,"event":"direct_gps_started"}
+{"time":9000,"event":"direct_gps_stopped"}

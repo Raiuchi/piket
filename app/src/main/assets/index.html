@@ -342,6 +342,14 @@
     font-weight:600;max-width:88vw;text-align:center;box-shadow:0 6px 24px rgba(0,0,0,.5);border:1px solid var(--line);
     opacity:0;pointer-events:none;transition:opacity .25s ease,transform .25s ease;z-index:90}
   .toast.on{opacity:1;transform:translate(-50%,0)}
+  .screen-modes{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .screen-mode{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:var(--panel2);color:var(--muted);font-size:12px}
+  .screen-mode.on{border-color:var(--accent);color:#fff;background:rgba(240,45,58,.16)}
+  .thermal-banner{display:none;position:fixed;z-index:90;left:12px;right:12px;top:calc(10px + env(safe-area-inset-top));padding:12px 14px;border:1px solid #D99022;border-radius:14px;background:rgba(30,22,10,.96);color:#FFD58A;box-shadow:0 8px 28px #0008}
+  .thermal-banner.on{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .thermal-banner button{border:1px solid #D99022;border-radius:10px;background:#4B320D;color:#FFE2A8;padding:8px 10px}
+  body.thermal-mode *,body.thermal-mode *::before,body.thermal-mode *::after{animation:none!important;transition:none!important}
+  body.screen-dim{filter:brightness(.28)}
 
   /* Premium cockpit visual system — original automotive-inspired design */
   :root{
@@ -494,6 +502,7 @@
   </style>
 </head>
 <body>
+<div class="thermal-banner" id="thermalBanner"><span>Телефон сильно нагрелся. Интерфейс переведён в экономичный режим.</span><button id="lowerBrightness">Снизить яркость</button></div>
 <div class="app">
 
   <div class="hero">
@@ -713,7 +722,7 @@
       <div class="row"><div><div class="t">Голосовое оповещение</div><div class="d">Объявляет ограничение и расстояние вслух.</div></div><div class="sw on" id="swVoice"></div></div>
       <div class="row"><div><div class="t">Звуковой сигнал</div></div><div class="sw on" id="swSound"></div></div>
       <div class="row"><div><div class="t">Вибрация</div></div><div class="sw on" id="swVibe"></div></div>
-      <div class="row"><div><div class="t">Не гасить экран</div><div class="d">Держит экран включённым в поездке.</div></div><div class="sw on" id="swWake"></div></div>
+      <div class="row"><div style="width:100%"><div class="t">Режим экрана</div><div class="d">Авто затемняет экран через 90 секунд, касание возвращает яркость.</div><div class="screen-modes" id="screenModes"><button class="screen-mode" data-screen="always">Всегда включён</button><button class="screen-mode" data-screen="auto">Авто затемнение</button><button class="screen-mode" data-screen="system">Обычный</button></div></div></div>
       <div class="row"><div><div class="t">Демо-режим</div><div class="d">Симуляция движения для проверки без GPS. Включи и нажми «Старт» — поедет к ближайшему ограничению.</div></div><div class="sw" id="swDemo"></div></div>
     </div>
     <div class="card speed-ref-entry">
@@ -1020,9 +1029,30 @@ window.addEventListener("error",function(e){
   // Геометрическая ось TRACK непрерывна и нужна для скорости, dead-reckoning и плавной
   // GPS-коррекции. Официальная ось CHAINAGE взята без изменений из listPoints.txt и может
   // иметь реальные смены километража. Никогда не интерполируем через такой разрыв.
-  function baseOfficialTrackM(trackM,label){
+  function exactAxisProfile(label,direction){
+    if(label==="Д. Долг - Павлово") return direction==="obratno"?
+      [[5001,5000],[6073,6400],[6074,2300],[7078,3000]]:
+      [[5001,5000],[6073,7400],[6074,2300],[7078,3000]];
+    if(label==="Павлово - Горы II путь") return [[32488,32000],[33499,33500],[33500,42800]];
+    if(label==="Горы - Павлово I путь") return [[32404,32000],[33499,33500],[33500,42800],[35354,43000]];
+    if(label==="Горы - Петрозаводск") return [[42000,42800],[43000,43000]];
+    return null;
+  }
+  function profileOfficial(trackM,profile){
+    if(!profile||trackM<profile[0][0]||trackM>profile[profile.length-1][0])return null;
+    for(var d=0;d<profile.length-1;d++)if(profile[d][0]===profile[d+1][0]&&trackM===profile[d][0])return profile[d+1][1];
+    for(var p=0;p<profile.length-1;p++){
+      var a=profile[p],b=profile[p+1];
+      if(a[0]===b[0]){if(trackM===b[0])return b[1];continue;}
+      if(trackM<b[0]||p===profile.length-2)return a[1]+(trackM-a[0])/(b[0]-a[0])*(b[1]-a[1]);
+    }
+    return profile[profile.length-1][1];
+  }
+  function baseOfficialTrackM(trackM,label,direction){
     var si=TRACK.labels.indexOf(label);
     if(si<0 || !isFinite(trackM)) return trackM;
+    var prof=exactAxisProfile(label,direction||(state&&state.ctx?journeyTowards():"tuda"));
+    var profValue=profileOfficial(trackM,prof);if(profValue!=null)return profValue;
     var pts=TRACK.segs[si], ids=CHAINAGE[si];
     if(!pts || !ids || pts.length!==ids.length) return trackM;
     if(trackM<=pts[0][2]) return ids[0]+(trackM-pts[0][2]);
@@ -1041,10 +1071,10 @@ window.addEventListener("error",function(e){
     var offsets=load("sap_routeOffsets",{}), value=+(offsets[label]);
     return isFinite(value) && Math.abs(value)<=1500 ? value : 0;
   }
-  function officialTrackM(trackM,label){ return baseOfficialTrackM(trackM,label)+routeOfficialOffset(label); }
+  function officialTrackM(trackM,label){ return baseOfficialTrackM(trackM,label,journeyTowards())+routeOfficialOffset(label); }
   function learnRouteOffset(label,officialM,trackM){
     if(!label || label==="Все участки" || !isFinite(officialM) || !isFinite(trackM)) return null;
-    var value=Math.round(officialM-baseOfficialTrackM(trackM,label));
+    var value=Math.round(officialM-baseOfficialTrackM(trackM,label,journeyTowards()));
     if(Math.abs(value)>1500) return null;
     var offsets=load("sap_routeOffsets",{}); offsets[label]=value; save("sap_routeOffsets",offsets);
     return value;
@@ -1052,7 +1082,7 @@ window.addEventListener("error",function(e){
 
   var state={
     restrictions: load("sap_res",[]),
-    settings: Object.assign({lead:3000,voice:true,sound:true,vibe:true,wake:true,demo:false}, load("sap_set",{})),
+    settings: Object.assign({lead:3000,voice:true,sound:true,vibe:true,screenMode:"auto",demo:false}, load("sap_set",{})),
     calib: load("sap_cal",null),
     ctx: Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}))
   };
@@ -1352,8 +1382,10 @@ window.addEventListener("error",function(e){
     box.onclick=function(e){var b=e.target.closest("[data-schedule-index]");if(b){var idx=+b.getAttribute("data-schedule-index"),kind=b.getAttribute("data-kind")||"dep",stop=train.stops[idx];openScheduleTimePicker(train,idx,kind,stop[kind]);return;}if(e.target.id==="scheduleReset"){Object.keys(scheduleOverrides).forEach(function(k){if(k.indexOf(train.number+":")===0)delete scheduleOverrides[k];});save("sap_schedule_overrides",scheduleOverrides);renderTrainSchedule();toast("Время восстановлено из расписания");}};
   }
   function renderTrainPicker(){var trains=trainsForContext(),field=$("#scheduleTrain");if(field.value&&!trains.some(function(t){return t.number===field.value;}))field.value="";renderTrainSchedule();}
-  function reqWake(){ try{if(window.Android&&window.Android.setKeepScreen)window.Android.setKeepScreen(!!state.settings.wake);}catch(e){} if(!state.settings.wake||!("wakeLock"in navigator))return; navigator.wakeLock.request("screen").then(function(w){rt.wake=w;w.addEventListener("release",function(){rt.wake=null;});}).catch(function(){}); }
-  function relWake(){ try{if(window.Android&&window.Android.setKeepScreen)window.Android.setKeepScreen(false);}catch(e){} if(rt.wake){try{rt.wake.release();}catch(e){} rt.wake=null;} }
+  function scheduleWebDim(){clearTimeout(rt.screenDimTimer);document.body.classList.remove("screen-dim");if(!(window.Android&&window.Android.setScreenMode)&&state.settings.screenMode==="auto")rt.screenDimTimer=setTimeout(function(){document.body.classList.add("screen-dim");},90000);}
+  document.addEventListener("pointerdown",function(){if(rt.tracking)scheduleWebDim();},{passive:true});
+  function reqWake(){ var mode=state.settings.screenMode||(state.settings.wake===false?"system":"auto");try{if(window.Android&&window.Android.setScreenMode)window.Android.setScreenMode(mode);else if(window.Android&&window.Android.setKeepScreen)window.Android.setKeepScreen(mode!=="system");}catch(e){} scheduleWebDim();if(mode==="system"||!("wakeLock"in navigator))return; navigator.wakeLock.request("screen").then(function(w){rt.wake=w;w.addEventListener("release",function(){rt.wake=null;});}).catch(function(){}); }
+  function relWake(){ clearTimeout(rt.screenDimTimer);document.body.classList.remove("screen-dim");try{if(window.Android&&window.Android.setScreenMode)window.Android.setScreenMode("system");else if(window.Android&&window.Android.setKeepScreen)window.Android.setKeepScreen(false);}catch(e){} if(rt.wake){try{rt.wake.release();}catch(e){} rt.wake=null;} }
   document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&rt.tracking)reqWake(); });
 
   // ВСПОМОГАТЕЛЬНЫЙ АКСЕЛЕРОМЕТР — мягкая подсказка при потере/глушении GPS, НЕ замена GPS.
@@ -2339,14 +2371,17 @@ window.addEventListener("error",function(e){
   function officialToTrackM(officialM,label,nearTrackM){
     var si=TRACK.labels.indexOf(label);
     if(si<0 || !isFinite(officialM)) return null;
-    var pts=TRACK.segs[si],ids=CHAINAGE[si],candidates=[];
+    var pts=TRACK.segs[si],ids=CHAINAGE[si],candidates=[],prof=exactAxisProfile(label,journeyTowards());
+    if(prof)for(var pi=0;pi<prof.length-1;pi++){var pa=prof[pi],pb=prof[pi+1];if(pa[0]===pb[0]||pa[1]===pb[1])continue;if(officialM>=Math.min(pa[1],pb[1])&&officialM<=Math.max(pa[1],pb[1]))candidates.push({track:pa[0]+(officialM-pa[1])/(pb[1]-pa[1])*(pb[0]-pa[0]),error:0});}
+    var profStart=prof&&prof[0][0],profEnd=prof&&prof[prof.length-1][0];
     if(pts.length&&pts[0][2]>0&&pts[0][2]<=5000&&Math.abs(ids[0]-pts[0][2])<=2500){
       var prefix=pts[0][2]+officialM-ids[0];
       if(prefix>=0&&prefix<=pts[0][2])candidates.push({track:prefix,error:0});
     }
-    for(var i=0;i<pts.length;i++) candidates.push({track:pts[i][2],error:Math.abs(ids[i]-officialM)});
+    for(var i=0;i<pts.length;i++) if(!prof||pts[i][2]<profStart||pts[i][2]>profEnd)candidates.push({track:pts[i][2],error:Math.abs(ids[i]-officialM)});
     for(var j=0;j<pts.length-1;j++){
       var a=pts[j][2],b=pts[j+1][2],physical=b-a,oa=ids[j],ob=ids[j+1],official=ob-oa;
+      if(prof&&Math.max(a,profStart)<Math.min(b,profEnd))continue;
       if(official<=0 || Math.abs(official-physical)>3000){
         if(officialM>=oa&&officialM<oa+physical-1)candidates.push({track:a+officialM-oa,error:0});
         continue;
@@ -2667,9 +2702,12 @@ window.addEventListener("error",function(e){
   function nudge(d){ if(state.calib==null){ toast("Сначала калибровка"); return; } rt.odo+=d*100*(dirDown()?-1:1); rt.posM=currentMeters(); renderTrip(); renderList(); }
   $("#pkPlus").addEventListener("click",function(){ nudge(1); }); $("#pkMinus").addEventListener("click",function(){ nudge(-1); });
 
-  function syncSw(){ [["#swVoice","voice"],["#swSound","sound"],["#swVibe","vibe"],["#swWake","wake"],["#swDemo","demo"]].forEach(function(p){ $(p[0]).classList.toggle("on",!!state.settings[p[1]]); }); $("#leadVal").textContent=fmtLead(state.settings.lead); }
+  function syncSw(){ [["#swVoice","voice"],["#swSound","sound"],["#swVibe","vibe"],["#swDemo","demo"]].forEach(function(p){ $(p[0]).classList.toggle("on",!!state.settings[p[1]]); }); var mode=state.settings.screenMode||(state.settings.wake===false?"system":"auto");document.querySelectorAll("[data-screen]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-screen")===mode);}); $("#leadVal").textContent=fmtLead(state.settings.lead); }
   function swBind(sel,key){ $(sel).addEventListener("click",function(){ state.settings[key]=!state.settings[key]; persist(); syncSw(); if(key==="wake"&&rt.tracking){if(state.settings.wake)reqWake();else relWake();} if(key==="demo"&&rt.tracking)stopTrack(); }); }
-  swBind("#swVoice","voice"); swBind("#swSound","sound"); swBind("#swVibe","vibe"); swBind("#swWake","wake"); swBind("#swDemo","demo");
+  swBind("#swVoice","voice"); swBind("#swSound","sound"); swBind("#swVibe","vibe"); swBind("#swDemo","demo");
+  $("#screenModes").addEventListener("click",function(e){var b=e.target.closest("[data-screen]");if(!b)return;state.settings.screenMode=b.getAttribute("data-screen");delete state.settings.wake;persist();syncSw();if(rt.tracking)reqWake();});
+  window.onNativeThermalState=function(status){var hot=(+status)>=3;document.body.classList.toggle("thermal-mode",hot);$("#thermalBanner").classList.toggle("on",hot);};
+  $("#lowerBrightness").addEventListener("click",function(){try{if(window.Android&&window.Android.lowerBrightness)window.Android.lowerBrightness();}catch(e){}$("#thermalBanner").classList.remove("on");toast("Яркость снижена до касания экрана");});
   $("#leadUp").addEventListener("click",function(){ state.settings.lead=Math.min(8000,state.settings.lead+500); persist(); syncSw(); renderTrip(); });
   $("#leadDn").addEventListener("click",function(){ state.settings.lead=Math.max(300,state.settings.lead-500); persist(); syncSw(); renderTrip(); });
 
@@ -2854,7 +2892,7 @@ window.addEventListener("error",function(e){
     // реально была введена перед поездкой, а не ту, что была (или не было) при создании службы.
     window.headlessRestart=function(){
       state.restrictions=load("sap_res",state.restrictions);
-      state.settings=Object.assign({lead:3000,voice:true,sound:true,vibe:true,wake:true,demo:false}, load("sap_set",{}));
+      state.settings=Object.assign({lead:3000,voice:true,sound:true,vibe:true,screenMode:"auto",demo:false}, load("sap_set",{}));
       state.calib=load("sap_cal",null);
       state.ctx=Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}));
       rt.tracking=true; rt.last=null; rt.speed=0; rt.odo=0; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0;

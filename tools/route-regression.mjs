@@ -9,8 +9,9 @@ const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
   RAILCHAINS: JSON.parse(fs.readFileSync('app/src/main/assets/data/timing.json','utf8')).railChains,
   state:{ctx:{peregon:'Павлово - Горы II путь'}}, rt:{tracking:true,posM:31000,physicalM:0},
   activeThrough:()=> 'dacha'};
+box.journeyTowards=()=>box.state.ctx.towards||'tuda';
 vm.createContext(box);
-for (const name of ['officialToTrackM','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
+for (const name of ['exactAxisProfile','officialToTrackM','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = html.indexOf('\n  function ', start + 1);
@@ -32,6 +33,13 @@ assert.ok(box.officialToTrackM(33000,'Павлово - Горы II путь',330
   'the old axis immediately before Gory must still resolve');
 assert.equal(box.officialToTrackM(1000,'Д. Долг - Павлово',1000),1000,
   'the supported short prefix before the first map point remains usable');
+box.state.ctx.towards='tuda';
+assert.ok(Math.abs(box.officialToTrackM(7400,'Д. Долг - Павлово',6073)-6073)<2);
+assert.ok(Math.abs(box.officialToTrackM(2300,'Д. Долг - Павлово',6074)-6074)<2);
+assert.ok(Math.abs(box.officialToTrackM(42800,'Павлово - Горы II путь',33500)-33500)<2);
+box.state.ctx.towards='obratno';
+assert.ok(Math.abs(box.officialToTrackM(6400,'Д. Долг - Павлово',6073)-6073)<2);
+assert.ok(Math.abs(box.officialToTrackM(42800,'Горы - Павлово I путь',33500)-33500)<2);
 for (const [route,a,b] of [['Павлово - Горы II путь',29807,33500],['Горы - Павлово I путь',28200,33500]]) {
   box.state.ctx.peregon=route;
   for (const [physical,expected] of [[a,29200],[(a+b)/2,31600],[b,34000]]) {

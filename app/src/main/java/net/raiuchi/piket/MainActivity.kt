@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.*
 import android.speech.tts.TextToSpeech
+import android.view.MotionEvent
 import android.view.WindowManager
 import android.webkit.*
 import androidx.core.content.ContextCompat
@@ -35,8 +36,16 @@ class MainActivity : Activity() {
     private val diagnostics by lazy { DiagnosticsLogger(this) }
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var thermalStatus = PowerManager.THERMAL_STATUS_NONE
+    private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
+    private var screenMode = "auto"
+    private var screenDimmed = false
+    private val autoDim = Runnable { if (screenMode == "auto") setWindowBrightness(0.16f, true) }
     private val snapshotPump = object : Runnable {
-        override fun run() { if (pageReady) publishSnapshot(repository.loadSnapshot()); handler.postDelayed(this, 1_000) }
+        override fun run() {
+            if (pageReady) publishSnapshot(repository.loadSnapshot())
+            handler.postDelayed(this, if (thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) 3_000 else 1_000)
+        }
     }
     @Volatile private var updateCheckRunning = false
     @Volatile private var lastUpdateCheckAt = 0L
@@ -53,7 +62,7 @@ class MainActivity : Activity() {
                 mediaPlaybackRequiresUserGesture=false;cacheMode=WebSettings.LOAD_NO_CACHE
             }
             view.webViewClient=object:WebViewClient(){
-                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot());checkForUpdate(true)}
+                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot());publishThermalState();checkForUpdate(true)}
                 override fun shouldOverrideUrlLoading(v:WebView,r:WebResourceRequest)=openExternal(r.url)
                 override fun shouldOverrideUrlLoading(v:WebView,url:String)=openExternal(Uri.parse(url))
             }
@@ -64,6 +73,46 @@ class MainActivity : Activity() {
             view.addJavascriptInterface(PiketBridge(),"Android");setContentView(view);view.loadUrl(APP_URL)
         }
         requestPermissionsIfNeeded()
+        registerThermalMonitor()
+    }
+
+    private fun registerThermalMonitor() {
+        if (Build.VERSION.SDK_INT < 29) return
+        val power = getSystemService(POWER_SERVICE) as? PowerManager ?: return
+        thermalStatus = power.currentThermalStatus
+        thermalListener = PowerManager.OnThermalStatusChangedListener { status ->
+            thermalStatus = status
+            runOnUiThread(::publishThermalState)
+        }.also(power::addThermalStatusListener)
+    }
+
+    private fun publishThermalState() {
+        if (pageReady) web?.evaluateJavascript(
+            "if(window.onNativeThermalState)window.onNativeThermalState($thermalStatus)", null)
+    }
+
+    private fun setWindowBrightness(value: Float, dimmed: Boolean) {
+        window.attributes = window.attributes.apply { screenBrightness = value }
+        screenDimmed = dimmed
+    }
+
+    private fun applyScreenMode(mode: String) {
+        screenMode = mode.takeIf { it in setOf("always", "auto", "system") } ?: "auto"
+        handler.removeCallbacks(autoDim)
+        when (screenMode) {
+            "always" -> { window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); setWindowBrightness(-1f, false) }
+            "auto" -> { window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); setWindowBrightness(-1f, false); handler.postDelayed(autoDim, 90_000) }
+            else -> { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); setWindowBrightness(-1f, false) }
+        }
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN && screenMode == "auto") {
+            if (screenDimmed) setWindowBrightness(-1f, false)
+            handler.removeCallbacks(autoDim)
+            handler.postDelayed(autoDim, 90_000)
+        }
+        return super.dispatchTouchEvent(event)
     }
 
     private fun publishSnapshot(s:TripSnapshot){
@@ -158,6 +207,8 @@ class MainActivity : Activity() {
         @JavascriptInterface fun stopTracking()=runOnUiThread{stopService(Intent(this@MainActivity,TrackingService::class.java))}
         @JavascriptInterface fun recalibrate()=runOnUiThread{pendingConfig?.let(::configureRunning)}
         @JavascriptInterface fun setKeepScreen(enabled:Boolean)=runOnUiThread{if(enabled)window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)}
+        @JavascriptInterface fun setScreenMode(mode:String)=runOnUiThread{applyScreenMode(mode)}
+        @JavascriptInterface fun lowerBrightness()=runOnUiThread{setWindowBrightness(0.18f,true)}
         @JavascriptInterface fun isServiceTracking()=serviceRunning()
         @JavascriptInterface fun isHeadless()=false
         @JavascriptInterface fun isTtsReady()=ttsReady
@@ -198,5 +249,8 @@ class MainActivity : Activity() {
         web?.evaluateJavascript(script, callback) ?: callback("\"webview-missing\"")
     }
     override fun onBackPressed(){if(web?.canGoBack()==true)web?.goBack()else moveTaskToBack(true)}
-    override fun onDestroy(){handler.removeCallbacksAndMessages(null);tts?.stop();tts?.shutdown();web?.let{v->(v.parent as? android.view.ViewGroup)?.removeView(v);v.stopLoading();v.removeJavascriptInterface("Android");v.destroy()};web=null;super.onDestroy()}
+    override fun onDestroy(){
+        thermalListener?.let { if(Build.VERSION.SDK_INT>=29)(getSystemService(POWER_SERVICE)as? PowerManager)?.removeThermalStatusListener(it) }
+        handler.removeCallbacksAndMessages(null);tts?.stop();tts?.shutdown();web?.let{v->(v.parent as? android.view.ViewGroup)?.removeView(v);v.stopLoading();v.removeJavascriptInterface("Android");v.destroy()};web=null;super.onDestroy()
+    }
 }

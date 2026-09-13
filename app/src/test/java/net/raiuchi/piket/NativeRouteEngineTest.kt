@@ -56,6 +56,19 @@ class NativeRouteEngineTest {
         assertTrue("production data must exercise kilometer-axis changes", transitions >= 5)
     }
 
+    @Test fun petrozavodskMapAxisChangesAreExactInBothDirections() {
+        assertEquals(7_400.0, engine.officialMeters("Д. Долг - Павлово", 6_073.0, "tuda")!!, 0.01)
+        assertEquals(2_300.0, engine.officialMeters("Д. Долг - Павлово", 6_074.0, "tuda")!!, 0.01)
+        assertEquals(6_400.0, engine.officialMeters("Д. Долг - Павлово", 6_073.0, "obratno")!!, 0.01)
+        assertEquals(2_300.0, engine.officialMeters("Д. Долг - Павлово", 6_074.0, "obratno")!!, 0.01)
+        assertEquals(33_500.0, engine.officialMeters("Павлово - Горы II путь", 33_499.0, "tuda")!!, 0.01)
+        assertEquals(42_800.0, engine.officialMeters("Павлово - Горы II путь", 33_500.0, "tuda")!!, 0.01)
+        assertEquals(42_800.0, engine.officialMeters("Горы - Павлово I путь", 33_500.0, "obratno")!!, 0.01)
+        assertEquals(42_800.0, engine.officialMeters("Горы - Петрозаводск", 42_000.0, "tuda")!!, 0.01)
+        assertEquals(42_800.0, engine.officialMeters("Горы - Петрозаводск", 42_000.0, "obratno")!!, 0.01)
+        assertEquals(33_500.0, engine.officialMeters("Горы - Павлово I путь", 33_499.0, "obratno")!!, 0.01)
+    }
+
     @Test fun snappingEveryControlPointReturnsItsPhysicalPosition() {
         for (label in engine.labels()) {
             val route = engine.route(label)!!

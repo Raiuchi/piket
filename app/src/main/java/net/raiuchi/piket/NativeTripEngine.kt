@@ -65,7 +65,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         val snap = input.snap?.takeIf { input.acceptedFix && it.routeLabel == route && it.distanceM <= 120.0 }
         if (physicalM == null && snap != null) {
             physicalM = snap.physicalM
-            val base = routes.officialMeters(route, snap.physicalM) ?: manualOfficialM
+            val base = routes.officialMeters(route, snap.physicalM, direction) ?: manualOfficialM
             officialOffsetM = (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
             recovering = false
             return output("native-gps")
@@ -125,7 +125,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
 
     private fun output(source: String): Output {
         val physical = physicalM
-        val official = physical?.let { routes.officialMeters(route, it)?.plus(officialOffsetM) }
+        val official = physical?.let { routes.officialMeters(route, it, direction)?.plus(officialOffsetM) }
         val alert = if (active && physical != null) nextRestriction(physical) else null
         return Output(active, physical, official, speedMps, recovering, source,
             alert?.restriction?.id, alert?.distanceM, alert?.inZone == true)
@@ -136,8 +136,10 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         return restrictions.asSequence()
             .filter { (it.route == "Все участки" || it.route == route) && (it.direction == "both" || it.direction == direction) }
             .mapNotNull { restriction ->
-                val start = routes.physicalMeters(route, restriction.startOfficialM - officialOffsetM, nowPhysicalM) ?: return@mapNotNull null
-                val end = routes.physicalMeters(route, restriction.endOfficialM - officialOffsetM, start) ?: start
+                val start = routes.physicalMeters(route, restriction.startOfficialM - officialOffsetM,
+                    nowPhysicalM, direction) ?: return@mapNotNull null
+                val end = routes.physicalMeters(route, restriction.endOfficialM - officialOffsetM,
+                    start, direction) ?: start
                 val low = minOf(start, end) - 5.0
                 val high = maxOf(start, end) + 5.0
                 val inZone = nowPhysicalM in low..high

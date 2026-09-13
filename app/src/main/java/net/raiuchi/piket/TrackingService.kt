@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.GnssStatus
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -58,6 +59,12 @@ class TrackingService : Service() {
 
     private var locationManager: LocationManager? = null
     private var gnssCallback: GnssStatus.Callback? = null
+    private var directGpsListener: LocationListener? = null
+    private var directGpsActive = false
+    private var directGpsStartedAt = 0L
+    private var lastDirectGpsStopAt = 0L
+    private var fusedRecoveryFixes = 0
+    private var lastProcessedFixNanos = 0L
     @Volatile private var satellitesUsed = 0
     @Volatile private var averageCn0 = 0f
     @Volatile private var gnssTelemetrySeen = false
@@ -175,7 +182,7 @@ class TrackingService : Service() {
             override fun onLocationResult(result: LocationResult) {
                 val location = result.lastLocation ?: return
                 if (isFreshRealFix(location)) lastFixReceivedAt = System.currentTimeMillis()
-                processLocation(location)
+                processLocation(location, false)
             }
             override fun onLocationAvailability(value: LocationAvailability) {
                 // Android may toggle this flag for a fraction of a second even while
@@ -219,6 +226,11 @@ class TrackingService : Service() {
                 } else if (silence <= 3_000) signalUnavailableMarked = false
                 if (silence > 10_000 && !networkBackupActive) startNetworkBackup()
                 else if (silence <= 10_000 && networkBackupActive) stopNetworkBackup()
+                val unusableFor = now - lastUsableFixAt
+                if (!directGpsActive && unusableFor > 10_000 && now - lastDirectGpsStopAt > 30_000)
+                    startDirectGps(now, silence, unusableFor)
+                if (directGpsActive && (fusedRecoveryFixes >= 3 || now - directGpsStartedAt > 120_000))
+                    stopDirectGps(if (fusedRecoveryFixes >= 3) "fused-recovered" else "battery-window")
                 // Fresh network fixes can mask a stalled precise-GPS stream.
                 // Bound retries to avoid continually restarting acquisition in interference.
                 if ((silence > 15_000 || now - lastUsableFixAt > 30_000) && now - lastFusedRestartAt > 120_000) {
@@ -244,7 +256,7 @@ class TrackingService : Service() {
     private fun startNetworkBackup() {
         if (networkBackupActive || fusedClient == null) return
         networkCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) { result.lastLocation?.let(::processLocation) }
+            override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { processLocation(it, false) } }
         }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         runCatching {
@@ -259,12 +271,41 @@ class TrackingService : Service() {
         networkCallback = null; networkBackupActive = false
     }
 
+    private fun startDirectGps(now: Long, silence: Long, unusableFor: Long) {
+        val manager = locationManager ?: (getSystemService(LOCATION_SERVICE) as? LocationManager) ?: return
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+            !manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) = processLocation(location, true)
+            override fun onProviderDisabled(provider: String) = Unit
+            override fun onProviderEnabled(provider: String) = Unit
+            @Deprecated("Deprecated in Android")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+        }
+        runCatching {
+            manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
+            directGpsListener = listener; directGpsActive = true; directGpsStartedAt = now
+            fusedRecoveryFixes = 0
+            diagnostics.event("direct_gps_started", mapOf("silence_ms" to silence, "unusable_ms" to unusableFor))
+        }
+    }
+
+    private fun stopDirectGps(reason: String) {
+        directGpsListener?.let { runCatching { locationManager?.removeUpdates(it) } }
+        if (directGpsActive) diagnostics.event("direct_gps_stopped", mapOf("reason" to reason,
+            "active_ms" to (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0)))
+        directGpsListener = null; directGpsActive = false
+        lastDirectGpsStopAt = System.currentTimeMillis(); fusedRecoveryFixes = 0
+    }
+
     private fun isFreshRealFix(location: Location): Boolean {
         val age = ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0)
         return age <= 5_000 && !location.isMock
     }
 
-    private fun processLocation(location: Location) {
+    private fun processLocation(location: Location, fromDirectGps: Boolean) {
+        if (location.elapsedRealtimeNanos <= lastProcessedFixNanos) return
+        lastProcessedFixNanos = location.elapsedRealtimeNanos
         val age = ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0)
         val accuracy = if (location.hasAccuracy()) location.accuracy else 999f
         val result = motionFilter.process(NativeMotionFilter.Fix(
@@ -276,6 +317,7 @@ class TrackingService : Service() {
         if (result.accepted && result.quality in setOf("good", "stationary")) {
             lastUsableFixAt = wallNow
             unusableFixMarked = false
+            if (directGpsActive && !fromDirectGps) fusedRecoveryFixes++
         } else if (!unusableFixMarked && wallNow - lastUsableFixAt > 8_000) {
             // FusedLocation can keep sending fresh but useless fixes with an
             // accuracy radius of hundreds or thousands of metres. The old
@@ -286,8 +328,8 @@ class TrackingService : Service() {
             diagnostics.event("usable_gps_lost", mapOf("accuracy_m" to accuracy,
                 "quality" to result.quality, "reason" to result.reason))
         }
-        var currentSnap = routeEngine?.snap(routeLabel, location.latitude, location.longitude)
         val state = tripEngine?.save()
+        var currentSnap = routeEngine?.snap(routeLabel, location.latitude, location.longitude, state?.direction)
         if (state != null && result.accepted && result.quality in setOf("good", "stationary")) {
             val next = journeyRouter?.nextLeg(journeyId, routeLabel, state.direction)
             val route = routeEngine?.route(routeLabel)
@@ -298,7 +340,9 @@ class TrackingService : Service() {
                 ((state.physicalM?.let { abs(it - boundary) <= 800.0 } == true) ||
                     (currentSnap?.let { abs(it.physicalM - boundary) <= 80.0 } == true))
             // Do not scan the entire next route on every fix hundreds of km from its junction.
-            val nextSnap = if (nearBoundary) next?.let { routeEngine?.snap(it.route, location.latitude, location.longitude) } else null
+            val nextSnap = if (nearBoundary) next?.let {
+                routeEngine?.snap(it.route, location.latitude, location.longitude, it.direction)
+            } else null
             val transition = journeyRouter?.consider(journeyId, routeLabel, state.direction,
                 state.physicalM, boundary, currentSnap?.distanceM, nextSnap?.distanceM, currentSnap?.physicalM)
             if (transition != null && nextSnap != null) {
@@ -345,6 +389,7 @@ class TrackingService : Service() {
             "lat" to location.latitude, "lon" to location.longitude,
             "accuracy_m" to location.accuracy,
             "provider" to location.provider,
+            "direct_gps_reserve" to fromDirectGps,
             "fix_age_ms" to ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0),
             "speed_accuracy_mps" to if (location.hasSpeedAccuracy()) location.speedAccuracyMetersPerSecond else null,
             "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
@@ -369,6 +414,7 @@ class TrackingService : Service() {
             .put("speedKmh", (output?.speedMps ?: 0f) * 3.6f).put("recovering", output?.recovering ?: false)
             .put("source", output?.source ?: "unavailable").put("satellites", satellitesUsed)
             .put("averageCn0", averageCn0).put("accuracyM", accuracy)
+            .put("directGpsReserve", directGpsActive)
             .put("alertInZone", output?.alertInZone ?: false)
             .put("frequentInterference", frequentInterference)
         output?.officialM?.let { json.put("officialM", it) }; output?.physicalM?.let { json.put("physicalM", it) }
@@ -482,6 +528,9 @@ class TrackingService : Service() {
             "battery_level" to battery?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1),
             "battery_scale" to battery?.getIntExtra(BatteryManager.EXTRA_SCALE, -1),
             "battery_temperature_c" to battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)?.takeIf { it >= 0 }?.div(10.0),
+            "thermal_status" to if (Build.VERSION.SDK_INT >= 29)
+                (getSystemService(POWER_SERVICE) as? PowerManager)?.currentThermalStatus else null,
+            "direct_gps_reserve" to directGpsActive,
             "plugged" to battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)))
         lastPowerSampleAt = now; lastProcessCpuMs = cpu
     }
@@ -534,7 +583,7 @@ class TrackingService : Service() {
             "physical_m" to tripEngine?.save()?.physicalM,
             "manual_official_m" to tripEngine?.save()?.manualOfficialM))
         tripTicker?.let(mainHandler::removeCallbacks); watchdog?.let(mainHandler::removeCallbacks)
-        tripTicker = null; watchdog = null; stopNetworkBackup()
+        tripTicker = null; watchdog = null; stopNetworkBackup(); stopDirectGps("service-stopped")
         mainLocationCallback?.let { fusedClient?.removeLocationUpdates(it) }
         gnssCallback?.let { locationManager?.unregisterGnssStatusCallback(it) }
         tts?.stop(); tts?.shutdown(); tts = null
