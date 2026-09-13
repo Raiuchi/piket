@@ -367,7 +367,7 @@ class TrackingService : Service() {
             updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))
         }
         persistSnapshot(output, accuracy); handleAlert(output)
-        recordDiagnosticSample(location, result, currentSnap, output)
+        recordDiagnosticSample(location, result, currentSnap, output, fromDirectGps)
         output?.officialM?.let { official ->
             val text=NativePositionLabel.kmPk(official)
             val now=SystemClock.elapsedRealtime()
@@ -378,7 +378,7 @@ class TrackingService : Service() {
     }
 
     private fun recordDiagnosticSample(location: Location, result: NativeMotionFilter.Result,
-        snap: NativeRouteEngine.Snap?, output: NativeTripEngine.Output?) {
+        snap: NativeRouteEngine.Snap?, output: NativeTripEngine.Output?, fromDirectGps: Boolean) {
         val now = SystemClock.elapsedRealtime()
         val qualityChanged = result.quality != lastDiagnosticQuality
         if (!qualityChanged && now - lastDiagnosticSampleAt < 5_000) return
