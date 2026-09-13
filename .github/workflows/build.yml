@@ -167,9 +167,4 @@ jobs:
           profile: pixel_6
           ram-size: 2048M
           disable-animations: true
-          script: |
-            ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace -Dorg.gradle.jvmargs=-Xmx1024m || {
-              adb logcat -d '*:E' || true
-              find app/build/outputs/androidTest-results -type f -maxdepth 8 -print -exec cat {} \; || true
-              exit 1
-            }
+          script: ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace -Dorg.gradle.jvmargs=-Xmx1024m
