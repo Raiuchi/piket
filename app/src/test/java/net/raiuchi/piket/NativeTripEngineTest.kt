@@ -122,7 +122,8 @@ class NativeTripEngineTest {
                         assertEquals("$label point $pointIndex GPS projection", testedRoute.chainageM[pointIndex],
                             routeSnap.officialM, 0.01)
                         assertEquals("$label point $pointIndex distance", 0.0, routeSnap.distanceM, 0.01)
-                        val expected = testedRoute.chainageM[pointIndex] + offset
+                        val directionalBase = routes.officialMeters(label, point.physicalM, direction)!!
+                        val expected = directionalBase + offset
                         tested.configure(label, direction, expected, true, emptyList())
                         assertEquals("$label $direction point $pointIndex initial", expected,
                             tested.update(NativeTripEngine.Input(1_000, 0f, true, routeSnap)).officialM!!, 0.01)
