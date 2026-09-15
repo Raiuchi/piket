@@ -79,6 +79,30 @@ class NativeTripEngineTest {
         assertEquals(0.0, output.alertDistanceM!!, 0.01)
     }
 
+    @Test fun repeatedOfficialKilometerUsesSavedPhysicalAxisHint() {
+        val label = "Д. Долг - Павлово"
+        val firstOccurrence = routes.physicalMeters(label, 2_300.0, 2_300.0, "tuda")!!
+        val secondOccurrence = routes.physicalMeters(label, 2_300.0, 6_074.0, "tuda")!!
+        assertTrue(secondOccurrence - firstOccurrence > 3_000.0)
+        val fix = NativeRouteEngine.Snap(label, firstOccurrence, 2_300.0, 0.0, 0)
+
+        val pinnedToSecond = NativeTripEngine.Restriction(
+            "second-axis", label, "tuda", 2_300.0, 2_400.0, 1_000.0,
+            secondOccurrence, routes.physicalMeters(label, 2_400.0, secondOccurrence, "tuda")
+        )
+        val local = NativeTripEngine(routes)
+        local.configure(label, "tuda", 2_300.0, true, listOf(pinnedToSecond))
+        assertNull(local.update(NativeTripEngine.Input(1_000, 0f, true, fix)).alertId)
+
+        val pinnedToFirst = pinnedToSecond.copy(id = "first-axis", startTrackHintM = firstOccurrence,
+            endTrackHintM = routes.physicalMeters(label, 2_400.0, firstOccurrence, "tuda"))
+        val first = NativeTripEngine(routes)
+        first.configure(label, "tuda", 2_300.0, true, listOf(pinnedToFirst))
+        val output = first.update(NativeTripEngine.Input(1_000, 0f, true, fix))
+        assertEquals("first-axis", output.alertId)
+        assertTrue(output.alertInZone)
+    }
+
     @Test fun restoredStateContinuesWithoutReturningToRouteStart() {
         engine.update(NativeTripEngine.Input(1_000, 20f, true, snap(0)))
         engine.update(NativeTripEngine.Input(6_000, 20f, false, null))

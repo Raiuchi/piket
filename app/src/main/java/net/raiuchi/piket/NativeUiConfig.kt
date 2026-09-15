@@ -40,6 +40,9 @@ data class NativeUiConfig(
                     put("lead", item.leadM)
                     put("speed", item.speed)
                     put("reason", item.reason)
+                    item.trackStartM?.let { put("trackStartM", it) }
+                    item.trackEndM?.let { put("trackEndM", it) }
+                    item.axisLabel?.let { put("axisLabel", it) }
                 })
             }
         })

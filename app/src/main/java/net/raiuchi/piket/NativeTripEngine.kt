@@ -6,7 +6,8 @@ import kotlin.math.pow
 /** Нативное счисление позиции. Не содержит Android API и проверяется unit-тестами. */
 class NativeTripEngine(private val routes: NativeRouteEngine) {
     data class Restriction(val id: String, val route: String, val direction: String,
-                           val startOfficialM: Double, val endOfficialM: Double, val leadM: Double)
+                           val startOfficialM: Double, val endOfficialM: Double, val leadM: Double,
+                           val startTrackHintM: Double? = null, val endTrackHintM: Double? = null)
     data class Input(val elapsedMs: Long, val speedMps: Float?, val acceptedFix: Boolean,
                      val snap: NativeRouteEngine.Snap?, val stationary: Boolean = false)
     data class Output(val active: Boolean, val physicalM: Double?, val officialM: Double?,
@@ -136,10 +137,13 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         return restrictions.asSequence()
             .filter { (it.route == "Все участки" || it.route == route) && (it.direction == "both" || it.direction == direction) }
             .mapNotNull { restriction ->
+                // A kilometre mark may occur more than once after a chainage reset. The
+                // saved physical hint selects the intended occurrence permanently; the
+                // official offset still shifts the exact point after manual calibration.
                 val start = routes.physicalMeters(route, restriction.startOfficialM - officialOffsetM,
-                    nowPhysicalM, direction) ?: return@mapNotNull null
+                    restriction.startTrackHintM ?: nowPhysicalM, direction) ?: return@mapNotNull null
                 val end = routes.physicalMeters(route, restriction.endOfficialM - officialOffsetM,
-                    start, direction) ?: start
+                    restriction.endTrackHintM ?: start, direction) ?: start
                 val low = minOf(start, end) - 5.0
                 val high = maxOf(start, end) + 5.0
                 val inZone = nowPhysicalM in low..high

@@ -9,7 +9,10 @@ data class RestrictionRecord(
     val meter: Int,
     val speed: Int,
     val reason: String,
-    val leadM: Int = 2000
+    val leadM: Int = 2000,
+    val trackStartM: Double? = null,
+    val trackEndM: Double? = null,
+    val axisLabel: String? = null
 )
 
 data class TripSnapshot(

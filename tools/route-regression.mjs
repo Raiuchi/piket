@@ -5,13 +5,14 @@ import assert from 'node:assert/strict';
 // Execute the shipped browser functions, not a second implementation of them.
 const html = fs.readFileSync('app/src/main/assets/index.html', 'utf8');
 const routes = JSON.parse(fs.readFileSync('app/src/main/assets/data/routes.json', 'utf8'));
+const timing = JSON.parse(fs.readFileSync('app/src/main/assets/data/timing.json','utf8'));
 const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
-  RAILCHAINS: JSON.parse(fs.readFileSync('app/src/main/assets/data/timing.json','utf8')).railChains,
+  RAILCHAINS: timing.railChains, TIMING_STATIONS: timing.stations,
   state:{ctx:{peregon:'Павлово - Горы II путь'}}, rt:{tracking:true,posM:31000,physicalM:0},
   activeThrough:()=> 'dacha'};
 box.journeyTowards=()=>box.state.ctx.towards||'tuda';
 vm.createContext(box);
-for (const name of ['exactAxisProfile','officialToTrackM','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
+for (const name of ['exactAxisProfile','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = html.indexOf('\n  function ', start + 1);
@@ -33,6 +34,9 @@ assert.ok(box.officialToTrackM(33000,'Павлово - Горы II путь',330
   'the old axis immediately before Gory must still resolve');
 assert.equal(box.officialToTrackM(1000,'Д. Долг - Павлово',1000),1000,
   'the supported short prefix before the first map point remains usable');
+const duplicateAxes=box.restrictionAxisOptions('Д. Долг - Павлово',2300,2300,'tuda');
+assert.ok(duplicateAxes.length>=2,'a repeated 2 km mark must require an explicit axis choice');
+assert.notEqual(duplicateAxes[0].trackStartM,duplicateAxes[1].trackStartM);
 box.state.ctx.towards='tuda';
 assert.ok(Math.abs(box.officialToTrackM(7400,'Д. Долг - Павлово',6073)-6073)<2);
 assert.ok(Math.abs(box.officialToTrackM(2300,'Д. Долг - Павлово',6074)-6074)<2);

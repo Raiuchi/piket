@@ -461,8 +461,11 @@ class TrackingService : Service() {
                 val start = item.optDouble("km") * 1_000 + (item.optDouble("pk", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("m", 0.0)
                 val end = if (item.has("kmE")) item.optDouble("kmE") * 1_000 + (item.optDouble("pkE", 1.0) - 1.0).coerceIn(0.0, 9.0) * 100 + item.optDouble("mE", 0.0) else start + 100.0
                 val id = item.optString("id", index.toString())
+                val startTrackHint = item.optDouble("trackStartM", Double.NaN).takeIf { it.isFinite() }
+                val endTrackHint = item.optDouble("trackEndM", Double.NaN).takeIf { it.isFinite() }
                 add(NativeTripEngine.Restriction(id, item.optString("peregon", "Все участки"),
-                    item.optString("dir", "both"), start, end, root.optDouble("lead", 3_000.0)))
+                    item.optString("dir", "both"), start, end, root.optDouble("lead", 3_000.0),
+                    startTrackHint, endTrackHint))
                 alertSpeech[id] = "${item.optInt("speed")} километров в час. ${item.optString("reason", "Ограничение")}" 
             }
         }

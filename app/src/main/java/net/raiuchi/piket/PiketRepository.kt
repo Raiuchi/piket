@@ -18,7 +18,9 @@ class PiketRepository(private val context: Context) {
                 item.optString("direction", "both"),
                 item.optInt("km"), item.optInt("pk"), item.optInt("meter"),
                 item.optInt("speed", 60), item.optString("reason", "Ограничение скорости"),
-                item.optInt("leadM", 2000)
+                item.optInt("leadM", 2000),
+                item.optNullableDouble("trackStartM"), item.optNullableDouble("trackEndM"),
+                item.optString("axisLabel").takeIf { it.isNotBlank() }
             )
         }
     }.getOrDefault(emptyList())
@@ -30,6 +32,9 @@ class PiketRepository(private val context: Context) {
                 put("id", item.id); put("route", item.route); put("direction", item.direction)
                 put("km", item.km); put("pk", item.pk); put("meter", item.meter)
                 put("speed", item.speed); put("reason", item.reason); put("leadM", item.leadM)
+                item.trackStartM?.let { put("trackStartM", it) }
+                item.trackEndM?.let { put("trackEndM", it) }
+                item.axisLabel?.let { put("axisLabel", it) }
             })
         }
         prefs.edit().putString("restrictions", array.toString()).commit()

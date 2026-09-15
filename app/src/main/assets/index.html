@@ -788,6 +788,10 @@
   <div class="f"><label>Направление</label>
     <div class="seg2" id="rDir"><button data-d="tuda" class="on">Туда</button><button data-d="obratno">Обратно</button></div>
   </div>
+  <div class="f"><label>Километровая ось / перегон</label>
+    <button type="button" class="pickfield" id="rAxisPick"><span id="rAxisVal">Укажи километр и пикет</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></button>
+    <p class="small" style="text-align:left;margin:6px 2px 0">Если одинаковый км встречается до и после смены километража, обязательно выбери нужное место.</p>
+  </div>
   <div class="f"><label>Начало — км и пикет</label>
     <div class="trio"><input id="rKm" class="num" inputmode="numeric" placeholder="напр. 1"><input id="rPk" class="num" inputmode="numeric" placeholder="1"><span class="unit">км · пк</span></div>
   </div>
@@ -1120,10 +1124,15 @@ window.addEventListener("error",function(e){
     state.restrictions.forEach(function(r){
       if(!r.peregon||r.peregon==="Все участки")return;
       var start=metersOf(r.km,r.pk,r.m),end=r.kmE==null?start:metersOf(r.kmE,r.pkE,r.mE);
-      if(officialToTrackM(start,r.peregon,null)!=null){delete r.routeNeedsReview;return;}
+      var local=restrictionAxisOptions(r.peregon,start,end,r.dir||"tuda");
+      if(local.length){
+        if(r.trackStartM==null&&local.length===1){r.trackStartM=local[0].trackStartM;r.trackEndM=local[0].trackEndM;r.axisLabel=local[0].label;}
+        r.routeNeedsReview=local.length>1&&r.trackStartM==null;
+        return;
+      }
       var related=new Set();(RAILCHAINS||[]).forEach(function(chain){if(chain.chain.indexOf(r.peregon)>=0)chain.chain.forEach(function(label){related.add(label);});});
-      var candidates=Array.from(related).filter(function(label){return officialToTrackM(start,label,null)!=null&&officialToTrackM(end,label,null)!=null;});
-      if(candidates.length===1){r.previousPeregon=r.peregon;r.peregon=candidates[0];delete r.routeNeedsReview;}
+      var candidates=Array.from(related).filter(function(label){return restrictionAxisOptions(label,start,end,r.dir||"tuda").length>0;});
+      if(candidates.length===1){r.previousPeregon=r.peregon;r.peregon=candidates[0];var moved=restrictionAxisOptions(r.peregon,start,end,r.dir||"tuda");if(moved.length===1){r.trackStartM=moved[0].trackStartM;r.trackEndM=moved[0].trackEndM;r.axisLabel=moved[0].label;delete r.routeNeedsReview;}else r.routeNeedsReview=true;}
       else r.routeNeedsReview=true;
     });
   }
@@ -2368,10 +2377,10 @@ window.addEventListener("error",function(e){
     if(state.calib==null || state.calib._trackM==null) return null;
     return state.calib._trackM+(dirDown()?-1:1)*rt.odo;
   }
-  function officialToTrackM(officialM,label,nearTrackM){
+  function officialToTrackCandidates(officialM,label,direction){
     var si=TRACK.labels.indexOf(label);
-    if(si<0 || !isFinite(officialM)) return null;
-    var pts=TRACK.segs[si],ids=CHAINAGE[si],candidates=[],prof=exactAxisProfile(label,journeyTowards());
+    if(si<0 || !isFinite(officialM)) return [];
+    var pts=TRACK.segs[si],ids=CHAINAGE[si],candidates=[],prof=exactAxisProfile(label,direction||journeyTowards());
     if(prof)for(var pi=0;pi<prof.length-1;pi++){var pa=prof[pi],pb=prof[pi+1];if(pa[0]===pb[0]||pa[1]===pb[1])continue;if(officialM>=Math.min(pa[1],pb[1])&&officialM<=Math.max(pa[1],pb[1]))candidates.push({track:pa[0]+(officialM-pa[1])/(pb[1]-pa[1])*(pb[0]-pa[0]),error:0});}
     var profStart=prof&&prof[0][0],profEnd=prof&&prof[prof.length-1][0];
     if(pts.length&&pts[0][2]>0&&pts[0][2]<=5000&&Math.abs(ids[0]-pts[0][2])<=2500){
@@ -2390,19 +2399,40 @@ window.addEventListener("error",function(e){
         candidates.push({track:a+(officialM-oa)/official*physical,error:0});
       }
     }
+    candidates=candidates.filter(function(x){return x.error<=0.01;}).sort(function(x,y){return x.track-y.track;}).filter(function(x,i,a){return i===0||Math.abs(x.track-a[i-1].track)>2;});
+    return candidates;
+  }
+  function officialToTrackM(officialM,label,nearTrackM,direction){
+    var candidates=officialToTrackCandidates(officialM,label,direction);
     candidates.sort(function(x,y){
       if(x.error!==y.error)return x.error-y.error;
       if(nearTrackM==null)return x.track-y.track;
       return Math.abs(x.track-nearTrackM)-Math.abs(y.track-nearTrackM);
     });
-    return candidates.length&&candidates[0].error<=0.01?candidates[0].track:null;
+    return candidates.length?candidates[0].track:null;
+  }
+  function restrictionAxisPlace(label,trackM,direction){
+    var mapped=(TIMING_STATIONS[label]||[]).map(function(row){var m=officialToTrackM(row[1],label,trackM,direction);return m==null?null:{name:row[0],track:m};}).filter(Boolean).sort(function(a,b){return a.track-b.track;});
+    var before=null,after=null;mapped.forEach(function(s){if(s.track<=trackM+5)before=s;if(after==null&&s.track>=trackM-5)after=s;});
+    if(before&&after&&before.name!==after.name)return before.name+" — "+after.name;
+    return (before||after)?"район "+(before||after).name:"место "+(trackM/1000).toFixed(1)+" км физического пути";
+  }
+  function restrictionAxisOptions(label,startOfficialM,endOfficialM,direction){
+    var starts=officialToTrackCandidates(startOfficialM,label,direction);
+    return starts.map(function(c,index){
+      var end=officialToTrackM(endOfficialM,label,c.track,direction),qualifier="";
+      if(starts.length>1)qualifier=index===0?"до смены километража":(index===starts.length-1?"после смены километража":"между сменами километража");
+      var place=restrictionAxisPlace(label,c.track,direction);
+      return{trackStartM:c.track,trackEndM:end==null?c.track:end,label:place+(qualifier?" · "+qualifier:"")};
+    });
   }
   function restrictionTrackRange(r,nearTrackM){
     var label=(r.peregon&&r.peregon!=="Все участки")?r.peregon:state.ctx.peregon;
     if(!label || label==="Все участки") return null;
     var offset=rt.nativeSnapshot&&label===state.ctx.peregon?(rt.nativeOfficialOffset||0):routeOfficialOffset(label);
-    var s=officialToTrackM(metersOf(r.km,r.pk,r.m)-offset,label,nearTrackM);
-    var e=(r.kmE!=null)?officialToTrackM(metersOf(r.kmE,r.pkE,r.mE)-offset,label,s):s;
+    var startHint=r.trackStartM!=null&&isFinite(+r.trackStartM)?+r.trackStartM:nearTrackM,endHint=r.trackEndM!=null&&isFinite(+r.trackEndM)?+r.trackEndM:null;
+    var s=officialToTrackM(metersOf(r.km,r.pk,r.m)-offset,label,startHint,r.dir);
+    var e=(r.kmE!=null)?officialToTrackM(metersOf(r.kmE,r.pkE,r.mE)-offset,label,endHint==null?s:endHint,r.dir):s;
     return s==null||e==null?null:{start:s,end:e,lo:Math.min(s,e),hi:Math.max(s,e)};
   }
 
@@ -2437,9 +2467,10 @@ window.addEventListener("error",function(e){
   }
 
   function chipsOf(r){ var c="";
-    if(r.routeNeedsReview)c+='<span class="chip">Проверь участок: километр вне его оси</span>';
+    if(r.routeNeedsReview)c+='<span class="chip">Проверь километровую ось</span>';
     if(r.dir)c+='<span class="chip c-dir">'+dirLabel(r.dir)+'</span>';
     if(r.peregon&&r.peregon!=="Все участки")c+='<span class="chip c-per">'+escapeHtml(r.peregon)+'</span>';
+    if(r.axisLabel)c+='<span class="chip">'+escapeHtml(r.axisLabel)+'</span>';
     if(r.reason)c+='<span class="chip">'+escapeHtml(r.reason)+'</span>';
     if(r.to){
       var daysLeft=Math.ceil((new Date(r.to)-new Date(todayStr()))/86400000);
@@ -2604,7 +2635,7 @@ window.addEventListener("error",function(e){
     if(perTarget==="ctx"){var picked=v,tripDir=journeyTowards();state.ctx.through=picked===CHUDOVO_DUTY?"chudovo":(picked===DACHA_THROUGH?"dacha":(picked===VYBORG_THROUGH?"vyborg":null));state.ctx.tripTowards=state.ctx.through==="chudovo"?tripDir:null;if(picked===CHUDOVO_DUTY)state.ctx.towards="obratno";else state.ctx.towards=tripDir;v=contextPeregonValue(picked);var changed=v!==state.ctx.peregon; state.ctx.peregon=v;
       if(changed && state.calib!=null){ state.calib._trackM=null; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; toast("Перегон изменён — привязка к координатам обновится на следующем сигнале"); }
       persist(); $("#sheetPer").classList.remove("on"); $("#scrim").classList.remove("on"); renderTrip(); }
-    else { resPeregon=v; $("#rPeregonVal").textContent=v; $("#sheetPer").classList.remove("on"); } });
+    else { resPeregon=v; resAxisTrackM=null; $("#rPeregonVal").textContent=v; $("#sheetPer").classList.remove("on"); refreshRestrictionAxes(); } });
   $("#peregonBtn").addEventListener("click",function(){ openPer("ctx",state.ctx.peregon); });
   document.querySelectorAll("#dirSeg button").forEach(function(b){ b.addEventListener("click",function(){
     var newDir=b.getAttribute("data-d");
@@ -2620,7 +2651,22 @@ window.addEventListener("error",function(e){
     if(activeThrough()==="chudovo"){state.ctx.tripTowards=newDir;state.ctx.peregon=newDir==="obratno"?"Горы - Петрозаводск":"Волховстрой - Чудово";state.ctx.towards="obratno";}else{state.ctx.towards=newDir;if(activeThrough()==="vyborg")state.ctx.peregon=newDir==="obratno"?"Выборг - Каменногорск":"СПбФин - Выборг";if(activeThrough()==="dacha")state.ctx.peregon=newDir==="obratno"?"Горы - Петрозаводск":"Д. Долг - Павлово";}
     setSeg("#dirSeg",journeyTowards(),"d"); rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; persist(); renderTrip(); toast("Направление: "+(journeyTowards()==="obratno"?"Обратно":"Туда")); }); });
 
-  var editId=null,resDir="tuda",resPeregon="Все участки",resReason="";
+  var editId=null,resDir="tuda",resPeregon="Все участки",resReason="",resAxisTrackM=null,resAxisEndM=null,resAxisLabel="",resAxisOptions=[];
+  function refreshRestrictionAxes(){
+    var km=parseInt($("#rKm").value,10),pk=parseInt($("#rPk").value,10),kE=parseInt($("#rKmE").value,10),pE=parseInt($("#rPkE").value,10);
+    if(isNaN(km)||!resPeregon||resPeregon==="Все участки"){resAxisOptions=[];resAxisTrackM=null;resAxisEndM=null;resAxisLabel="";$("#rAxisVal").textContent=isNaN(km)?"Укажи километр и пикет":"Сначала выбери точный участок";return resAxisOptions;}
+    var start=metersOf(km,isNaN(pk)?1:pk,0),end=$("#rangeBox").classList.contains("on")&&!isNaN(kE)?metersOf(kE,isNaN(pE)?1:pE,0):start;
+    resAxisOptions=restrictionAxisOptions(resPeregon,start,end,resDir);
+    var selected=null;if(resAxisTrackM!=null&&resAxisOptions.length)selected=resAxisOptions.slice().sort(function(a,b){return Math.abs(a.trackStartM-resAxisTrackM)-Math.abs(b.trackStartM-resAxisTrackM);})[0];
+    if(!selected&&resAxisOptions.length===1)selected=resAxisOptions[0];
+    if(selected){resAxisTrackM=selected.trackStartM;resAxisEndM=selected.trackEndM;resAxisLabel=selected.label;$("#rAxisVal").textContent=selected.label;}
+    else{resAxisTrackM=null;resAxisEndM=null;resAxisLabel="";$("#rAxisVal").textContent=resAxisOptions.length?"Выбери ось — найдено вариантов: "+resAxisOptions.length:"Такой отметки на выбранном участке нет";}
+    return resAxisOptions;
+  }
+  function openRestrictionAxisPicker(){
+    refreshRestrictionAxes();if(!resAxisOptions.length){toast("На выбранном участке нет такого километра");return;}
+    openChoicePicker("Километровая ось / перегон",resAxisOptions.map(function(x){return{value:String(x.trackStartM),label:x.label,meta:"точная физическая привязка"};}),resAxisTrackM==null?"":String(resAxisTrackM),function(value){var chosen=resAxisOptions.find(function(x){return Math.abs(x.trackStartM-(+value))<2;});if(!chosen)return;resAxisTrackM=chosen.trackStartM;resAxisEndM=chosen.trackEndM;resAxisLabel=chosen.label;$("#rAxisVal").textContent=chosen.label;});
+  }
   function openRes(r){ editId=r?r.id:null; $("#resTitle").textContent=r?"Изменить ограничение":"Новое ограничение";
     resPeregon=r?(r.peregon||"Все участки"):state.ctx.peregon; $("#rPeregonVal").textContent=resPeregon;
     resDir=r?(r.dir||"tuda"):state.ctx.towards; setSeg("#rDir",resDir,"d");
@@ -2628,23 +2674,27 @@ window.addEventListener("error",function(e){
     resReason=r?(r.reason||""):""; $("#rReasonVal").textContent=resReason||"— без причины —";
     var hasDate=r&&(r.from||r.to); $("#dateBox").classList.toggle("on",!!hasDate); $("#rFrom").value=r?(r.from||""):""; $("#rTo").value=r?(r.to||""):""; setDateLabel("#rFrom","#rFromText");setDateLabel("#rTo","#rToText");
     var hasE=r&&r.kmE!=null; $("#rangeBox").classList.toggle("on",!!hasE); $("#rKmE").value=hasE?r.kmE:""; $("#rPkE").value=hasE?r.pkE:"";
+    resAxisTrackM=r&&r.trackStartM!=null&&isFinite(+r.trackStartM)?+r.trackStartM:null;resAxisEndM=r&&r.trackEndM!=null&&isFinite(+r.trackEndM)?+r.trackEndM:null;resAxisLabel=r?(r.axisLabel||""):"";refreshRestrictionAxes();
     openSheet("#sheetRes"); }
-  document.querySelectorAll("#rDir button").forEach(function(b){ b.addEventListener("click",function(){ resDir=b.getAttribute("data-d"); setSeg("#rDir",resDir,"d"); }); });
+  document.querySelectorAll("#rDir button").forEach(function(b){ b.addEventListener("click",function(){ resDir=b.getAttribute("data-d"); setSeg("#rDir",resDir,"d");resAxisTrackM=null;refreshRestrictionAxes(); }); });
   $("#rPeregonPick").addEventListener("click",function(){ openPer("add",resPeregon); });
+  $("#rAxisPick").addEventListener("click",openRestrictionAxisPicker);
+  ["#rKm","#rPk","#rKmE","#rPkE"].forEach(function(id){$(id).addEventListener("input",refreshRestrictionAxes);});
   $("#rReasonPick").addEventListener("click",function(){
     $("#reasonList").innerHTML=REASONS.map(function(p){ return '<button class="perItem'+(p===(resReason||"— без причины —")?' on':'')+'" data-r="'+p+'">'+p+(p===(resReason||"— без причины —")?'<span class="ck">✓</span>':'')+'</button>'; }).join("");
     openSheet("#sheetReason"); });
   $("#reasonList").addEventListener("click",function(e){ var b=e.target.closest("[data-r]"); if(!b)return; var v=b.getAttribute("data-r");
     resReason=(v==="— без причины —")?"":v; $("#rReasonVal").textContent=v; $("#sheetReason").classList.remove("on"); });
   $("#dateToggle").addEventListener("click",function(){ $("#dateBox").classList.toggle("on"); });
-  $("#rangeToggle").addEventListener("click",function(){ $("#rangeBox").classList.toggle("on"); });
+  $("#rangeToggle").addEventListener("click",function(){ $("#rangeBox").classList.toggle("on");refreshRestrictionAxes(); });
   $("#resCancel").addEventListener("click",closeSheets);
   $("#btnAdd").addEventListener("click",function(){ openRes(null); });
   $("#resSave").addEventListener("click",function(){ var km=parseInt($("#rKm").value,10); if(isNaN(km)){ toast("Впиши километр"); return; }
     var pk=parseInt($("#rPk").value,10); if(isNaN(pk))pk=1; var spd=parseInt($("#rSpd").value,10);
+    refreshRestrictionAxes();if(!resAxisOptions.length){toast("Этот километр отсутствует на выбранном участке");return;}if(resAxisOptions.length>1&&resAxisTrackM==null){toast("Выбери конкретную километровую ось");openRestrictionAxisPicker();return;}
     var r={ id:editId||("r"+Date.now()+Math.floor(Math.random()*1000)), peregon:resPeregon, dir:resDir,
       km:km, pk:Math.max(1,Math.min(10,pk)), spd:isNaN(spd)?null:spd, reason:resReason,
-      from:$("#rFrom").value||null, to:$("#rTo").value||null };
+      from:$("#rFrom").value||null, to:$("#rTo").value||null,trackStartM:resAxisTrackM,trackEndM:resAxisEndM,axisLabel:resAxisLabel };
     if($("#rangeBox").classList.contains("on")){ var kE=parseInt($("#rKmE").value,10),pE=parseInt($("#rPkE").value,10); if(!isNaN(kE)){ r.kmE=kE; r.pkE=isNaN(pE)?1:Math.max(1,Math.min(10,pE)); } }
     if(editId){ var i=state.restrictions.findIndex(function(x){return x.id===editId;}); if(i>=0)state.restrictions[i]=r; } else state.restrictions.push(r);
     persist(); closeSheets(); renderList(); renderTrip(); toast(editId?"Сохранено":"Ограничение добавлено"); });
