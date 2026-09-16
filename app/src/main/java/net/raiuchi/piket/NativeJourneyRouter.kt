@@ -9,7 +9,16 @@ class NativeJourneyRouter private constructor(
 ) {
     data class Chain(val direction: String, val routes: List<String>)
     data class Leg(val route: String, val direction: String)
-    data class Transition(val route: String, val direction: String)
+    data class Transition(
+        val route: String,
+        val direction: String,
+        /** Physical metre on the current route where this particular junction lives. */
+        val boundaryM: Double? = null,
+        /** Some documented electronic-map junctions do not share an identical GPS polyline. */
+        val maxNextDistanceM: Double = 80.0,
+        /** Cab/train changes must never be applied while the train is moving. */
+        val requireStop: Boolean = false
+    )
 
     private var candidate: String? = null
     private var confirmations = 0
@@ -25,9 +34,39 @@ class NativeJourneyRouter private constructor(
         if (!journey.isNullOrBlank() && journey != "null") {
             val legs = journeys[journey].orEmpty()
             val index = legs.indexOfFirst { it.route == current && it.direction == direction }
-            return legs.getOrNull(index + 1)?.let { Transition(it.route, it.direction) }
+            val next = legs.getOrNull(index + 1) ?: return null
+            return documentedTransition(journey, current, direction, next)
         }
-        return nextRoute(current, direction)?.let { Transition(it, direction) }
+        val next = nextRoute(current, direction) ?: return null
+        return documentedTransition(null, current, direction, Leg(next, direction))
+    }
+
+    /**
+     * Boundaries come from the operational electronic-map memo, not from the first/last
+     * coordinate in a polyline. Several routes intentionally overlap around a station and
+     * the endpoint heuristic silently used 130.0 km instead of Vyborg's 128.9 km and
+     * Gory's 42 km instead of the internal Volkhov 124.4 km junction.
+     */
+    private fun documentedTransition(journey: String?, current: String, direction: String, next: Leg): Transition {
+        return when {
+            current == "СПбФин - Выборг" && direction == "tuda" && next.route == "Выборг - Каменногорск" ->
+                Transition(next.route, next.direction, boundaryM = 128_900.0,
+                    maxNextDistanceM = 150.0, requireStop = true)
+            current == "Выборг - Каменногорск" && direction == "obratno" && next.route == "СПбФин - Выборг" ->
+                Transition(next.route, next.direction, boundaryM = 1_000.0,
+                    maxNextDistanceM = 150.0, requireStop = true)
+            journey == "819" && current == "Волховстрой - Чудово" && direction == "obratno" ->
+                Transition(next.route, next.direction, boundaryM = 1_000.0, maxNextDistanceM = 150.0)
+            journey == "820" && current == "Горы - Петрозаводск" && direction == "obratno" ->
+                Transition(next.route, next.direction, boundaryM = 124_400.0, maxNextDistanceM = 150.0)
+            journey == "820" && current == "Волховстрой - Чудово" && direction == "tuda" ->
+                Transition(next.route, next.direction, boundaryM = 101_000.0,
+                    maxNextDistanceM = 5_000.0, requireStop = true)
+            journey == "820" && current == "Чудово - Новгород" && direction == "tuda" ->
+                Transition(next.route, next.direction, boundaryM = 75_175.0,
+                    maxNextDistanceM = 80.0, requireStop = true)
+            else -> Transition(next.route, next.direction)
+        }
     }
 
     fun consider(
@@ -38,14 +77,16 @@ class NativeJourneyRouter private constructor(
         currentEndM: Double?,
         currentDistanceM: Double?,
         nextDistanceM: Double?,
-        observedPhysicalM: Double?
+        observedPhysicalM: Double?,
+        stopped: Boolean = true
     ): Transition? {
         val next = nextLeg(journey, current, direction) ?: return reset()
         if (currentPhysicalM == null || currentEndM == null || nextDistanceM == null) return reset()
         val nearBoundary = kotlin.math.abs(currentPhysicalM - currentEndM) <= 800.0 ||
             (observedPhysicalM != null && kotlin.math.abs(observedPhysicalM - currentEndM) <= 80.0 &&
                 currentDistanceM != null)
-        val neighborReliable = nextDistanceM <= 80.0
+        val neighborReliable = nextDistanceM <= next.maxNextDistanceM
+        if (next.requireStop && !stopped) return reset(false)
         val sameGeometryTurn = next.route == current && next.direction != direction
         val previousObserved = lastObservedPhysicalM
         lastObservedPhysicalM = observedPhysicalM
@@ -53,7 +94,9 @@ class NativeJourneyRouter private constructor(
             if (next.direction == "tuda") observedPhysicalM > previousObserved + 4.0
             else observedPhysicalM < previousObserved - 4.0
         val neighborClearlyBetter = currentDistanceM != null && nextDistanceM + 25.0 < currentDistanceM
-        if (!nearBoundary || !neighborReliable || !(neighborClearlyBetter || movedInNextDirection)) return reset(false)
+        val documentedStoppedJunction = next.requireStop && stopped && neighborReliable
+        if (!nearBoundary || !neighborReliable ||
+            !(neighborClearlyBetter || movedInNextDirection || documentedStoppedJunction)) return reset(false)
         val key = "${next.route}|${next.direction}"
         if (candidate == key) confirmations += 1 else { candidate = key; confirmations = 1 }
         if (confirmations < 2) return null

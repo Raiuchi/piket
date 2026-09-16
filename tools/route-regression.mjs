@@ -51,4 +51,9 @@ for (const [route,a,b] of [['Павлово - Горы II путь',29807,33500]
     assert.equal(box.scheduleLiveM(),expected,`${route} ${physical}`);
   }
 }
-console.log('Browser route regression: remote restrictions, pre-reset axis, Pavlovo/Gory endpoints and midpoint in both directions passed');
+assert.ok(html.includes('boundaryM:128900,cabChange:true') && html.includes('boundaryM:1000,cabChange:true'),
+  'Vyborg must switch at the documented stopped junction in both directions');
+assert.ok(html.includes('boundaryM:124400') && html.includes('boundaryM:101000,cabChange:true') &&
+  html.includes('boundaryM:75175,trainChange'),
+  'Volkhov, Chudovo and Novgorod must use their production junction boundaries');
+console.log('Browser route regression: axes, restrictions and all documented through-route junctions passed');

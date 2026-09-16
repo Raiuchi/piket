@@ -333,18 +333,21 @@ class TrackingService : Service() {
         if (state != null && result.accepted && result.quality in setOf("good", "stationary")) {
             val next = journeyRouter?.nextLeg(journeyId, routeLabel, state.direction)
             val route = routeEngine?.route(routeLabel)
-            val boundary = route?.points?.takeIf { it.isNotEmpty() }?.let {
+            val routeBoundary = route?.points?.takeIf { it.isNotEmpty() }?.let {
                 if (state.direction == "obratno") it.first().physicalM else it.last().physicalM
             }
+            val boundary = next?.boundaryM ?: routeBoundary
+            val stoppedForJunction = state.speedMps <= 1.5f
             val nearBoundary = boundary != null &&
                 ((state.physicalM?.let { abs(it - boundary) <= 800.0 } == true) ||
                     (currentSnap?.let { abs(it.physicalM - boundary) <= 80.0 } == true))
             // Do not scan the entire next route on every fix hundreds of km from its junction.
-            val nextSnap = if (nearBoundary) next?.let {
+            val nextSnap = if (nearBoundary && (next?.requireStop != true || stoppedForJunction)) next?.let {
                 routeEngine?.snap(it.route, location.latitude, location.longitude, it.direction)
             } else null
             val transition = journeyRouter?.consider(journeyId, routeLabel, state.direction,
-                state.physicalM, boundary, currentSnap?.distanceM, nextSnap?.distanceM, currentSnap?.physicalM)
+                state.physicalM, boundary, currentSnap?.distanceM, nextSnap?.distanceM,
+                currentSnap?.physicalM, stoppedForJunction)
             if (transition != null && nextSnap != null) {
                 diagnostics.event("route_transition", mapOf("from" to routeLabel,
                     "to" to transition.route, "direction" to transition.direction,

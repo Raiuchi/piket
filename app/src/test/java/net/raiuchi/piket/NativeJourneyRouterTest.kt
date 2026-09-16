@@ -87,18 +87,51 @@ class NativeJourneyRouterTest {
     }
 
     @Test fun follows819And820TechnicalDirections() {
-        assertEquals(NativeJourneyRouter.Transition("Горы - Петрозаводск", "tuda"),
-            router.nextLeg("819", "Волховстрой - Чудово", "obratno"))
-        assertEquals(NativeJourneyRouter.Transition("Волховстрой - Чудово", "tuda"),
-            router.nextLeg("820", "Горы - Петрозаводск", "obratno"))
-        assertEquals(NativeJourneyRouter.Transition("Чудово - Новгород", "obratno"),
-            router.nextLeg("820", "Чудово - Новгород", "tuda"))
+        assertEquals("Горы - Петрозаводск",
+            router.nextLeg("819", "Волховстрой - Чудово", "obratno")?.route)
+        assertEquals("Волховстрой - Чудово",
+            router.nextLeg("820", "Горы - Петрозаводск", "obratno")?.route)
+        assertEquals("Чудово - Новгород",
+            router.nextLeg("820", "Чудово - Новгород", "tuda")?.route)
     }
 
-    @Test fun confirmsNovgorodCabChangeFromActualReverseMovement() {
-        assertNull(router.consider("820", "Чудово - Новгород", "tuda", 67_590.0, 67_600.0, 10.0, 10.0, 67_590.0))
-        assertNull(router.consider("820", "Чудово - Новгород", "tuda", 67_585.0, 67_600.0, 10.0, 10.0, 67_580.0))
-        val switched = router.consider("820", "Чудово - Новгород", "tuda", 67_580.0, 67_600.0, 10.0, 10.0, 67_570.0)
+    @Test fun usesDocumentedProductionBoundariesInsteadOfPolylineEndpoints() {
+        val vyborg = router.nextLeg(null, "СПбФин - Выборг", "tuda")!!
+        assertEquals(128_900.0, vyborg.boundaryM!!, 0.01)
+        assertTrue(vyborg.requireStop)
+        assertEquals(150.0, vyborg.maxNextDistanceM, 0.01)
+
+        val volkhov = router.nextLeg("820", "Горы - Петрозаводск", "obratno")!!
+        assertEquals(124_400.0, volkhov.boundaryM!!, 0.01)
+        assertFalse(volkhov.requireStop)
+
+        val chudovo = router.nextLeg("820", "Волховстрой - Чудово", "tuda")!!
+        assertEquals(101_000.0, chudovo.boundaryM!!, 0.01)
+        assertEquals(5_000.0, chudovo.maxNextDistanceM, 0.01)
+        assertTrue(chudovo.requireStop)
+
+        val novgorod = router.nextLeg("820", "Чудово - Новгород", "tuda")!!
+        assertEquals(75_175.0, novgorod.boundaryM!!, 0.01)
+        assertTrue(novgorod.requireStop)
+    }
+
+    @Test fun cabChangeWaitsForStopAndTwoReliableFixes() {
+        assertNull(router.consider(null, "СПбФин - Выборг", "tuda",
+            128_900.0, 128_900.0, 0.0, 48.0, 128_900.0, stopped = false))
+        assertNull(router.consider(null, "СПбФин - Выборг", "tuda",
+            128_900.0, 128_900.0, 0.0, 48.0, 128_900.0, stopped = true))
+        val switched = router.consider(null, "СПбФин - Выборг", "tuda",
+            128_900.0, 128_900.0, 0.0, 48.0, 128_900.0, stopped = true)
+        assertEquals("Выборг - Каменногорск", switched?.route)
+    }
+
+    @Test fun confirmsNovgorodCabChangeAtActualRouteEndpoint() {
+        assertNull(router.consider("820", "Чудово - Новгород", "tuda",
+            75_175.0, 75_175.0, 0.0, 0.0, 75_175.0, stopped = false))
+        assertNull(router.consider("820", "Чудово - Новгород", "tuda",
+            75_175.0, 75_175.0, 0.0, 0.0, 75_175.0, stopped = true))
+        val switched = router.consider("820", "Чудово - Новгород", "tuda",
+            75_175.0, 75_175.0, 0.0, 0.0, 75_175.0, stopped = true)
         assertEquals("Чудово - Новгород", switched?.route)
         assertEquals("obratno", switched?.direction)
     }

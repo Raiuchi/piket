@@ -1469,12 +1469,16 @@ window.addEventListener("error",function(e){
     { towards: "obratno", chain: ["Выборг - Каменногорск", "СПбФин - Выборг"], recalibrate: true }
   ];
   function nextInChain(){
+    // Vyborg is an internal cab-change junction at 128.9 km, not the 130.0 km
+    // endpoint of the coordinate array. Keep both axes in one trip and switch only stopped.
+    if(state.ctx.peregon==="СПбФин - Выборг"&&state.ctx.towards==="tuda")return{label:"Выборг - Каменногорск",towards:"tuda",recalibrate:true,place:"Выборг",boundaryM:128900,cabChange:true};
+    if(state.ctx.peregon==="Выборг - Каменногорск"&&state.ctx.towards==="obratno")return{label:"СПбФин - Выборг",towards:"obratno",recalibrate:true,place:"Выборг",boundaryM:1000,cabChange:true};
     if(activeThrough()==="chudovo"){
       var duty=journeyTowards();
       if(duty==="tuda"&&state.ctx.peregon==="Волховстрой - Чудово"&&state.ctx.towards==="obratno")return{label:"Горы - Петрозаводск",towards:"tuda",recalibrate:true,place:"Волховстрой"};
       if(duty==="obratno"&&state.ctx.peregon==="Горы - Петрозаводск"&&state.ctx.towards==="obratno")return{label:"Волховстрой - Чудово",towards:"tuda",recalibrate:true,place:"Волховстрой",boundaryM:124400};
-      if(duty==="obratno"&&state.ctx.peregon==="Волховстрой - Чудово"&&state.ctx.towards==="tuda")return{label:"Чудово - Новгород",towards:"tuda",recalibrate:true,place:"Чудово",cabChange:true};
-      if(duty==="obratno"&&state.ctx.peregon==="Чудово - Новгород"&&state.ctx.towards==="tuda")return{label:"Чудово - Новгород",towards:"obratno",recalibrate:true,place:"Великий Новгород",trainChange:"819 → 820"};
+      if(duty==="obratno"&&state.ctx.peregon==="Волховстрой - Чудово"&&state.ctx.towards==="tuda")return{label:"Чудово - Новгород",towards:"tuda",recalibrate:true,place:"Чудово",boundaryM:101000,cabChange:true};
+      if(duty==="obratno"&&state.ctx.peregon==="Чудово - Новгород"&&state.ctx.towards==="tuda")return{label:"Чудово - Новгород",towards:"obratno",recalibrate:true,place:"Великий Новгород",boundaryM:75175,trainChange:"819 → 820"};
       return null;
     }
     for(var i=0;i<RAILCHAINS.length;i++){
