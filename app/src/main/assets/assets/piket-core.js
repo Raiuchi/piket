@@ -38,5 +38,19 @@ var PIKET_RELIABILITY = {
   triggerAudit: function(expectedLeadM,actualAheadM) {
     var delta=Math.round((+actualAheadM||0)-(+expectedLeadM||0));
     return {deltaM:delta,ok:Math.abs(delta)<=250};
+  },
+  browserSpeedCeiling: function(route) {
+    route=String(route||"");
+    if(route==="СпбГл - Москва") return 255;
+    if(route==="Броневая - Луга") return 170;
+    if(route==="СПбФин - Выборг" || route==="Выборг - Каменногорск") return 190;
+    if(route==="Горы - Петрозаводск" || route==="Д. Долг - Павлово" || route==="Павлово - Горы II путь" || route==="Горы - Павлово I путь" || route==="Чудово - Новгород" || route==="Волховстрой - Чудово") return 150;
+    return 200;
+  },
+  lossSpeed: function(speed,elapsedSec,totalLossSec,accelAvailable,accelMag) {
+    speed=Math.max(0,+speed||0); elapsedSec=Math.max(0,+elapsedSec||0); totalLossSec=Math.max(0,+totalLossSec||0);
+    if(totalLossSec>=120) return 0;
+    var decay=!accelAvailable?0.985:(accelMag<0.5?0.995:(accelMag<1.5?0.985:(accelMag<3?0.96:0.90)));
+    return speed*Math.pow(decay,elapsedSec);
   }
 };
