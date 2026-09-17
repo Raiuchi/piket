@@ -1181,7 +1181,7 @@ window.addEventListener("error",function(e){
     $("#gpsTxt").textContent="частая зона помех";
   }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserFixAt:0,lastGpsRestartAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting"};
+  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserFixAt:0,lastGpsRestartAt:0,webHiddenAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting"};
   rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0; rt.speedCand=null; rt.speedCandCount=0; rt.stationaryAnchor=null; rt.stationarySince=0; rt.lastSnapSegIdx=-1; rt.zoneHintUntil=0; rt.zoneHintCooldownUntil=0;
   rt.lastAccuracy=999; rt.directionMismatchCount=0; rt.directionWarning=false; rt.alertRepeatAt=0;
   var TIMING_STATIONS={
@@ -1396,7 +1396,35 @@ window.addEventListener("error",function(e){
   document.addEventListener("pointerdown",function(){if(rt.tracking)scheduleWebDim();},{passive:true});
   function reqWake(){ var mode=state.settings.screenMode||(state.settings.wake===false?"system":"auto");try{if(window.Android&&window.Android.setScreenMode)window.Android.setScreenMode(mode);else if(window.Android&&window.Android.setKeepScreen)window.Android.setKeepScreen(mode!=="system");}catch(e){} scheduleWebDim();if(mode==="system"||!("wakeLock"in navigator))return; navigator.wakeLock.request("screen").then(function(w){rt.wake=w;w.addEventListener("release",function(){rt.wake=null;});}).catch(function(){}); }
   function relWake(){ clearTimeout(rt.screenDimTimer);document.body.classList.remove("screen-dim");try{if(window.Android&&window.Android.setScreenMode)window.Android.setScreenMode("system");else if(window.Android&&window.Android.setKeepScreen)window.Android.setKeepScreen(false);}catch(e){} if(rt.wake){try{rt.wake.release();}catch(e){} rt.wake=null;} }
-  document.addEventListener("visibilitychange",function(){ if(document.visibilityState==="visible"&&rt.tracking)reqWake(); });
+  function isIOSWeb(){return !window.Android&&(/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1));}
+  function restartBrowserGps(eventName,now,fields,resetMotion){
+    if(!rt.tracking||window.Android||!("geolocation"in navigator))return false;
+    now=now||Date.now();
+    try{
+      if(rt.watchId!=null)navigator.geolocation.clearWatch(rt.watchId);
+      if(rt.backupWatchId!=null)navigator.geolocation.clearWatch(rt.backupWatchId);
+      rt.backupWatchId=null;rt.backupActive=false;
+      if(resetMotion){
+        // После возврата из фона старая точка и старая скорость больше не описывают поезд.
+        // Не вычисляем скорость через весь пропущенный путь: ждём новый независимый GPS-фикс.
+        rt.speed=0;rt.last=null;rt.pendingCandM=null;rt.pendingCount=0;rt.gpsResiduals=[];rt.gpsResidualAt=0;
+        rt.signalLostAt=rt.signalLostAt||now;rt.lastLossDecayAt=now;rt.lastBrowserFixAt=0;
+        rt.fixQuality="recovering";rt.gpsState="waiting";
+      }
+      try{navigator.geolocation.getCurrentPosition(onPos,function(){},{enableHighAccuracy:true,maximumAge:0,timeout:8000});}catch(ignore){}
+      rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:27000});
+      rt.lastGpsRestartAt=now;webLog(eventName,fields||{});return true;
+    }catch(e){webLog("gps_watch_restart_failed",{reason:eventName});return false;}
+  }
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState!=="visible"){if(rt.tracking&&!window.Android){rt.webHiddenAt=Date.now();webLog("web_backgrounded",{});}return;}
+    if(!rt.tracking)return;
+    reqWake();
+    if(rt.webHiddenAt){
+      var hiddenMs=Math.max(0,Date.now()-rt.webHiddenAt);rt.webHiddenAt=0;
+      if(restartBrowserGps("gps_resume_restart",Date.now(),{hidden_ms:hiddenMs},true))toast("Возвращаю GPS после блокировки…");
+    }
+  });
 
   // ВСПОМОГАТЕЛЬНЫЙ АКСЕЛЕРОМЕТР — мягкая подсказка при потере/глушении GPS, НЕ замена GPS.
   // КРИТИЧНО: не пытаемся вычислить точную скорость через интегрирование ускорения — это
@@ -2137,12 +2165,7 @@ window.addEventListener("error",function(e){
     // пользователям при подобных системных зависаниях.
     var primaryFixSilence=rt.lastBrowserFixAt?(now-rt.lastBrowserFixAt):Infinity;
     if(rt.tracking && rt.watchId!=null && primaryFixSilence>15000 && now-(rt.lastGpsRestartAt||0)>15000){
-      try{
-        navigator.geolocation.clearWatch(rt.watchId);
-        try{navigator.geolocation.getCurrentPosition(onPos,function(){},{enableHighAccuracy:true,maximumAge:0,timeout:8000});}catch(ignore){}
-        rt.watchId=navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:27000});
-        rt.lastGpsRestartAt=now; webLog("gps_watch_restarted",{silence_ms:primaryFixSilence});
-      }catch(e){}
+      restartBrowserGps("gps_watch_restarted",now,{silence_ms:primaryFixSilence},false);
     }
     // ЗАПАСНОЙ СЕТЕВОЙ КАНАЛ (браузерный аналог Android network backup, v1.4.29): если основной
     // канал молчит дольше 10с - включаем второй watchPosition с enableHighAccuracy:false как
@@ -2279,7 +2302,8 @@ window.addEventListener("error",function(e){
       toast("Отслеживание включено");
       return;
     }
-    rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0;
+    rt.tracking=true; rt.last=null; rt.speed=0; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0;rt.webHiddenAt=0;
+
     try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
     if("geolocation"in navigator){
       // ПРОГРЕВ GPS: одиночный getCurrentPosition ПЕРЕД watchPosition.
@@ -2301,7 +2325,7 @@ window.addEventListener("error",function(e){
     startAccelHelper();
     reqWake();
     startTicker();
-    setTrackBtn(true); warmVoice(); toast("Отслеживание включено"); }
+    setTrackBtn(true); warmVoice(); toast(isIOSWeb()?"iPhone: не блокируй экран — iOS остановит GPS":"Отслеживание включено"); }
 
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
   window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection,nativeFrequentInterference){
