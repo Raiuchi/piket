@@ -1104,12 +1104,13 @@ window.addEventListener("error",function(e){
             lead:state.settings.lead==null?3000:state.settings.lead
           });
         });
-        var trainField=document.getElementById("scheduleTrain"),selectedTrain=trainField&&trainField.value;
+        var selectedTrain=selectedScheduleTrain();
         var nativeJourney=activeThrough()==="chudovo"&&/^(819|820)$/.test(selectedTrain||"")?selectedTrain:(activeThrough()==="chudovo"?(journeyTowards()==="obratno"?"820":"819"):null);
         window.Android.configureNativeTrip(JSON.stringify({
           route:state.ctx.peregon||"Все участки",
           direction:state.ctx.towards||"tuda",
           journey:nativeJourney,
+          train:selectedTrain||null,
           manualOfficialM:manual,
           active:!!rt.tracking,
           lead:state.settings.lead||3000,
@@ -1204,7 +1205,8 @@ window.addEventListener("error",function(e){
   addTimingStation("Волховстрой - Чудово","Блок-пост 60 км",60000,"Ирса");
   addTimingStation("Чудово - Новгород","Великий Новгород",70000);
   var MAXSPD=250;
-  function currentBrowserSpeedCeiling(){return PIKET_RELIABILITY.browserSpeedCeiling(state.ctx.peregon);}
+  function currentBrowserSpeedCeiling(){return PIKET_RELIABILITY.browserSpeedCeiling(state.ctx.peregon,selectedScheduleTrain());}
+  function currentBrowserTrustedSpeedCeiling(){return PIKET_RELIABILITY.browserTrustedSpeedCeiling(state.ctx.peregon,selectedScheduleTrain());}
   var $=function(s){return document.querySelector(s);};
   var timingRows=[];
   function closePremiumPicker(){var p=$("#premiumPicker");p.classList.remove("on");p.setAttribute("aria-hidden","true");}
@@ -1328,10 +1330,12 @@ window.addEventListener("error",function(e){
     var day=new Date(),a=dep.split(":"),p=time.split(":"),departure=new Date(day),arrival=new Date(day);departure.setHours(+a[0],+a[1],0,0);arrival.setHours(+p[0],+p[1],0,0);if(arrival<=departure)arrival.setDate(arrival.getDate()+1);
     var remaining=dirDown()?from-target:target-from, req=PIKET_RELIABILITY.requiredAverageKmh(remaining,(arrival-departure)/1000);
     if(remaining<0||req==null){out.style.display="block";out.className="timing-result bad";out.textContent="Станция находится позади по выбранному направлению.";return;}
-    var impossible=req>MAXSPD;out.style.display="block";out.className="timing-result"+(impossible?" bad":"");
-    out.innerHTML=(impossible?'<b>График недостижим: расчёт '+Math.round(req)+' км/ч</b><br><strong>Следуй по максимально допустимой скорости участка</strong><br>':'Средняя по графику: <strong>'+Math.round(req)+' км/ч</strong><br>')+'Расстояние '+fmtM(remaining)+' · '+Math.round((arrival-departure)/60000)+' мин.<br><small>Учитывай график, сигналы, ограничения и фактические условия. Это справочный расчёт.</small>';
+    var impossible=req>currentBrowserSpeedCeiling();out.style.display="block";out.className="timing-result"+(impossible?" bad":"");
+    out.innerHTML=(impossible?'<b>График недостижим: расчёт '+Math.round(req)+' км/ч</b><br><strong>Следовать с максимально реализуемой скоростью согласно приказам по скоростям</strong><br>':'Средняя по графику: <strong>'+Math.round(req)+' км/ч</strong><br>')+'Расстояние '+fmtM(remaining)+' · '+Math.round((arrival-departure)/60000)+' мин.<br><small>Учитывай график, сигналы, ограничения и фактические условия. Это справочный расчёт.</small>';
   }
-  var scheduleOverrides=load("sap_schedule_overrides",{});
+  var scheduleOverrides=load("sap_schedule_overrides",{}),scheduleTrainSelections=load("sap_schedule_trains",{});
+  function scheduleTrainKey(){return scheduleSourceRoute()+"|"+journeyTowards()+"|"+(activeThrough()||"direct");}
+  function selectedScheduleTrain(){var field=document.getElementById("scheduleTrain"),current=field&&field.value;return current||(scheduleTrainSelections&&scheduleTrainSelections[scheduleTrainKey()])||"";}
   function scheduleNorm(s){return String(s||"").toLowerCase().replace(/ё/g,"е").replace(/[–—-]/g,"").replace(/[^a-zа-я0-9]/g,"").replace(/станция|московское|московский/g,"");}
   var scheduleAliases={"спетербурггл":"санктпетербургглавный","спетербургтм":"санктпетербургсортировочныймосковский","спсмпобухово":"обухово","чудовомоск":"чудовомосковское","бологоемоск":"бологоемосковское","москватовокт":"москватоварная","москвапасокт":"москвапассажирская","москвапассокт":"москвапассажирская","мурманскворота":"мурманскиеворота","оятъволховстр":"оятъ","оятволховстр":"оят","бп284км":"пост284км","выборгпасс":"выборгпассажирский","выборгп":"выборгпассажирский","спполисть":"спасскаяполисть","предузпавловск":"предузловаяпавловская","новгородпост":"новгородтранспортныйпост"};
   scheduleAliases["спетербургтм"]="санктпетербургтоварныймосковский";
@@ -1366,7 +1370,7 @@ window.addEventListener("error",function(e){
   }
   function scheduleRequirement(a,b,totalSec){var lo=Math.min(a,b),hi=Math.max(a,b),cuts=[lo,hi],ranges=[];state.restrictions.filter(function(r){return isActive(r)&&scheduleRestrictionApplies(r)&&+r.spd>0;}).forEach(function(r){var x=scheduleRestrictionM(r,false),y=scheduleRestrictionM(r,true),rlo=Math.max(lo,Math.min(x,y)),rhi=Math.min(hi,Math.max(x,y));if(rhi>rlo){ranges.push({lo:rlo,hi:rhi,spd:+r.spd});cuts.push(rlo,rhi);}});cuts.sort(function(x,y){return x-y;});var fixedM=0,fixedSec=0;for(var i=0;i<cuts.length-1;i++){var s=cuts[i],e=cuts[i+1],mid=(s+e)/2,limits=ranges.filter(function(r){return mid>=r.lo&&mid<=r.hi;});if(limits.length){var limit=Math.min.apply(null,limits.map(function(r){return r.spd;}));fixedM+=e-s;fixedSec+=(e-s)/(limit/3.6);}}var freeM=(hi-lo)-fixedM,remain=totalSec-fixedSec,req=freeM>0&&remain>0?(freeM/1000)/(remain/3600):(freeM===0&&remain>=0?0:Infinity);return{kmh:req,zones:ranges.length};}
   function secondsUntilSchedule(clock){var target=scheduleSeconds(clock);if(target==null)return null;var d=new Date(),now=d.getHours()*3600+d.getMinutes()*60+d.getSeconds(),left=target-now;if(left < -43200)left+=86400;else if(left > 43200)left-=86400;return left;}
-  function updateScheduleLivePace(force){var now=Date.now();if(!force&&now-(rt.lastSchedulePaceAt||0)<5000)return;rt.lastSchedulePaceAt=now;var el=$("#scheduleLivePace");if(!el)return;var pos=scheduleLiveM(),to=+el.getAttribute("data-to"),clock=el.getAttribute("data-arrival"),left=secondsUntilSchedule(clock);if(pos==null||!isFinite(to)||left==null)return;var passed=el.getAttribute("data-dir")==="obratno"?pos<to-20:pos>to+20;if(passed){renderTrainSchedule();return;}var distance=Math.abs(to-pos),calc=scheduleRequirement(pos,to,left),target=calc.kmh,late=left<=0||!isFinite(target)||target>MAXSPD;el.classList.toggle("late",late);el.querySelector("[data-live-distance]").textContent=fmtM(distance);el.querySelector("[data-live-time]").textContent=left>0?Math.floor(left/60)+" мин "+(left%60)+" сек":"время вышло";el.querySelector("[data-live-speed]").textContent=Math.round(rt.speed||0)+" км/ч";el.querySelector("[data-live-target]").textContent=late?"максимальная допустимая скорость":Math.round(target)+" км/ч";el.querySelector("[data-live-note]").textContent=late?"по ведомости участка и действующим ограничениям":"средняя по графику на оставшемся пути";}
+  function updateScheduleLivePace(force){var now=Date.now();if(!force&&now-(rt.lastSchedulePaceAt||0)<5000)return;rt.lastSchedulePaceAt=now;var el=$("#scheduleLivePace");if(!el)return;var pos=scheduleLiveM(),to=+el.getAttribute("data-to"),clock=el.getAttribute("data-arrival"),left=secondsUntilSchedule(clock);if(pos==null||!isFinite(to)||left==null)return;var passed=el.getAttribute("data-dir")==="obratno"?pos<to-20:pos>to+20;if(passed){renderTrainSchedule();return;}var distance=Math.abs(to-pos),calc=scheduleRequirement(pos,to,left),target=calc.kmh,late=left<=0||!isFinite(target)||target>currentBrowserSpeedCeiling();el.classList.toggle("late",late);el.querySelector("[data-live-distance]").textContent=fmtM(distance);el.querySelector("[data-live-time]").textContent=left>0?Math.floor(left/60)+" мин "+(left%60)+" сек":"время вышло";el.querySelector("[data-live-speed]").textContent=Math.round(rt.speed||0)+" км/ч";el.querySelector("[data-live-target]").textContent=late?"максимально реализуемая по приказам":Math.round(target)+" км/ч";el.querySelector("[data-live-note]").textContent=late?"согласно приказам по скоростям и действующим ограничениям":"средняя по графику на оставшемся пути";}
   function openScheduleTimePicker(train,index,kind,original){var key=train.number+":"+index+":"+kind,v=scheduleTime(train,index,kind,original)||"00:00",p=v.split(":"),h=+p[0]||0,m=+p[1]||0,half=p[2]==="30";function draw(){ $("#ppBody").innerHTML='<div class="pp-dials"><div class="pp-col"><button data-step="h1">＋</button><div class="pp-value">'+two(h)+'</div><button data-step="h-1">−</button></div><div class="pp-sep">:</div><div class="pp-col"><button data-step="m1">＋</button><div class="pp-value">'+two(m)+'</div><button data-step="m-1">−</button></div></div><button type="button" class="pp-option'+(half?' on':'')+'" id="scheduleHalf"><span>Полминуты</span><small>'+(half?'включено · :30':'выключено · :00')+'</small></button>';$("#ppBody").onclick=function(e){var s=e.target.getAttribute("data-step");if(s){if(s[0]==="h")h=(h+(s==="h1"?1:23))%24;else m=(m+(s==="m1"?1:59))%60;draw();return;}if(e.target.closest("#scheduleHalf")){half=!half;draw();}};}pickerTitle(kind==="arr"?"Время прибытия":"Время отправления");$("#ppActions").style.display="flex";$("#ppClear").style.display="block";$("#ppClear").onclick=function(){delete scheduleOverrides[key];delete scheduleOverrides[train.number+":"+index];save("sap_schedule_overrides",scheduleOverrides);closePremiumPicker();renderTrainSchedule();};$("#ppApply").onclick=function(){scheduleOverrides[key]=two(h)+":"+two(m)+(half?":30":"");delete scheduleOverrides[train.number+":"+index];save("sap_schedule_overrides",scheduleOverrides);closePremiumPicker();renderTrainSchedule();};draw();}
   function trainsForContext(){var rows=scheduleRowsForContext(),sourceRoute=scheduleSourceRoute(),through=activeThrough();return ((window.PIKET_SCHEDULES&&PIKET_SCHEDULES.trains)||[]).filter(function(t){if(through==="chudovo")return (String(t.number)==="819"||String(t.number)==="820")&&t.stops.filter(function(s){return !!scheduleStation(s.station,rows);}).length>=2;return t.route===sourceRoute&&t.direction===journeyTowards()&&t.stops.filter(function(s){return !!scheduleStation(s.station,rows);}).length>=2;});}
   function renderTrainSchedule(){
@@ -1384,14 +1388,14 @@ window.addEventListener("error",function(e){
       if(x.arr)buttons+='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="arr"><small>'+(x.dep&&x.dep!==x.arr?'приб':'проход')+'</small>'+formatScheduleTime(x.arr)+'</button>';
       if(x.dep&&x.dep!==x.arr)buttons+='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="dep"><small>отпр</small>'+formatScheduleTime(x.dep)+'</button>';
       if(!buttons&&x.dep)buttons='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="dep"><small>проход</small>'+formatScheduleTime(x.dep)+'</button>';
-      if(next){var fromTime=x.dep||x.arr,toTime=next.arr||next.dep,a=scheduleSeconds(fromTime),b=scheduleSeconds(toTime);if(a!=null&&b!=null){if(b<=a)b+=86400;var sec=b-a;if(x.m!=null&&next.m!=null){var calc=scheduleRequirement(x.m,next.m,sec),req=calc.kmh,note=calc.zones?' · учтено зон: '+calc.zones:'',speedTitle=calc.zones?'средняя по графику вне ограничений ':'средняя по графику ',impossible=!isFinite(req)||req>MAXSPD,speedValue=impossible?'график недостижим · расчёт '+Math.round(req)+' км/ч<br><small>следуй по максимально допустимой скорости участка</small>':speedTitle+Math.round(req)+' км/ч';run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+fmtM(Math.abs(next.m-x.m))+' · '+(sec/60).toFixed(sec%60?1:0)+' мин'+note+'</span><strong>'+speedValue+'</strong></div>';}else run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+(sec/60).toFixed(sec%60?1:0)+' мин</span><strong>нет км</strong></div>';}}
+      if(next){var fromTime=x.dep||x.arr,toTime=next.arr||next.dep,a=scheduleSeconds(fromTime),b=scheduleSeconds(toTime);if(a!=null&&b!=null){if(b<=a)b+=86400;var sec=b-a;if(x.m!=null&&next.m!=null){var calc=scheduleRequirement(x.m,next.m,sec),req=calc.kmh,note=calc.zones?' · учтено зон: '+calc.zones:'',speedTitle=calc.zones?'средняя по графику вне ограничений ':'средняя по графику ',impossible=!isFinite(req)||req>currentBrowserSpeedCeiling(),speedValue=impossible?'график недостижим · расчёт '+Math.round(req)+' км/ч<br><small>следовать с максимально реализуемой скоростью согласно приказам по скоростям</small>':speedTitle+Math.round(req)+' км/ч';run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+fmtM(Math.abs(next.m-x.m))+' · '+(sec/60).toFixed(sec%60?1:0)+' мин'+note+'</span><strong>'+speedValue+'</strong></div>';}else run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+(sec/60).toFixed(sec%60?1:0)+' мин</span><strong>нет км</strong></div>';}}
       var livePace=(i===live&&next&&next.m!=null)?'<div class="schedule-live-pace" id="scheduleLivePace" data-dir="'+train.direction+'" data-to="'+next.m+'" data-arrival="'+escapeHtml(next.arr||next.dep||'')+'"><div><span>фактическая скорость</span><b data-live-speed>—</b></div><div class="pace-target"><span>ориентир по графику</span><b data-live-target>—</b><small data-live-note>средняя по графику на оставшемся пути</small></div><div><span>до станции</span><b data-live-distance>—</b></div><div><span>времени осталось</span><b data-live-time>—</b></div></div>':'';
       return '<div class="schedule-leg'+(i===live?' live':'')+'"><div class="schedule-stop"><b>'+escapeHtml(x.name)+(x.m!=null?' <small>· '+escapeHtml(x.mark||stationMark(x.displayM))+'</small>':' <small>· км уточняется</small>')+'</b><div class="schedule-times">'+buttons+'</div></div>'+run+livePace+'</div>';
     }).join("")+'<button class="schedule-reset" id="scheduleReset">Сбросить мои правки времени этого поезда</button>';
     updateScheduleLivePace(true);
     box.onclick=function(e){var b=e.target.closest("[data-schedule-index]");if(b){var idx=+b.getAttribute("data-schedule-index"),kind=b.getAttribute("data-kind")||"dep",stop=train.stops[idx];openScheduleTimePicker(train,idx,kind,stop[kind]);return;}if(e.target.id==="scheduleReset"){Object.keys(scheduleOverrides).forEach(function(k){if(k.indexOf(train.number+":")===0)delete scheduleOverrides[k];});save("sap_schedule_overrides",scheduleOverrides);renderTrainSchedule();toast("Время восстановлено из расписания");}};
   }
-  function renderTrainPicker(){var trains=trainsForContext(),field=$("#scheduleTrain");if(field.value&&!trains.some(function(t){return t.number===field.value;}))field.value="";renderTrainSchedule();}
+  function renderTrainPicker(){var trains=trainsForContext(),field=$("#scheduleTrain"),before=field.value,key=scheduleTrainKey(),saved=scheduleTrainSelections[key]||"";field.value=saved;if(field.value&&!trains.some(function(t){return t.number===field.value;})){field.value="";delete scheduleTrainSelections[key];save("sap_schedule_trains",scheduleTrainSelections);}if(before!==field.value)syncNativeRouteContext();renderTrainSchedule();}
   function scheduleWebDim(){clearTimeout(rt.screenDimTimer);document.body.classList.remove("screen-dim");if(!(window.Android&&window.Android.setScreenMode)&&state.settings.screenMode==="auto")rt.screenDimTimer=setTimeout(function(){document.body.classList.add("screen-dim");},90000);}
   document.addEventListener("pointerdown",function(){if(rt.tracking)scheduleWebDim();},{passive:true});
   function reqWake(){ var mode=state.settings.screenMode||(state.settings.wake===false?"system":"auto");try{if(window.Android&&window.Android.setScreenMode)window.Android.setScreenMode(mode);else if(window.Android&&window.Android.setKeepScreen)window.Android.setKeepScreen(mode!=="system");}catch(e){} scheduleWebDim();if(mode==="system"||!("wakeLock"in navigator))return; navigator.wakeLock.request("screen").then(function(w){rt.wake=w;w.addEventListener("release",function(){rt.wake=null;});}).catch(function(){}); }
@@ -1718,16 +1722,25 @@ window.addEventListener("error",function(e){
     // на 0, хотя поезд реально едет. Понижен до dt>0.5 — надёжнее подхватывает скорость.
     var poorDoppler=(c.speedAccuracyMps!=null && c.speedAccuracyMps>=0 && c.speedAccuracyMps>8);
     var spd=(!poorDoppler&&c.speed!=null&&c.speed>=0)?c.speed*3.6:null;
-    var browserSpeedCeiling=currentBrowserSpeedCeiling();
-    if(spd!=null && spd>browserSpeedCeiling){
-      webLog("gps_speed_rejected",{provider_speed_kmh:spd,ceiling_kmh:browserSpeedCeiling,accuracy_m:acc}); spd=null;
+    var browserSpeedCeiling=currentBrowserSpeedCeiling(),browserTrustedSpeedCeiling=currentBrowserTrustedSpeedCeiling();
+    var coordinateSpeed=(rt.last&&dt>=0.5&&dt<=5&&signalGood)?haversine(rt.last,pt)/dt*3.6:null;
+    var automaticHighSpeedProof=coordinateSpeed!=null&&coordinateSpeed>browserTrustedSpeedCeiling&&
+      Math.abs(coordinateSpeed-(spd==null?coordinateSpeed:spd))<=25&&haversine(rt.last,pt)>=Math.max(20,acc);
+    var highSpeedCheck=PIKET_RELIABILITY.confirmAutomaticHighSpeed(rt.autoHighSpeedCandidate,rt.autoHighSpeedCandidateCount,
+      coordinateSpeed,spd,automaticHighSpeedProof);
+    rt.autoHighSpeedCandidate=highSpeedCheck.candidate;rt.autoHighSpeedCandidateCount=highSpeedCheck.count;
+    var automaticHighSpeedConfirmed=highSpeedCheck.confirmed;
+    if(automaticHighSpeedConfirmed)rt.autoHighSpeedUntil=now+10000;
+    if(spd!=null && (spd>browserSpeedCeiling || (spd>browserTrustedSpeedCeiling&&!automaticHighSpeedConfirmed))){
+      webLog("gps_speed_rejected",{provider_speed_kmh:spd,ceiling_kmh:browserSpeedCeiling,
+        trusted_ceiling_kmh:browserTrustedSpeedCeiling,coordinate_speed_kmh:coordinateSpeed,accuracy_m:acc}); spd=null;
     }
     if(spd==null && rt.last && dt>0.5 && (!poorDoppler || signalGood)){
       var fbDist=haversine(rt.last,pt);
       // Минимум 15м накопленного смещения — иначе обычное дрожание стоящего GPS-приёмника
       // (5-10м между фиксами) даёт кажущуюся скорость 20-40 км/ч и ложно "оживляет" счётчик,
       // хотя поезд реально стоит на станции.
-      if(fbDist>=15){ var fb=fbDist/dt*3.6; if(fb<=browserSpeedCeiling)spd=fb; }
+      if(fbDist>=15){ var fb=fbDist/dt*3.6; if(fb<=browserSpeedCeiling&&(fb<=browserTrustedSpeedCeiling||automaticHighSpeedConfirmed))spd=fb; }
       else spd=0;
     }
     // СТОЯНКА ПРОТИВ ЛОЖНОГО ДОПЛЕРА. При помехах чип иногда сообщает 150–250 км/ч,
@@ -1810,7 +1823,7 @@ window.addEventListener("error",function(e){
       var totalDist=haversine(rt.zeroSpeedAnchor,pt);
       // Порог 30м (выше, чем у обычного fallback) — watchdog копит шум дольше (8+с),
       // выше шанс случайного выброса GPS-шума дать ложное "движение" на стоянке.
-      if(totalDt>0 && totalDist>=30){ var forced=totalDist/totalDt*3.6; if(forced>5&&forced<=currentBrowserSpeedCeiling()){ rt.speed=forced; rt.zeroSpeedSince=null; rt.zeroSpeedAnchor=null; } }
+      if(totalDt>0 && totalDist>=30){ var forced=totalDist/totalDt*3.6; if(forced>5&&forced<=(Date.now()<(rt.autoHighSpeedUntil||0)?currentBrowserSpeedCeiling():currentBrowserTrustedSpeedCeiling())){ rt.speed=forced; rt.zeroSpeedSince=null; rt.zeroSpeedAnchor=null; } }
     }
 
     // ЗАПАСНАЯ АВТОКАЛИБРОВКА: машинист нажал «Старт», но забыл откалиброваться вручную.
@@ -2100,7 +2113,7 @@ window.addEventListener("error",function(e){
     rt.last=pt;
     autoDetectPeregon(c.latitude, c.longitude, acc);
     updateAndroidNotification();
-    renderTrip(); evalAlerts(); }
+    renderTripAdaptive(false); evalAlerts(); }
   function onErr(e){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; // watchdog ориентируется только на последнюю пригодную позицию
     if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
@@ -2139,7 +2152,9 @@ window.addEventListener("error",function(e){
     return;
   }
     var now=Date.now(), dt=(now-(rt.lastTick||now))/1000; rt.lastTick=now;
-    rt.speed=Math.max(0,Math.min(+rt.speed||0,currentBrowserSpeedCeiling()));
+    var retainedSpeed=Math.max(0,+rt.speed||0),retainedCeiling=Date.now()<(rt.autoHighSpeedUntil||0)?currentBrowserSpeedCeiling():currentBrowserTrustedSpeedCeiling();
+    if(retainedSpeed>retainedCeiling){webLog("stored_speed_rejected",{speed_kmh:retainedSpeed,ceiling_kmh:retainedCeiling});retainedSpeed=0;}
+    rt.speed=retainedSpeed;
     // КРИТИЧНО: odo накапливаем ТОЛЬКО при реальном движении (>5 км/ч).
     // GPS-шум на стоянке показывает 30-50 км/ч — без этой защиты за 5 минут
     // накапливается 3+ км фиктивного odo, что бакует неправильный _trackM
@@ -2152,7 +2167,7 @@ window.addEventListener("error",function(e){
       rt.fixQuality="recovering"; rt.gpsState="recovering";
       if(Math.abs(rt.correctionTargetOdo-rt.odo)<5){ rt.odo=rt.correctionTargetOdo; rt.correctionTargetOdo=null; rt.fixQuality="good"; rt.gpsState="precise"; }
     }
-    rt.posM=currentMeters(); renderTrip(); updateScheduleLivePace(false); evalAlerts(); recordZoneQuality(); checkZoneWarning();
+    rt.posM=currentMeters(); renderTripAdaptive(false); evalAlerts(); recordZoneQuality(); checkZoneWarning();
     // ВОТЧДОГ ПОДПИСКИ (браузерный аналог Java watchdog в Android-приложении): если ни onPos,
     // ни onErr вообще не вызывались браузером дольше 20 секунд - это значит сама подписка
     // watchPosition молча "зависла" (известны такие случаи на некоторых телефонах/системах -
@@ -2332,7 +2347,8 @@ window.addEventListener("error",function(e){
     if(!rt.tracking)return;
     if(state.settings.demo){renderDemoStatus();return;}
     renderSatellites(satellitesUsed,gnssTelemetry===true,false);
-    if(nativeRoute&&nativeRoute!==state.ctx.peregon){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
+    var nativeStructureChanged=!!(nativeRoute&&nativeRoute!==state.ctx.peregon),nativeAlertChanged=nativeAlertId!==rt.nativeAlertId||nativeAlertInZone!==rt.nativeAlertInZone;
+    if(nativeStructureChanged){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
     // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
     if(nativeOfficialM!=null){
       rt.nativeSnapshot=true;
@@ -2346,8 +2362,12 @@ window.addEventListener("error",function(e){
       $("#gpsTxt").textContent=nativeTripRecovering?"позиция восстанавливается":"GPS + Kotlin";
       $("#spdSrc").textContent=nativeTripRecovering?"Расчётная позиция":"Нативная позиция ✓";
       $("#spdSrc").className="src"+(nativeTripRecovering?" dr":"");
-      if(document.getElementById("v-trip").classList.contains("on"))renderTrip();
-      if(document.getElementById("v-list").classList.contains("on"))renderList();
+      var nativeNow=Date.now(),fullRenderEvery=rt.thermalHot?5000:3000;
+      var fullNativeRender=nativeStructureChanged||nativeAlertChanged||!rt.lastFullNativeRenderAt||nativeNow-rt.lastFullNativeRenderAt>=fullRenderEvery;
+      if(document.getElementById("v-trip").classList.contains("on")){
+        if(fullNativeRender){rt.lastFullNativeRenderAt=nativeNow;renderTrip();}else renderTripTelemetry();
+      }
+      if(fullNativeRender&&document.getElementById("v-list").classList.contains("on"))renderList();
       evalAlerts(); return;
     }
     var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0 }, timestamp:time };
@@ -2513,7 +2533,7 @@ window.addEventListener("error",function(e){
     if(!r){ el.style.display="none"; return; }
     el.className="g-limit "+speedClass(r.spd); el.style.display="flex"; $("#limVal").textContent=r.spd||"—"; }
 
-  function renderTrip(){ renderPositionTrust(); renderTimingStations(); renderTrainPicker();
+  function renderTripTelemetry(){
     // В режиме зеркала (IS_MIRROR) видимый экран НЕ ведёт свой расчёт позиции - rt.odo
     // здесь всегда 0 (считает только headless-копия в службе). currentMeters() пересчитывал
     // бы позицию через локальный (нулевой) rt.odo и затирал бы правильное значение rt.posM,
@@ -2528,6 +2548,15 @@ window.addEventListener("error",function(e){
       confEl.className="conf-dots"+(rt.fixQuality?(" q-"+rt.fixQuality):"");
     }
     var acwEl=$("#autoCalWarn"); if(acwEl) acwEl.style.display=rt.autoCalib?"block":"none";
+    updateScheduleLivePace(false);
+  }
+
+  function renderTripAdaptive(force){ var now=Date.now(),every=rt.thermalHot?5000:3000;
+    if(force||!rt.lastFullNativeRenderAt||now-rt.lastFullNativeRenderAt>=every){rt.lastFullNativeRenderAt=now;renderTrip();return true;}
+    renderTripTelemetry();return false;
+  }
+
+  function renderTrip(){ renderPositionTrust(); renderTimingStations(); renderTrainPicker();renderTripTelemetry();
     var sig=$("#signal"),content=$("#sigContent"),distEl=$("#sigDist"),stEl=$("#sigState"),appW=$("#approachWrap"),appBar=$("#approachBar");
     if(state.calib==null){ sig.className="signal"; updateLimitBadge(null); updateGaugeDanger(null);
       if(rt.tracking){
@@ -2785,8 +2814,13 @@ window.addEventListener("error",function(e){
   function swBind(sel,key){ $(sel).addEventListener("click",function(){ state.settings[key]=!state.settings[key]; persist(); syncSw(); if(key==="wake"&&rt.tracking){if(state.settings.wake)reqWake();else relWake();} if(key==="demo"&&rt.tracking)stopTrack(); }); }
   swBind("#swVoice","voice"); swBind("#swSound","sound"); swBind("#swVibe","vibe"); swBind("#swDemo","demo");
   $("#screenModes").addEventListener("click",function(e){var b=e.target.closest("[data-screen]");if(!b)return;state.settings.screenMode=b.getAttribute("data-screen");delete state.settings.wake;persist();syncSw();if(rt.tracking)reqWake();});
-  window.onNativeThermalState=function(status){var hot=(+status)>=3;document.body.classList.toggle("thermal-mode",hot);$("#thermalBanner").classList.toggle("on",hot);};
-  $("#lowerBrightness").addEventListener("click",function(){try{if(window.Android&&window.Android.lowerBrightness)window.Android.lowerBrightness();}catch(e){}$("#thermalBanner").classList.remove("on");toast("Яркость снижена до касания экрана");});
+  window.onNativeThermalState=function(status){var hot=(+status)>=3;if(rt.thermalHot&&!hot)rt.lastFullNativeRenderAt=0;rt.thermalHot=hot;document.body.classList.toggle("thermal-mode",hot);$("#thermalBanner").classList.toggle("on",hot);};
+  $("#lowerBrightness").addEventListener("click",function(){
+    state.settings.screenMode="auto";delete state.settings.wake;persist();syncSw();
+    try{if(window.Android&&window.Android.setScreenMode)window.Android.setScreenMode("auto");if(window.Android&&window.Android.lowerBrightness)window.Android.lowerBrightness();}catch(e){}
+    if(!(window.Android&&window.Android.lowerBrightness))document.body.classList.add("screen-dim");
+    $("#thermalBanner").classList.remove("on");toast("Автозатемнение включено, яркость снижена");
+  });
   $("#leadUp").addEventListener("click",function(){ state.settings.lead=Math.min(8000,state.settings.lead+500); persist(); syncSw(); renderTrip(); });
   $("#leadDn").addEventListener("click",function(){ state.settings.lead=Math.max(300,state.settings.lead-500); persist(); syncSw(); renderTrip(); });
 
@@ -2949,7 +2983,7 @@ window.addEventListener("error",function(e){
   }
   $("#btnJumpOrder").addEventListener("click",jumpToOrderFromTrip);
   $("#timingCalc").addEventListener("click",calculateTiming);
-  $("#scheduleTrainPick").addEventListener("click",function(){var trains=trainsForContext();openChoicePicker("Номер поезда",trains.map(function(t){return{label:"Поезд № "+t.number,meta:t.title,value:t.number};}),$("#scheduleTrain").value,function(v){$("#scheduleTrain").value=v;rt.scheduleProgressKey=null;rt.scheduleProgressIndex=0;rt.scheduleProgressStarted=false;syncNativeRouteContext();renderTrainSchedule();});});
+  $("#scheduleTrainPick").addEventListener("click",function(){var trains=trainsForContext();openChoicePicker("Номер поезда",trains.map(function(t){return{label:"Поезд № "+t.number,meta:t.title,value:t.number};}),$("#scheduleTrain").value,function(v){$("#scheduleTrain").value=v;scheduleTrainSelections[scheduleTrainKey()]=v;save("sap_schedule_trains",scheduleTrainSelections);rt.scheduleProgressKey=null;rt.scheduleProgressIndex=0;rt.scheduleProgressStarted=false;syncNativeRouteContext();renderTrainSchedule();});});
   $("#ppClose").addEventListener("click",closePremiumPicker);$("#ppBackdrop").addEventListener("click",closePremiumPicker);
   $("#timingFromPick").addEventListener("click",function(){openChoicePicker("Станция отправления",timingRows.map(function(x){return{label:x[0],meta:timingStationMark(x),value:x[1]};}),$("#timingFrom").value,function(v){$("#timingFrom").value=v;var x=timingRows.find(function(r){return String(r[1])===String(v);});$("#timingFromText").textContent=x[0]+" · "+timingStationMark(x);});});
   $("#timingStationPick").addEventListener("click",function(){openChoicePicker("Станция назначения",timingRows.map(function(x){return{label:x[0],meta:timingStationMark(x),value:x[1]};}),$("#timingStation").value,function(v){$("#timingStation").value=v;var x=timingRows.find(function(r){return String(r[1])===String(v);});$("#timingStationText").textContent=x[0]+" · "+timingStationMark(x);});});

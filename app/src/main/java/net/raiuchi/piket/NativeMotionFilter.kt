@@ -47,6 +47,22 @@ class NativeMotionFilter {
     private var mismatchCandidate: Float? = null
     private var mismatchCount = 0
     private var wasStationary = false
+    private var speedCeilingKmh = 160f
+    private var trustedSpeedCeilingKmh = 160f
+    private var highSpeedCandidateKmh: Float? = null
+    private var highSpeedCandidateCount = 0
+
+    fun setSpeedCeilingKmh(value: Float) = setSpeedCeilingsKmh(value, value)
+
+    fun setSpeedCeilingsKmh(hardValue: Float, trustedValue: Float) {
+        val hard = hardValue.takeIf { it.isFinite() && it > 0f } ?: 160f
+        val trusted = trustedValue.takeIf { it.isFinite() && it > 0f }?.coerceAtMost(hard) ?: hard
+        if (hard == speedCeilingKmh && trusted == trustedSpeedCeilingKmh) return
+        speedCeilingKmh = hard
+        trustedSpeedCeilingKmh = trusted
+        if (lastSpeedMps * 3.6f > trusted) lastSpeedMps = 0f
+        markSignalUnavailable()
+    }
 
     fun reset() {
         previous = null
@@ -56,6 +72,8 @@ class NativeMotionFilter {
         recovering = true
         recoveryCandidate = null
         recoveryCount = 0
+        highSpeedCandidateKmh = null
+        highSpeedCandidateCount = 0
         mismatchCandidate = null
         mismatchCount = 0
         wasStationary = false
@@ -65,6 +83,8 @@ class NativeMotionFilter {
         recovering = true
         recoveryCandidate = null
         recoveryCount = 0
+        highSpeedCandidateKmh = null
+        highSpeedCandidateCount = 0
     }
 
     fun process(fix: Fix): Result {
@@ -87,6 +107,7 @@ class NativeMotionFilter {
 
         var speedReconciled = false
         var positionCorroborated = false
+        var speedCeilingRejected = false
         var speed = if (!poorDoppler) fix.speedMps?.takeIf { it >= 0f } else null
         if (speed == null && dt >= 0.5 && !weakSatellites) speed = (distance / dt).toFloat()
 
@@ -130,7 +151,24 @@ class NativeMotionFilter {
         }
 
         if (speed != null) {
-            if (speed > 83.34f) speed = null // 300 км/ч — выше рабочего диапазона составов
+            val speedKmh = speed * 3.6f
+            var automaticHighSpeedRejected = false
+            if (speedKmh > trustedSpeedCeilingKmh && trustedSpeedCeilingKmh < speedCeilingKmh) {
+                if (positionCorroborated || speedReconciled) {
+                    val candidate = highSpeedCandidateKmh
+                    if (candidate != null && abs(candidate - speedKmh) <= 35f) highSpeedCandidateCount++
+                    else highSpeedCandidateCount = 1
+                    highSpeedCandidateKmh = speedKmh
+                    automaticHighSpeedRejected = highSpeedCandidateCount < 2
+                } else automaticHighSpeedRejected = true
+            } else {
+                highSpeedCandidateKmh = null
+                highSpeedCandidateCount = 0
+            }
+            if (speedKmh > speedCeilingKmh || automaticHighSpeedRejected) {
+                speed = null
+                speedCeilingRejected = true
+            }
             // During cold start/recovery the first sample is only a candidate, so
             // compare two candidates with each other below rather than with the
             // stale pre-outage speed.
@@ -159,7 +197,12 @@ class NativeMotionFilter {
             recovering -> "recovering"
             else -> "good"
         }
-        return Result(true, speed, stationary, quality, if (speed == null) "speed-filtered" else "ok")
+        val reason = when {
+            speedCeilingRejected -> "speed-ceiling"
+            speed == null -> "speed-filtered"
+            else -> "ok"
+        }
+        return Result(true, speed, stationary, quality, reason)
     }
 
     private fun updateStationary(fix: Fix) {

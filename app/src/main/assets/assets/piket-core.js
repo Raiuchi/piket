@@ -39,15 +39,29 @@ var PIKET_RELIABILITY = {
     var delta=Math.round((+actualAheadM||0)-(+expectedLeadM||0));
     return {deltaM:delta,ok:Math.abs(delta)<=250};
   },
-  browserSpeedCeiling: function(route) {
-    route=String(route||"");
-    if(route==="СпбГл - Москва") return 255;
-    if(route==="Броневая - Луга") return 170;
-    if(route==="СПбФин - Выборг" || route==="Выборг - Каменногорск") return 190;
-    if(route==="Горы - Петрозаводск" || route==="Д. Долг - Павлово" || route==="Павлово - Горы II путь" || route==="Горы - Павлово I путь" || route==="Чудово - Новгород" || route==="Волховстрой - Чудово") return 150;
-    return 200;
+  isSapsanTrain: function(trainNumber) {
+    var text=String(trainNumber||"").trim(),number=/^\d+$/.test(text)?Number(text):NaN;
+    return number>=751 && number<=786;
   },
-  lossSpeed: function(speed,elapsedSec,totalLossSec,accelAvailable,accelMag) {
+  browserSpeedCeiling: function(route,trainNumber) {
+    route=String(route||"");
+    if(route==="СпбГл - Москва") return !String(trainNumber||"").trim()||this.isSapsanTrain(trainNumber)?250:160;
+    if(route==="Броневая - Луга") return 140;
+    if(route==="СПбФин - Выборг" || route==="Выборг - Каменногорск") return 160;
+    if(route==="Горы - Петрозаводск" || route==="Д. Долг - Павлово" || route==="Павлово - Горы II путь" || route==="Горы - Павлово I путь" || route==="Чудово - Новгород" || route==="Волховстрой - Чудово") return 120;
+    return 160;
+  },
+  browserTrustedSpeedCeiling: function(route,trainNumber) {
+    route=String(route||"");
+    if(route==="СпбГл - Москва" && !String(trainNumber||"").trim()) return 160;
+    return this.browserSpeedCeiling(route,trainNumber);
+  },
+  confirmAutomaticHighSpeed: function(previousCandidate,count,coordinateSpeed,providerSpeed,hasCoordinateProof) {
+    if(!hasCoordinateProof || !isFinite(coordinateSpeed)) return {candidate:null,count:0,confirmed:false};
+    var candidate=+coordinateSpeed,previous=previousCandidate==null?null:+previousCandidate;
+    var nextCount=previous!=null&&Math.abs(previous-candidate)<=35?(+count||0)+1:1;
+    return {candidate:candidate,count:nextCount,confirmed:nextCount>=2};
+  },  lossSpeed: function(speed,elapsedSec,totalLossSec,accelAvailable,accelMag) {
     speed=Math.max(0,+speed||0); elapsedSec=Math.max(0,+elapsedSec||0); totalLossSec=Math.max(0,+totalLossSec||0);
     if(totalLossSec>=120) return 0;
     var decay=!accelAvailable?0.985:(accelMag<0.5?0.995:(accelMag<1.5?0.985:(accelMag<3?0.96:0.90)));

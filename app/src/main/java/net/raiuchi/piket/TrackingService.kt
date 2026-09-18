@@ -75,6 +75,13 @@ class TrackingService : Service() {
     private var journeyRouter: NativeJourneyRouter? = null
     @Volatile private var routeLabel = "Все участки"
     @Volatile private var journeyId: String? = null
+    @Volatile private var trainNumber: String? = null
+
+    private fun updateSpeedCeiling() {
+        motionFilter.setSpeedCeilingsKmh(
+            RouteSpeedCeilings.maxKmh(routeLabel, trainNumber),
+            RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber))
+    }
 
     private lateinit var mainHandler: Handler
     private var tripTicker: Runnable? = null
@@ -353,6 +360,7 @@ class TrackingService : Service() {
                     "to" to transition.route, "direction" to transition.direction,
                     "physical_m" to nextSnap.physicalM, "official_m" to nextSnap.officialM))
                 routeLabel = transition.route
+                updateSpeedCeiling()
                 tripEngine?.switchRoute(transition.route, transition.direction, nextSnap)
                 currentSnap = nextSnap
             }
@@ -437,17 +445,23 @@ class TrackingService : Service() {
             .put("offsetM", state.offsetM).put("speedMps", state.speedMps)
         state.physicalM?.let { json.put("physicalM", it) }
         journeyId?.let { json.put("journey", it) }
+        trainNumber?.let { json.put("train", it) }
         getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("trip", json.toString()).apply()
     }
 
     private fun restoreTripState() = runCatching {
         val raw = getSharedPreferences("piket_native", MODE_PRIVATE).getString("trip", null) ?: return@runCatching
-        val json = JSONObject(raw); journeyId = json.optString("journey").ifBlank { null }
-        tripEngine?.restore(NativeTripEngine.SavedState(json.optBoolean("active"), json.optString("route", "Все участки"),
+        val json = JSONObject(raw)
+        journeyId = json.optString("journey").takeUnless { it.isBlank() || it == "null" }
+        trainNumber = json.optString("train").takeUnless { it.isBlank() || it == "null" }
+        routeLabel = json.optString("route", routeLabel)
+        updateSpeedCeiling()
+        val ceilingMps = RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber) / 3.6f
+        val savedSpeed = json.optDouble("speedMps").toFloat().takeIf { it.isFinite() && it in 0f..ceilingMps } ?: 0f
+        tripEngine?.restore(NativeTripEngine.SavedState(json.optBoolean("active"), routeLabel,
             json.optString("direction", "tuda"), json.optDouble("manualOfficialM"),
             json.optDouble("physicalM").takeIf { json.has("physicalM") }, json.optDouble("offsetM"),
-            json.optDouble("speedMps").toFloat(), 0))
-        routeLabel = json.optString("route", routeLabel)
+            savedSpeed, 0))
     }
 
     private fun applyConfig(raw: String?) = runCatching {
@@ -455,6 +469,8 @@ class TrackingService : Service() {
         val previousState = tripEngine?.save()
         routeLabel = root.optString("route", "Все участки")
         journeyId = root.optString("journey").takeUnless { it.isBlank() || it == "null" }
+        trainNumber = root.optString("train").takeUnless { it.isBlank() || it == "null" }
+        updateSpeedCeiling()
         soundEnabled = root.optBoolean("sound", true); vibrationEnabled = root.optBoolean("vibration", true)
         alertSpeech.clear()
         val restrictions = buildList {
@@ -479,6 +495,8 @@ class TrackingService : Service() {
         tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
             nextActive, restrictions)
         diagnostics.event("trip_configured", mapOf("route" to routeLabel, "journey" to journeyId,
+            "train" to trainNumber, "speed_ceiling_kmh" to RouteSpeedCeilings.maxKmh(routeLabel, trainNumber),
+            "trusted_speed_ceiling_kmh" to RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber),
             "direction" to nextDirection, "active" to nextActive,
             "manual_official_m" to root.optDouble("manualOfficialM"), "restrictions" to restrictions.size))
     }

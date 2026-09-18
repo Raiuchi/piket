@@ -4,6 +4,40 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NativeMotionFilterTest {
+    @Test fun automaticMoscowModeRejectsUncorroborated250Spike() {
+        val filter = NativeMotionFilter()
+        filter.setSpeedCeilingsKmh(250f, 160f)
+        val result = filter.process(fix(0, speed = 69.4f))
+        assertNull(result.filteredSpeedMps)
+        assertEquals("speed-ceiling", result.reason)
+    }
+
+    @Test fun automaticMoscowModeAcceptsTwoCoordinateConfirmedHighSpeedFixes() {
+        val filter = NativeMotionFilter()
+        filter.setSpeedCeilingsKmh(250f, 160f)
+        filter.process(fix(0, speed = 40f))
+        filter.process(fix(1_000, lat = 59.90036, speed = 40f))
+        assertNull(filter.process(fix(2_000, lat = 59.90086, speed = 55.5f)).filteredSpeedMps)
+        val accepted = filter.process(fix(3_000, lat = 59.90136, speed = 55.5f))
+        assertNotNull(accepted.filteredSpeedMps)
+        assertEquals(55.5f, accepted.filteredSpeedMps!!, 0.5f)
+    }
+    @Test fun rejectsSpeedAboveConfiguredRouteCeiling() {
+        val filter = NativeMotionFilter()
+        filter.setSpeedCeilingKmh(120f)
+        val result = filter.process(fix(0, speed = 35f))
+        assertNull(result.filteredSpeedMps)
+        assertEquals("speed-ceiling", result.reason)
+    }
+
+    @Test fun acceptsConfirmedSpeedBelowConfiguredRouteCeiling() {
+        val filter = NativeMotionFilter()
+        filter.setSpeedCeilingKmh(120f)
+        assertNull(filter.process(fix(0, speed = 33f)).filteredSpeedMps)
+        val result = filter.process(fix(1_000, lat = 59.900297, speed = 33f))
+        assertNotNull(result.filteredSpeedMps)
+        assertEquals(33f, result.filteredSpeedMps!!, 0.5f)
+    }
     @Test fun coordinateUncertaintyDoesNotZeroMovingDoppler() {
         for (accuracy in listOf(10f, 20f, 30f)) {
             val filter = NativeMotionFilter()

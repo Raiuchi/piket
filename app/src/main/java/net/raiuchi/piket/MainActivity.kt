@@ -44,7 +44,9 @@ class MainActivity : Activity() {
     private val snapshotPump = object : Runnable {
         override fun run() {
             if (pageReady) publishSnapshot(repository.loadSnapshot())
-            handler.postDelayed(this, if (thermalStatus >= PowerManager.THERMAL_STATUS_SEVERE) 3_000 else 1_000)
+            // Keep the safety-critical numbers moving once per second even when the phone is hot.
+            // The page itself throttles expensive structural redraws in thermal mode.
+            handler.postDelayed(this, 1_000)
         }
     }
     @Volatile private var updateCheckRunning = false

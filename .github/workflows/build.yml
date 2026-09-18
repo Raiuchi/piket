@@ -34,6 +34,7 @@ jobs:
         run: |
           node tools/route-regression.mjs
           node tools/alert-regression.mjs
+          node tools/speed-order-regression.mjs
           node tools/replay-diagnostics.mjs tools/fixtures/diagnostics-clean.jsonl --expect-clean
 
       - name: Restore signing key

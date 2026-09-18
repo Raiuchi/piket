@@ -12,7 +12,7 @@ const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
   activeThrough:()=> 'dacha'};
 box.journeyTowards=()=>box.state.ctx.towards||'tuda';
 vm.createContext(box);
-for (const name of ['exactAxisProfile','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
+for (const name of ['exactAxisProfile','profileOfficial','baseOfficialTrackM','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = html.indexOf('\n  function ', start + 1);
@@ -56,4 +56,39 @@ assert.ok(html.includes('boundaryM:128900,cabChange:true') && html.includes('bou
 assert.ok(html.includes('boundaryM:124400') && html.includes('boundaryM:101000,cabChange:true') &&
   html.includes('boundaryM:75175,trainChange'),
   'Volkhov, Chudovo and Novgorod must use their production junction boundaries');
-console.log('Browser route regression: axes, restrictions and all documented through-route junctions passed');
+for (let routeIndex=0;routeIndex<routes.tracks.labels.length;routeIndex++) {
+  const label=routes.tracks.labels[routeIndex],points=routes.tracks.segs[routeIndex],axis=routes.chainage[routeIndex];
+  assert.equal(points.length,axis.length,`${label}: route and official axis sizes`);
+  if (box.exactAxisProfile(label,'tuda')) continue; // Direction-specific memo profiles are checked above.
+  for (let pointIndex=0;pointIndex<points.length;pointIndex++) {
+    const physical=points[pointIndex][2];
+    assert.ok(Math.abs(box.baseOfficialTrackM(physical,label,'tuda')-axis[pointIndex])<0.01,
+      `${label}: forward control point ${pointIndex}`);
+    assert.ok(Math.abs(box.baseOfficialTrackM(physical,label,'obratno')-axis[pointIndex])<0.01,
+      `${label}: reverse control point ${pointIndex}`);
+  }
+}
+
+const moscowIndex=routes.tracks.labels.indexOf('СпбГл - Москва');
+assert.ok(moscowIndex>=0,'Moscow route must exist');
+const moscowPhysical=routes.tracks.segs[moscowIndex].map(point=>point[2]);
+const moscowAxis=routes.chainage[moscowIndex];
+const axisJumpIndex=moscowPhysical.indexOf(204230);
+assert.ok(axisJumpIndex>=0,'Moscow 205/210 km axis transition must exist');
+assert.equal(moscowAxis[axisJumpIndex],205000);
+assert.equal(moscowPhysical[axisJumpIndex+1],204353);
+assert.equal(moscowAxis[axisJumpIndex+1],210000,
+  'Moscow axis must switch 205 -> 210 in the forward direction and 210 -> 205 in reverse');
+
+const activity=fs.readFileSync('app/src/main/java/net/raiuchi/piket/MainActivity.kt','utf8');
+assert.ok(activity.includes('handler.postDelayed(this, 1_000)') && !activity.includes('THERMAL_STATUS_SEVERE) 3_000'),
+  'thermal mode must keep speed and kilometer telemetry at one-second cadence');
+assert.ok(html.includes('function renderTripTelemetry()') && html.includes('fullRenderEvery=rt.thermalHot?5000:3000') &&
+  html.includes('function renderTripAdaptive(force)') &&
+  html.includes('rt.posM=currentMeters(); renderTripAdaptive(false); evalAlerts();'),
+  'APK and browser thermal modes must throttle only expensive structural redraws');
+assert.ok(html.includes('state.settings.screenMode="auto";delete state.settings.wake;persist();syncSw();') &&
+  html.includes('Автозатемнение включено, яркость снижена'),
+  'accepting the heat warning must persist Auto dimming in settings');
+
+console.log('Browser route regression: axes, Moscow 205/210 transition, thermal UI and all documented through-route junctions passed');
