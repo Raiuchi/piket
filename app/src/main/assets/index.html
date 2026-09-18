@@ -79,7 +79,7 @@
   .gps.dead .dot{background:var(--rsig);box-shadow:0 0 8px var(--rsig);animation:pulse .6s infinite}
   .telemetry{display:flex;align-items:flex-end;flex-direction:column;gap:6px}
   .sat{display:flex;align-items:center;gap:5px;min-height:25px;padding:4px 9px;border:1px solid rgba(126,151,174,.24);border-radius:999px;background:linear-gradient(180deg,rgba(24,32,42,.8),rgba(8,12,17,.9));color:#82909d;font-size:9px;letter-spacing:.1em;text-transform:uppercase;box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
-  .sat svg{width:12px;height:12px;stroke:currentColor}.sat b{min-width:12px;color:#c9d3dc;font-size:11px;font-variant-numeric:tabular-nums;text-align:center}.sat.good{color:#45dda2;border-color:rgba(69,221,162,.3)}.sat.good b{color:#8ff4c8}.sat.weak{color:#e8b449;border-color:rgba(232,180,73,.3)}.sat.demo{color:#e93b60;border-color:rgba(233,59,96,.3)}
+  .sat svg{width:12px;height:12px;stroke:currentColor}.sat b{min-width:12px;color:#c9d3dc;font-size:11px;font-variant-numeric:tabular-nums;text-align:center}.sat.good{color:#45dda2;border-color:rgba(69,221,162,.3)}.sat.good b{color:#8ff4c8}.sat.weak{color:#e8b449;border-color:rgba(232,180,73,.3)}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   .train{position:relative;z-index:2;margin-top:10px;height:74px;display:flex;align-items:flex-end}
   .train svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 10px 20px rgba(0,0,0,.4))}
@@ -549,7 +549,7 @@
     <div class="update-banner" id="updateBanner">
       <span class="ico">✦</span>
       <span class="txt"><strong>Вышло обновление <b id="ubVer"></b></strong>Скачайте новую версию ПИКЕТ</span>
-      <button class="ub-dl" id="ubDownload">Скачать</button>
+      <button class="ub-dl" id="ubDownload">Скачать и установить</button>
       <button class="ub-x" id="ubClose">✕</button>
     </div>
     <div class="board">
@@ -723,7 +723,6 @@
       <div class="row"><div><div class="t">Звуковой сигнал</div></div><div class="sw on" id="swSound"></div></div>
       <div class="row"><div><div class="t">Вибрация</div></div><div class="sw on" id="swVibe"></div></div>
       <div class="row"><div style="width:100%"><div class="t">Режим экрана</div><div class="d">Авто затемняет экран через 90 секунд, касание возвращает яркость.</div><div class="screen-modes" id="screenModes"><button class="screen-mode" data-screen="always">Всегда включён</button><button class="screen-mode" data-screen="auto">Авто затемнение</button><button class="screen-mode" data-screen="system">Обычный</button></div></div></div>
-      <div class="row"><div><div class="t">Демо-режим</div><div class="d">Симуляция движения для проверки без GPS. Включи и нажми «Старт» — поедет к ближайшему ограничению.</div></div><div class="sw" id="swDemo"></div></div>
     </div>
     <div class="card speed-ref-entry">
       <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><span class="ref-kicker">Путевой норматив</span><div class="t">Справочник скоростей · ОКТ-10 и ОКТ-54</div><div class="d">Редакция от 29.06.2026</div></div><div style="color:#68BFF5;font-size:24px">›</div></div>
@@ -1086,7 +1085,7 @@ window.addEventListener("error",function(e){
 
   var state={
     restrictions: load("sap_res",[]),
-    settings: Object.assign({lead:3000,voice:true,sound:true,vibe:true,screenMode:"auto",demo:false}, load("sap_set",{})),
+    settings: Object.assign({lead:3000,voice:true,sound:true,vibe:true,screenMode:"auto"}, load("sap_set",{})),
     calib: load("sap_cal",null),
     ctx: Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}))
   };
@@ -1182,9 +1181,11 @@ window.addEventListener("error",function(e){
     $("#gpsTxt").textContent="частая зона помех";
   }
 
-  var rt={tracking:false,watchId:null,simTimer:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserFixAt:0,lastGpsRestartAt:0,webHiddenAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting"};
+  var rt={tracking:false,watchId:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,stoppedPositionM:null,stoppedRoute:null,stoppedDirection:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserFixAt:0,lastGpsRestartAt:0,webHiddenAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting"};
   rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0; rt.speedCand=null; rt.speedCandCount=0; rt.stationaryAnchor=null; rt.stationarySince=0; rt.lastSnapSegIdx=-1; rt.zoneHintUntil=0; rt.zoneHintCooldownUntil=0;
   rt.lastAccuracy=999; rt.directionMismatchCount=0; rt.directionWarning=false; rt.alertRepeatAt=0;
+  var savedStop=load("sap_lastStop",null);
+  if(savedStop&&isFinite(+savedStop.position)&&savedStop.route===state.ctx.peregon&&savedStop.direction===state.ctx.towards){rt.stoppedPositionM=+savedStop.position;rt.stoppedRoute=savedStop.route;rt.stoppedDirection=savedStop.direction;rt.posM=rt.stoppedPositionM;}
   var TIMING_STATIONS={
     "СпбГл - Москва":[["Санкт-Петербург-Главный",200],["Навалочная",3000],["Фарфоровская",6500],["Санкт-Петербург-Сортировочный-Московский",8000],["Обухово",10600],["Славянка",16300],["Металлострой",19000],["Ижорский Завод",22800],["Колпино",24600],["Поповка",34400],["Саблино",40200],["Тосно-2",49800],["Тосно",52500],["Ушаки",62800],["Георгиевская",67900],["Рябово",72400],["Соколов Ручей",74500],["Болотницкая",77600],["Любань",82500],["Померанье",88700],["Трубниково",95300],["Бабино",99600],["Бабино-2",102600],["Торфяное",109300],["Чудово-Московское",117800],["Волхово",124000],["Волхов Мост",125600],["Дубцы",133700],["Гряды",141100],["Большая Вишера",151600],["Малая Вишера",161700],["Краснёнка",173500],["Бурга",180900],["Мстинский Мост",188800],["Торбино",215200],["Вялка",222700],["Боровёнка",230900],["Заозерье",238900],["Окуловка",249000],["Яблоновка",260300],["Угловка",268700],["Селище",277200],["Лыкошино",287500],["Заключье",291600],["Алёшинка",296200],["Березайка",304900],["Поплавенец",312000],["Бологое-Московское",319400],["Бушевец",326200],["Бочановка",333400],["Академическая",345300],["Леонтьево",355500],["Цна",359700],["Вышний Волочёк",364200],["Елизаровка",370500],["Терелесовская",374900],["Осеченка",379900],["Индустрия",382800],["Спирово",397800],["Калашниково",418600],["Лихославль",441200],["Тверца",465900],["Дорошиха",478000],["Пролетарская",480200],["Тверь",483000],["Лазурная",489600],["Чуприяновка",496100],["Кузьминка",503400],["Редкино",517200],["Московское Море",521800],["Завидово",531000],["Решетниково",544700],["Клин",560600],["Подсолнечная",584900],["Поварово-1",598300],["Алабушево",607400],["Крюково",611200],["Сходня",619700],["Химки",631200],["Ховрино",633900],["Грачёвская",635800],["Москва-Товарная",646600],["Москва-Пассажирская",649500]],
     "СПбФин - Выборг":[["Санкт-Петербург-Финляндский",500],["Ланская",5100],["Удельная",7700],["Озерки",10300],["Шувалово",11100],["Парголово",15600],["Левашово",19100],["Песочная",23200],["Дибуны",24500],["Белоостров",31300],["Солнечное",35500],["Репино",39800],["Комарово",43500],["Зеленогорск",49900],["Ушково",54600],["Рощино",58700],["Каннельярви",74700],["Захонское",80800],["Кирилловское",88300],["Лейпясуо",100200],["Гаврилово",107700],["Лебедевка",113800],["Верхне-Черкасово",119300],["Лазаревка",124200],["Выборг-Товарный",126500],["Выборг-Пассажирский",128900]],
@@ -1669,15 +1670,10 @@ window.addEventListener("error",function(e){
   function updateAndroidNotification(){
     try{ var m=rt.posM; if(m==null)return; var txt=kmFrom(m)+" км · ПК"+pkFrom(m)+" · "+Math.round(rt.speed)+" км/ч"; if(window.Android&&window.Android.updatePosition)window.Android.updatePosition(txt); }catch(e){}
   }
-  function renderSatellites(count,available,demo){
+  function renderSatellites(count,available){
     var el=document.getElementById("sat"),num=document.getElementById("satCount"); if(!el||!num)return;
-    if(demo){el.className="sat demo";num.textContent="SIM";el.title="Демонстрационный режим";return;}
     if(!available){el.className="sat";num.textContent="—";el.title="Количество спутников пока недоступно";return;}
     count=Math.max(0,Math.round(+count||0)); el.className="sat "+(count>=6?"good":(count>0?"weak":"")); num.textContent=String(count); el.title="Спутников используется: "+count;
-  }
-  function renderDemoStatus(){
-    $("#gps").className="gps live"; $("#gpsTxt").textContent="ДЕМО";
-    $("#spdSrc").textContent="ДЕМО · симуляция"; $("#spdSrc").className="src"; renderSatellites(0,false,true);
   }
   var diagnosticKey="piket_web_diagnostics", diagnosticLast=0;
   function webLog(event, fields){
@@ -1696,7 +1692,6 @@ window.addEventListener("error",function(e){
     } }
   }
   function processBrowserPosition(p,fromBackup){ var c=p.coords,acc=c.accuracy||999; rt.lastAccuracy=acc;
-    if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(state.calib&&c.heading!=null&&(+c.speed||0)>5){
       var dsi=TRACK.labels.indexOf(state.ctx.peregon),dtm=currentTrackMeters();
       if(dsi>=0&&dtm!=null){var db=expectedTrackBearing(TRACK.segs[dsi],dtm);if(db!=null){var wanted=dirDown()?(db+180)%360:db,wrong=bearingDiff(c.heading,wanted)>110;rt.directionMismatchCount=Math.max(0,(rt.directionMismatchCount||0)+(wrong?1:-1));var was=rt.directionWarning;rt.directionWarning=rt.directionMismatchCount>=3;if(rt.directionWarning&&!was){toast("⚠️ Движение не совпадает с выбранным направлением");say("Проверь выбранное направление движения");}}}
@@ -2115,7 +2110,6 @@ window.addEventListener("error",function(e){
     updateAndroidNotification();
     renderTripAdaptive(false); evalAlerts(); }
   function onErr(e){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; // watchdog ориентируется только на последнюю пригодную позицию
-    if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
       // КРИТИЧНО: при полной потере сигнала скорость раньше оставалась ЗАСТЫВШЕЙ на
       // последнем известном значении - если перед самой потерей был случайный шумовой
@@ -2230,7 +2224,6 @@ window.addEventListener("error",function(e){
     return {gps:"live", txt:"GPS вкл", src:"GPS — фоновая служба", srcCls:"src live"};
   }
   function mirrorTick(graceMs,gen){
-    if(state.settings.demo&&rt.tracking){renderDemoStatus();return;}
     if(gen!==rt.mirrorGen) return; // зеркало уже остановлено/перезапущено — этот отложенный вызов устарел, игнорируем
     var snap=readTrackSnapshot();
     var fresh = snap && snap.tracking && (Date.now()-snap.ts)<=5000;
@@ -2283,6 +2276,7 @@ window.addEventListener("error",function(e){
     rt.mirrorGen=(rt.mirrorGen||0)+1;
     if(rt.tickTimer){ clearInterval(rt.tickTimer); rt.tickTimer=null; } mirrorTick(8000,rt.mirrorGen); }
   function stopMirror(){
+    if(rt.posM!=null){rt.stoppedPositionM=+rt.posM;rt.stoppedRoute=state.ctx.peregon;rt.stoppedDirection=state.ctx.towards;save("sap_lastStop",{position:rt.stoppedPositionM,route:rt.stoppedRoute,direction:rt.stoppedDirection,time:Date.now()});}
     rt.mirrorGen=(rt.mirrorGen||0)+1; // обесценивает все отложенные вызовы mirrorTick этой сессии
     IS_MIRROR=false; stopTicker(); rt.tracking=false; rt.speed=0;
     $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src";
@@ -2293,12 +2287,13 @@ window.addEventListener("error",function(e){
   function startTrack(){
     alertState={};rt.nativeSnapshot=false;
     webLog("trip_started");
-    if(state.settings.demo){ startSim(); return; }
+
     if(state.calib==null || state.calib._manual!==true){
       toast("Сначала обязательная калибровка по километровому столбу");
       openCal();
       return;
     }
+    rt.stoppedPositionM=null;rt.stoppedRoute=null;rt.stoppedDirection=null;save("sap_lastStop",null);
     rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0; rt.zoneWarnedKey=null; rt.trackingSince=Date.now();
     // Старт разрешён только после ручной калибровки. Автоматической остаётся именно
     // дорожная GPS-коррекция уже начатой поездки — она исправляет дрейф после РЭБ.
@@ -2345,8 +2340,7 @@ window.addEventListener("error",function(e){
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
   window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection,nativeFrequentInterference){
     if(!rt.tracking)return;
-    if(state.settings.demo){renderDemoStatus();return;}
-    renderSatellites(satellitesUsed,gnssTelemetry===true,false);
+    renderSatellites(satellitesUsed,gnssTelemetry===true);
     var nativeStructureChanged=!!(nativeRoute&&nativeRoute!==state.ctx.peregon),nativeAlertChanged=nativeAlertId!==rt.nativeAlertId||nativeAlertInZone!==rt.nativeAlertInZone;
     if(nativeStructureChanged){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
     // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
@@ -2373,53 +2367,20 @@ window.addEventListener("error",function(e){
     var fakePos={ coords:{ latitude:lat, longitude:lon, accuracy:acc, speed:(speedMps==null?null:speedMps), heading:bearingDeg, fixAgeMs:fixAgeMs, satellitesUsed:satellitesUsed, averageCn0:averageCn0 }, timestamp:time };
     onPos(fakePos); };
 
-  function startSim(){
-    rt.mirrorGen=(rt.mirrorGen||0)+1; IS_MIRROR=false; stopTicker();
-    if(rt.watchId!=null){try{navigator.geolocation.clearWatch(rt.watchId);}catch(e){}rt.watchId=null;}
-    if(rt.backupWatchId!=null){try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){}rt.backupWatchId=null;}
-    rt.backupActive=false; stopAccelHelper();
-    try{if(window.Android&&window.Android.stopTracking)window.Android.stopTracking();}catch(e){}
-    if(rt.simTimer){clearInterval(rt.simTimer);rt.simTimer=null;}
-    if(state.calib==null){
-      var firstM=null;
-      state.restrictions.forEach(function(r){ if(!isActive(r)||!inCtx(r))return; var s=metersOf(r.km,r.pk); if(firstM==null||s<firstM)firstM=s; });
-      var baseKm=firstM!=null?Math.max(0,kmFrom(firstM)-3):0;
-      state.calib={km:baseKm,pk:0,m:0,dir:"up"}; rt.autoCalib=true;
-    }
-    rt.tracking=true; rt.speed=0; rt.last=null; alertState={}; rt.posM=currentMeters();
-    try{ if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); rt.audio.resume&&rt.audio.resume(); }catch(e){}
-    reqWake(); setTrackBtn(true);
-    renderDemoStatus();
-    var t=Date.now();
-    rt.simTimer=setInterval(function(){
-      var now=Date.now(),dt=(now-t)/1000; t=now;
-      rt.speed=Math.min(140,rt.speed+14*dt);
-      rt.odo+=rt.speed/3.6*dt;
-      rt.posM=currentMeters();
-      renderDemoStatus();
-      renderTrip(); evalAlerts();
-    },250);
-    // Демо — это чисто визуальная симуляция в видимом экране, ей не нужна настоящая
-    // Android-служба (GPS, foreground-уведомление, headless WebView). Раньше демо всё
-    // равно запускало реальную службу через Android.startTracking() — без пользы, только
-    // расход батареи и лишнее уведомление, пока человек просто проверяет интерфейс.
-    warmVoice();
-    toast("Демо запущено"); }
 
   function setTrackBtn(on){ var b=$("#btnTrack"); if(on){ b.textContent="■ Стоп"; b.classList.remove("primary"); b.classList.add("stop"); } else { b.textContent="▶ Старт"; b.classList.add("primary"); b.classList.remove("stop"); }
     var dirSeg=$("#dirSeg"); if(dirSeg) dirSeg.style.opacity = on ? "0.5" : "1"; }
-  function stopTrack(){ webLog("trip_stopped"); rt.tracking=false;
+  function stopTrack(){ webLog("trip_stopped"); if(rt.posM!=null){rt.stoppedPositionM=+rt.posM;rt.stoppedRoute=state.ctx.peregon;rt.stoppedDirection=state.ctx.towards;save("sap_lastStop",{position:rt.stoppedPositionM,route:rt.stoppedRoute,direction:rt.stoppedDirection,time:Date.now()});} rt.tracking=false;
     var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.remove("on");
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
     if(rt.backupWatchId!=null){ try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){} rt.backupWatchId=null; }
     rt.backupActive=false;
-    if(rt.simTimer){ clearInterval(rt.simTimer); rt.simTimer=null; }
     stopTicker();
     stopAccelHelper();
     relWake(); rt.speed=0;
     try{ if(window.Android&&window.Android.stopTracking)window.Android.stopTracking(); }catch(e){}
-    if(rt.autoCalib){ state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; }
-    $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src"; renderSatellites(0,false,false);
+    if(rt.autoCalib){ state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; rt.stoppedPositionM=null; rt.stoppedRoute=null; rt.stoppedDirection=null; save("sap_lastStop",null); }
+    $("#gps").className="gps"; $("#gpsTxt").textContent="GPS выкл"; $("#spdSrc").textContent="GPS не активен"; $("#spdSrc").className="src"; renderSatellites(0,false);
     setTrackBtn(false); renderTrip(); renderList(); }
 
   function currentTrackMeters(){
@@ -2539,7 +2500,8 @@ window.addEventListener("error",function(e){
     // бы позицию через локальный (нулевой) rt.odo и затирал бы правильное значение rt.posM,
     // которое mirrorTick() только что поставил из снэпшота headless. Поэтому в зеркале просто
     // используем rt.posM как есть, не трогая его здесь.
-    var m = IS_MIRROR ? rt.posM : currentMeters();
+    var keepStopped=!rt.tracking&&rt.stoppedPositionM!=null&&rt.stoppedRoute===state.ctx.peregon&&rt.stoppedDirection===state.ctx.towards;
+    var m = keepStopped ? rt.stoppedPositionM : (IS_MIRROR ? rt.posM : currentMeters());
     if(!IS_MIRROR && m!=null) rt.posM=m;
     $("#oKm").textContent=m==null?"—":kmFrom(m); $("#oPk").textContent=m==null?"—":pkFrom(m); $("#oM").textContent=m==null?"—":meterInPk(m);
     $("#oTrav").textContent=fmtM(rt.odo); setGauge(); $("#peregonVal").textContent=contextPeregonLabel(state.ctx.peregon);
@@ -2770,7 +2732,7 @@ window.addEventListener("error",function(e){
   $("#calReset").addEventListener("click",async function(){
     if(rt.tracking){toast("Сначала останови поездку, затем сбрось калибровку");return;}
     if(!(await showConfirm("Сбросить текущую позицию? Это нужно только если едешь НОВЫЙ маршрут, а в приложении осталась позиция с прошлой поездки.",{okText:"Сбросить"})))return;
-    state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; rt.autoCalCand=null; rt.autoCalCount=0;
+    state.calib=null; rt.autoCalib=false; rt.odo=0; rt.posM=null; rt.stoppedPositionM=null; rt.stoppedRoute=null; rt.stoppedDirection=null; save("sap_lastStop",null); rt.autoCalCand=null; rt.autoCalCount=0;
     rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0;
     rt.peregonCandLabel=null; rt.peregonCandCount=0; rt.awaitingManualCalib=false;
     persist(); closeSheets(); renderTrip(); renderList();
@@ -2796,7 +2758,7 @@ window.addEventListener("error",function(e){
     }
     var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null,_manual:true};
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
-    state.calib=cal; rt.autoCalib=false;
+    state.calib=cal; rt.autoCalib=false; rt.stoppedPositionM=null; rt.stoppedRoute=null; rt.stoppedDirection=null; save("sap_lastStop",null);
     rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; rt.correctionTargetOdo=null; alertState={}; rt.posM=currentMeters(); persist();
     rt.manualCalibAt=Date.now();
     save("sap_manualCalib", rt.manualCalibAt);
@@ -2810,9 +2772,9 @@ window.addEventListener("error",function(e){
   function nudge(d){ if(state.calib==null){ toast("Сначала калибровка"); return; } rt.odo+=d*100*(dirDown()?-1:1); rt.posM=currentMeters(); renderTrip(); renderList(); }
   $("#pkPlus").addEventListener("click",function(){ nudge(1); }); $("#pkMinus").addEventListener("click",function(){ nudge(-1); });
 
-  function syncSw(){ [["#swVoice","voice"],["#swSound","sound"],["#swVibe","vibe"],["#swDemo","demo"]].forEach(function(p){ $(p[0]).classList.toggle("on",!!state.settings[p[1]]); }); var mode=state.settings.screenMode||(state.settings.wake===false?"system":"auto");document.querySelectorAll("[data-screen]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-screen")===mode);}); $("#leadVal").textContent=fmtLead(state.settings.lead); }
-  function swBind(sel,key){ $(sel).addEventListener("click",function(){ state.settings[key]=!state.settings[key]; persist(); syncSw(); if(key==="wake"&&rt.tracking){if(state.settings.wake)reqWake();else relWake();} if(key==="demo"&&rt.tracking)stopTrack(); }); }
-  swBind("#swVoice","voice"); swBind("#swSound","sound"); swBind("#swVibe","vibe"); swBind("#swDemo","demo");
+  function syncSw(){ [["#swVoice","voice"],["#swSound","sound"],["#swVibe","vibe"]].forEach(function(p){ $(p[0]).classList.toggle("on",!!state.settings[p[1]]); }); var mode=state.settings.screenMode||(state.settings.wake===false?"system":"auto");document.querySelectorAll("[data-screen]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-screen")===mode);}); $("#leadVal").textContent=fmtLead(state.settings.lead); }
+  function swBind(sel,key){ $(sel).addEventListener("click",function(){ state.settings[key]=!state.settings[key]; persist(); syncSw(); if(key==="wake"&&rt.tracking){if(state.settings.wake)reqWake();else relWake();} }); }
+  swBind("#swVoice","voice"); swBind("#swSound","sound"); swBind("#swVibe","vibe");
   $("#screenModes").addEventListener("click",function(e){var b=e.target.closest("[data-screen]");if(!b)return;state.settings.screenMode=b.getAttribute("data-screen");delete state.settings.wake;persist();syncSw();if(rt.tracking)reqWake();});
   window.onNativeThermalState=function(status){var hot=(+status)>=3;if(rt.thermalHot&&!hot)rt.lastFullNativeRenderAt=0;rt.thermalHot=hot;document.body.classList.toggle("thermal-mode",hot);$("#thermalBanner").classList.toggle("on",hot);};
   $("#lowerBrightness").addEventListener("click",function(){
@@ -2858,8 +2820,11 @@ window.addEventListener("error",function(e){
 
   // ========= ПРОВЕРКА ОБНОВЛЕНИЙ =========
   var updateUrl="https://github.com/Raiuchi/piket/releases/latest";
-  window.showUpdateBanner=function(ver,url){ $("#ubVer").textContent="v"+ver; updateUrl=url||updateUrl; $("#updateBanner").classList.add("on"); };
-  $("#ubDownload").addEventListener("click",function(){ try{ if(window.Android&&window.Android.openUrl)window.Android.openUrl(updateUrl); else window.open(updateUrl,"_blank"); }catch(e){} });
+  window.showUpdateBanner=function(ver,url){ $("#ubVer").textContent="v"+ver; updateUrl=url||updateUrl; $("#ubDownload").disabled=false; $("#ubDownload").textContent=window.Android?"Скачать и установить":"Скачать APK"; $("#updateBanner").classList.add("on"); };
+  window.onUpdateDownloadProgress=function(percent){var b=$("#ubDownload");b.disabled=true;b.textContent=percent>=0?"Загрузка "+percent+"%":"Загрузка…";};
+  window.onUpdateDownloadReady=function(){var b=$("#ubDownload");b.disabled=true;b.textContent="Открываю установку…";};
+  window.onUpdateDownloadError=function(message){var b=$("#ubDownload");b.disabled=false;b.textContent="Повторить";toast(message||"Не удалось скачать обновление");};
+  $("#ubDownload").addEventListener("click",function(){ try{ if(window.Android&&window.Android.downloadUpdate){window.Android.downloadUpdate();}else window.open(updateUrl,"_blank"); }catch(e){window.onUpdateDownloadError("Не удалось начать обновление");} });
   $("#ubClose").addEventListener("click",function(){ $("#updateBanner").classList.remove("on"); });
   try{ $("#appVerLine").textContent="Версия приложения: "+((window.Android&&window.Android.getAppVersion)?window.Android.getAppVersion():"1.5.0"); }catch(e){}
 
@@ -3005,7 +2970,7 @@ window.addEventListener("error",function(e){
     // реально была введена перед поездкой, а не ту, что была (или не было) при создании службы.
     window.headlessRestart=function(){
       state.restrictions=load("sap_res",state.restrictions);
-      state.settings=Object.assign({lead:3000,voice:true,sound:true,vibe:true,screenMode:"auto",demo:false}, load("sap_set",{}));
+      state.settings=Object.assign({lead:3000,voice:true,sound:true,vibe:true,screenMode:"auto"}, load("sap_set",{}));
       state.calib=load("sap_cal",null);
       state.ctx=Object.assign({peregon:"Все участки",towards:"tuda"}, load("sap_ctx",{}));
       rt.tracking=true; rt.last=null; rt.speed=0; rt.odo=0; rt.pendingCandM=null; rt.pendingCount=0; rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0;

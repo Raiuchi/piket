@@ -6,6 +6,7 @@ import android.app.ActivityManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.Settings
 import android.os.*
 import android.speech.tts.TextToSpeech
 import android.view.MotionEvent
@@ -14,6 +15,8 @@ import android.webkit.*
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
@@ -52,6 +55,10 @@ class MainActivity : Activity() {
     @Volatile private var updateCheckRunning = false
     @Volatile private var lastUpdateCheckAt = 0L
     private var updateRetryCount = 0
+    @Volatile private var updateDownloadRunning = false
+    @Volatile private var latestUpdateUrl: String? = null
+    @Volatile private var latestUpdateVersion: String? = null
+    private var pendingInstallFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -167,6 +174,8 @@ class MainActivity : Activity() {
                             download=asset.optString("browser_download_url",download);break
                         }
                     }
+                    latestUpdateVersion=latest
+                    latestUpdateUrl=download
                     handler.post{web?.evaluateJavascript("if(window.showUpdateBanner)window.showUpdateBanner('${jsQuote(latest)}','${jsQuote(download)}')",null)}
                 }
             }.isSuccess
@@ -178,10 +187,114 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    private fun updateDownloadJs(script: String) =
+        handler.post { if (pageReady) web?.evaluateJavascript(script, null) }
+
+    private fun downloadLatestUpdate() {
+        if (updateDownloadRunning) return
+        val source = latestUpdateUrl
+        val version = latestUpdateVersion
+        if (source.isNullOrBlank() || version.isNullOrBlank()) {
+            updateDownloadJs("if(window.onUpdateDownloadError)window.onUpdateDownloadError('Сначала проверь обновление')")
+            checkForUpdate(true)
+            return
+        }
+        updateDownloadRunning = true
+        updateDownloadJs("if(window.onUpdateDownloadProgress)window.onUpdateDownloadProgress(0)")
+        Thread {
+            var partial: File? = null
+            runCatching {
+                val sourceUri = Uri.parse(source)
+                require(sourceUri.scheme == "https" && sourceUri.host.equals("github.com", true)) {
+                    "Недопустимый адрес обновления"
+                }
+                val updateDir = File(cacheDir, "updates").apply { mkdirs() }
+                partial = File(updateDir, "piket-$version.apk.part")
+                val target = File(updateDir, "piket-$version.apk")
+                partial!!.delete()
+                target.delete()
+                val connection = (URL(source).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15_000
+                    readTimeout = 45_000
+                    instanceFollowRedirects = true
+                    useCaches = false
+                    setRequestProperty("Accept", "application/vnd.android.package-archive")
+                    setRequestProperty("User-Agent", "Piket-Android-Updater")
+                }
+                val code = connection.responseCode
+                if (code !in 200..299) throw java.io.IOException("GitHub download HTTP $code")
+                val total = connection.contentLengthLong
+                var copied = 0L
+                var lastPercent = -1
+                connection.inputStream.use { input ->
+                    FileOutputStream(partial!!).use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            output.write(buffer, 0, count)
+                            copied += count
+                            if (copied > 200L * 1024 * 1024) throw java.io.IOException("Файл обновления слишком большой")
+                            val percent = if (total > 0) ((copied * 100) / total).toInt().coerceIn(0, 100) else -1
+                            if (percent >= 0 && percent >= lastPercent + 2) {
+                                lastPercent = percent
+                                updateDownloadJs("if(window.onUpdateDownloadProgress)window.onUpdateDownloadProgress($percent)")
+                            }
+                        }
+                        output.fd.sync()
+                    }
+                }
+                connection.disconnect()
+                if (copied < 1_000_000) throw java.io.IOException("Получен неполный APK")
+                if (!partial!!.renameTo(target)) {
+                    partial!!.copyTo(target, overwrite = true)
+                    partial!!.delete()
+                }
+                handler.post {
+                    updateDownloadRunning = false
+                    web?.evaluateJavascript("if(window.onUpdateDownloadReady)window.onUpdateDownloadReady()", null)
+                    promptInstall(target)
+                }
+            }.onFailure { error ->
+                partial?.delete()
+                updateDownloadRunning = false
+                updateDownloadJs(
+                    "if(window.onUpdateDownloadError)window.onUpdateDownloadError('${jsQuote(error.message ?: "Не удалось скачать APK")}')"
+                )
+            }
+        }.start()
+    }
+
+    private fun promptInstall(file: File) {
+        if (!file.exists()) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            pendingInstallFile = file
+            runCatching {
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            }.onFailure {
+                updateDownloadJs("if(window.onUpdateDownloadError)window.onUpdateDownloadError('Разреши установку из этого источника в настройках Android')")
+            }
+            return
+        }
+        pendingInstallFile = null
+        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        }.onFailure {
+            updateDownloadJs("if(window.onUpdateDownloadError)window.onUpdateDownloadError('Не удалось открыть установщик Android')")
+        }
+    }
+
     override fun onResume(){
         super.onResume()
         web?.onResume()
         web?.resumeTimers()
+        pendingInstallFile?.let { file ->
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()) promptInstall(file)
+        }
         handler.removeCallbacks(snapshotPump)
         if(web != null) handler.post(snapshotPump)
         if(pageReady)checkForUpdate()
@@ -215,6 +328,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun isHeadless()=false
         @JavascriptInterface fun isTtsReady()=ttsReady
         @JavascriptInterface fun getAppVersion():String=packageManager.getPackageInfo(packageName,0).versionName?:"0.0.0"
+        @JavascriptInterface fun downloadUpdate()=runOnUiThread{downloadLatestUpdate()}
         @JavascriptInterface fun speak(text:String)=runOnUiThread{if(ttsReady)tts?.speak(text,TextToSpeech.QUEUE_FLUSH,null,"piket-ui")}
         @JavascriptInterface fun vibrate(kind:String)=runOnUiThread{val v=if(Build.VERSION.SDK_INT>=31)(getSystemService(VIBRATOR_MANAGER_SERVICE)as VibratorManager).defaultVibrator else getSystemService(VIBRATOR_SERVICE)as Vibrator;val p=if(kind=="danger")longArrayOf(0,160,80,160,80,260)else longArrayOf(0,120,90,120);if(Build.VERSION.SDK_INT>=26)v.vibrate(VibrationEffect.createWaveform(p,-1))else v.vibrate(p,-1)}
         @JavascriptInterface fun beep(kind:String){}

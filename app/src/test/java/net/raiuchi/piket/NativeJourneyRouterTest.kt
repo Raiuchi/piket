@@ -61,6 +61,38 @@ class NativeJourneyRouterTest {
         }
     }
 
+    @Test fun allDocumentedVyborgAndChudovoTransitionsConfirmSafely() {
+        val cases = listOf(
+            arrayOf<String?>("null", "СПбФин - Выборг", "tuda"),
+            arrayOf<String?>("null", "Выборг - Каменногорск", "obratno"),
+            arrayOf<String?>("819", "Волховстрой - Чудово", "obratno"),
+            arrayOf<String?>("820", "Горы - Петрозаводск", "obratno"),
+            arrayOf<String?>("820", "Волховстрой - Чудово", "tuda"),
+            arrayOf<String?>("820", "Чудово - Новгород", "tuda")
+        )
+        cases.forEach { (journey, current, direction) ->
+            val fresh = NativeJourneyRouter.fromTimingJson(timingSource, journeySource)
+            val currentLabel = current!!
+            val travelDirection = direction!!
+            val transition = fresh.nextLeg(journey, currentLabel, travelDirection)!!
+            val boundary = transition.boundaryM!!
+            assertNull(fresh.consider(journey, currentLabel, travelDirection, boundary, boundary,
+                120.0, 10.0, boundary, stopped = true))
+            val switched = fresh.consider(journey, currentLabel, travelDirection, boundary, boundary,
+                120.0, 10.0, boundary, stopped = true)
+            assertNotNull("$journey $current $direction", switched)
+            assertEquals(transition.route, switched?.route)
+            assertEquals(transition.direction, switched?.direction)
+        }
+    }
+
+    @Test fun bronevayaLugaHasNoAutomaticAxisTransition() {
+        assertNull(router.nextRoute("Броневая - Луга", "tuda"))
+        assertNull(router.nextRoute("Броневая - Луга", "obratno"))
+        assertNull(router.nextLeg(null, "Броневая - Луга", "tuda"))
+        assertNull(router.nextLeg(null, "Броневая - Луга", "obratno"))
+    }
+
     @Test fun endpointProjectionRecoversMissedTransitionAfterCountingDrift() {
         repeat(2) { index ->
             val result = router.consider("null", "Павлово - Горы II путь", "tuda",

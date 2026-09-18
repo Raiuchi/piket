@@ -37,7 +37,6 @@ data class PiketSettings(
     val sound: Boolean = true,
     val vibration: Boolean = true,
     val keepScreenOn: Boolean = true,
-    val demoMode: Boolean = false,
     val leadM: Int = 2000
 )
 

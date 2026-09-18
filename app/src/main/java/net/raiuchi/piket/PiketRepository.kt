@@ -44,13 +44,12 @@ class PiketRepository(private val context: Context) {
         sound = prefs.getBoolean("sound", true),
         vibration = prefs.getBoolean("vibration", true),
         keepScreenOn = prefs.getBoolean("keepScreen", true),
-        demoMode = prefs.getBoolean("demo", false),
         leadM = prefs.getInt("leadM", 2000)
     )
 
     fun saveSettings(value: PiketSettings) = prefs.edit()
         .putBoolean("sound", value.sound).putBoolean("vibration", value.vibration)
-        .putBoolean("keepScreen", value.keepScreenOn).putBoolean("demo", value.demoMode)
+        .putBoolean("keepScreen", value.keepScreenOn).remove("demo")
         .putInt("leadM", value.leadM).commit()
 
     fun loadScheduleOverrides(): Map<String, String> = runCatching {
