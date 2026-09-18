@@ -126,6 +126,7 @@
   .conf-dots.q-weak span:nth-child(-n+2){background:var(--amber)}
   .conf-dots.q-waiting span:nth-child(1){background:var(--rsig)}
   /* Гейдж реагирует на реальную опасность превышения - не просто украшение, а сигнал */
+  .gaugeWrap.gd-ready .g-fg{stroke:var(--green);filter:drop-shadow(0 0 11px rgba(47,191,113,.65))}
   .gaugeWrap.gd-warn .g-fg{stroke:var(--amber);filter:drop-shadow(0 0 12px rgba(245,165,36,.65))}
   .gaugeWrap.gd-warn .g-center .sv{color:var(--amber);text-shadow:0 0 26px rgba(245,165,36,.5)}
   .gaugeWrap.gd-danger .g-fg{stroke:var(--rsig);filter:drop-shadow(0 0 16px rgba(255,77,79,.85))}
@@ -418,6 +419,7 @@
   .g-needle::before{content:"";position:absolute;left:50%;bottom:-21px;transform:translateX(-50%);width:5px;height:25px;border-radius:0 0 4px 4px;background:linear-gradient(90deg,#4B5660,#D9E2E9 50%,#404A53);box-shadow:0 2px 4px rgba(0,0,0,.7)}
   .g-needle::after{content:"";position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;
     background:radial-gradient(circle at 38% 32%,#DCE6EE,#707E89 38%,#111820 43%,#020304 72%);border:1px solid #73818D;box-shadow:0 2px 7px #000}
+  .gaugeWrap.gd-ready .g-needle{background:linear-gradient(90deg,#0E7544,#53E49A,#0A6238);box-shadow:0 0 10px rgba(47,191,113,.75)}
   .gaugeWrap.gd-warn .g-needle{background:linear-gradient(90deg,#9A5B00,#FFD15A,#8A4D00);box-shadow:0 0 10px rgba(245,165,36,.8)}
   .gaugeWrap.gd-danger .g-needle{background:#FF4D4F;box-shadow:0 0 14px rgba(255,77,79,.95)}
 
@@ -491,9 +493,9 @@
   /* Приказ скоростей: главный путь зелёный, боковой — жёлтый. Тип поезда имеет свой спокойный акцент. */
   .srBadge.glp{border-color:rgba(73,214,132,.38);background:linear-gradient(180deg,rgba(42,190,105,.30),rgba(12,91,52,.28));color:#9AF2C0}
   .srBadge.bokp{border-color:rgba(245,183,36,.35);background:linear-gradient(180deg,rgba(245,183,36,.28),rgba(116,70,10,.25));color:#FFD48A}
-  .routeCard.train-sapsan{border-color:rgba(255,255,255,.96);background:linear-gradient(145deg,#FFFFFF,#ECECEF);box-shadow:inset 0 1px 0 #FFFFFF,0 10px 24px rgba(0,0,0,.34)}
+  .routeCard.train-sapsan{border-color:rgba(240,45,58,.30);background:linear-gradient(145deg,#0B0B0D,#020203);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 24px rgba(0,0,0,.34)}
   .routeCard.train-sapsan .rcTrain{border-color:rgba(240,45,58,.42);background:#FFFFFF;color:#D91D2B}
-  .routeCard.train-sapsan .rcName{color:#151519}.routeCard.train-sapsan svg{color:#D91D2B}
+  .routeCard.train-sapsan .rcName{color:#F4F4F6}.routeCard.train-sapsan svg{color:#F02D3A}
   .routeCard.train-lastochka{border-color:rgba(240,45,58,.30);background:linear-gradient(145deg,#0B0B0D,#020203);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 24px rgba(0,0,0,.34)}
   .routeCard.train-lastochka .rcTrain{border-color:rgba(240,45,58,.38);background:#050506;color:#F02D3A}
   .routeCard.train-lastochka .rcName{color:#F4F4F6}.routeCard.train-lastochka svg{color:#F02D3A}
@@ -2502,22 +2504,23 @@ window.addEventListener("error",function(e){
 
   function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#gaugeNeedle").style.transform="rotate("+(-135+v/MAXSPD*270).toFixed(2)+"deg)"; $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
 
-  // Гейдж не просто крутится - он должен ОРАТЬ, если едешь на пределе или уже превысил
-  // ближайшее ограничение. gd-danger (на лимите или выше) - весь спидометр заливается
-  // тревожным красным с пульсацией. gd-warn (в пределах 5 км/ч ДО лимита, ещё не нарушение,
-  // но уже пора сбрасывать) - жёлтый. По просьбе Владислава - именно "88 при лимите 90 уже
-  // жёлтый, 90 уже красный", не "красный только когда реально превысил" - раньше было cur>spd
-  // (строго больше), стало cur>=spd (на лимите уже красный, не только за ним).
+  // Выбранная дистанция включает трёхцветный контроль подготовки к ограничению:
+  // красный — скорость выше лимита более чем на 10 км/ч, жёлтый — осталось погасить
+  // не более 10 км/ч, зелёный — лимит выполнен. В зоне любое превышение красное.
   function gaugeDangerClass(r,inzone,ahead,lead){
     if(!rt.tracking||!r||r.spd==null)return"gd-ok";
-    var spd=+r.spd, cur=rt.speed;
-    if(inzone){ if(cur>=spd)return"gd-danger"; if(cur>=spd-5)return"gd-warn"; return"gd-ok"; }
-    if(ahead!=null&&lead!=null&&ahead<=lead){ if(cur>=spd)return"gd-warn"; }
+    var spd=+r.spd,cur=Math.round(+rt.speed||0);
+    if(inzone)return cur>spd?"gd-danger":"gd-ready";
+    if(ahead!=null&&lead!=null&&ahead>=0&&ahead<=lead){
+      if(cur>spd+10)return"gd-danger";
+      if(cur>spd)return"gd-warn";
+      return"gd-ready";
+    }
     return"gd-ok";
   }
   function updateGaugeDanger(r,inzone,ahead,lead){
     var cls=gaugeDangerClass(r,inzone,ahead,lead);
-    $("#gaugeWrap").classList.remove("gd-ok","gd-warn","gd-danger");
+    $("#gaugeWrap").classList.remove("gd-ok","gd-ready","gd-warn","gd-danger");
     $("#gaugeWrap").classList.add(cls);
   }
 
