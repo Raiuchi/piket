@@ -491,12 +491,13 @@
   /* Приказ скоростей: главный путь зелёный, боковой — жёлтый. Тип поезда имеет свой спокойный акцент. */
   .srBadge.glp{border-color:rgba(73,214,132,.38);background:linear-gradient(180deg,rgba(42,190,105,.30),rgba(12,91,52,.28));color:#9AF2C0}
   .srBadge.bokp{border-color:rgba(245,183,36,.35);background:linear-gradient(180deg,rgba(245,183,36,.28),rgba(116,70,10,.25));color:#FFD48A}
-  .routeCard.train-sapsan{border-color:rgba(75,174,255,.42);background:linear-gradient(145deg,rgba(19,55,82,.98),rgba(9,16,23,.98))}
-  .routeCard.train-sapsan .rcTrain{border-color:rgba(88,190,255,.42);background:linear-gradient(180deg,rgba(39,151,226,.30),rgba(10,77,121,.24));color:#A9E5FF}
-  .routeCard.train-sapsan svg,#v-speedref.train-sapsan #srTitle{color:#70CFFF}
-  .routeCard.train-lastochka{border-color:rgba(73,214,132,.38);background:linear-gradient(145deg,rgba(18,64,46,.98),rgba(8,20,15,.98))}
-  .routeCard.train-lastochka .rcTrain{border-color:rgba(73,214,132,.38);background:linear-gradient(180deg,rgba(42,190,105,.28),rgba(12,91,52,.22));color:#9AF2C0}
-  .routeCard.train-lastochka svg,#v-speedref.train-lastochka #srTitle{color:#75E4A5}
+  .routeCard.train-sapsan{border-color:rgba(255,255,255,.96);background:linear-gradient(145deg,#FFFFFF,#ECECEF);box-shadow:inset 0 1px 0 #FFFFFF,0 10px 24px rgba(0,0,0,.34)}
+  .routeCard.train-sapsan .rcTrain{border-color:rgba(240,45,58,.42);background:#FFFFFF;color:#D91D2B}
+  .routeCard.train-sapsan .rcName{color:#151519}.routeCard.train-sapsan svg{color:#D91D2B}
+  .routeCard.train-lastochka{border-color:rgba(240,45,58,.30);background:linear-gradient(145deg,#0B0B0D,#020203);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 24px rgba(0,0,0,.34)}
+  .routeCard.train-lastochka .rcTrain{border-color:rgba(240,45,58,.38);background:#050506;color:#F02D3A}
+  .routeCard.train-lastochka .rcName{color:#F4F4F6}.routeCard.train-lastochka svg{color:#F02D3A}
+  #v-speedref.train-sapsan #srTitle,#v-speedref.train-lastochka #srTitle{color:#F02D3A}
   .sheet{background:linear-gradient(180deg,#19191E,#09090B);border-color:rgba(255,255,255,.16)}
   .sheet:not(.on){visibility:hidden!important;box-shadow:none!important}
   .timing-card{margin:12px 0;padding:16px;border:1px solid #3b2a31;border-radius:18px;background:linear-gradient(145deg,#15191f,#101318)}
