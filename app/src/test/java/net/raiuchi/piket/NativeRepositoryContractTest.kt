@@ -140,4 +140,13 @@ class NativeRepositoryContractTest {
         assertTrue("Gory axis jump must use 34 km for travel math and 42 km only for display",
             html.contains("[\"Горы\",34000,42000,goryChange]"))
     }
+    @Test fun scheduleTimeSwipeAndRed25LegendAreBundled() {
+        val html = projectFile("app/src/main/assets/index.html").readText()
+        assertTrue(html.contains("function bindScheduleDial"))
+        assertTrue(html.contains("data-dial=\"h\""))
+        assertTrue(html.contains("data-dial=\"m\""))
+        assertTrue(html.contains("half?\":30\":\"\""))
+        assertTrue(html.contains(".srBadge.speed25"))
+        assertTrue(html.contains("🔴 25 — скорость 25 км/ч"))
+    }
 }
