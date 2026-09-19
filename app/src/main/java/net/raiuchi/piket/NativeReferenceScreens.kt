@@ -201,8 +201,8 @@ fun NativeSpeedReferenceScreen(data: NativeReferenceData, close: () -> Unit) {
                     Card(colors = CardDefaults.cardColors(containerColor = Color.Transparent),shape=RoundedCornerShape(17.dp)) {
                         Row(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color(0xFF1B212B),Color(0xFF0C0E13))),RoundedCornerShape(17.dp)).border(1.dp,Color(0xFF2E3743),RoundedCornerShape(17.dp)).padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(row.name, Modifier.weight(1f))
-                            row.mainSpeed?.let { SpeedBadge(it, if (it == 25) Color(0xFFD91D2B) else Color(0xFF177548)) }
-                            row.sideSpeed?.let { Spacer(Modifier.width(7.dp)); SpeedBadge(it, if (it == 25) Color(0xFFD91D2B) else Color(0xFF735411)) }
+                            row.mainSpeed?.let { SpeedBadge(it, if (it == 15 || it == 25) Color(0xFFD91D2B) else Color(0xFF177548)) }
+                            row.sideSpeed?.let { Spacer(Modifier.width(7.dp)); SpeedBadge(it, if (it == 15 || it == 25) Color(0xFFD91D2B) else Color(0xFF735411)) }
                         }
                     }
                 }
