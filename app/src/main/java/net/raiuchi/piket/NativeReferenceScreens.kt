@@ -3,6 +3,7 @@ package net.raiuchi.piket
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
@@ -160,9 +162,23 @@ private fun PremiumTimeDialog(initial: String?, dismiss: () -> Unit, save: (Stri
 
 @Composable
 private fun TimeStepper(value: Int, down: () -> Unit, up: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    var dragDistance by remember { mutableFloatStateOf(0f) }
+    Column(
+        Modifier.pointerInput(Unit) {
+            detectVerticalDragGestures(
+                onDragStart = { dragDistance = 0f },
+                onVerticalDrag = { _, amount ->
+                    dragDistance += amount
+                    while (dragDistance <= -24f) { up(); dragDistance += 24f }
+                    while (dragDistance >= 24f) { down(); dragDistance -= 24f }
+                }
+            )
+        },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         Text("＋", Modifier.clickable(onClick = up).padding(10.dp), color = PiketRed, fontSize = 25.sp)
         Text("%02d".format(value), fontSize = 42.sp, fontWeight = FontWeight.ExtraBold)
+        Text("свайп вверх / вниз", color = Color(0xFF8997A6), fontSize = 9.sp)
         Text("−", Modifier.clickable(onClick = down).padding(10.dp), color = PiketBlue, fontSize = 25.sp)
     }
 }
@@ -170,21 +186,23 @@ private fun TimeStepper(value: Int, down: () -> Unit, up: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NativeSpeedReferenceScreen(data: NativeReferenceData, close: () -> Unit) {
-    var selected by remember { mutableStateOf(data.speedRoutes.firstOrNull()) }
+    val preferredOrder = remember { listOf("sap-spb-msk", "sap-msk-spb", "last-spb-msk", "last-msk-spb", "last-spbfin-kamenn", "last-kamenn-spbfin", "last-luga", "last-dd-ptz", "last-ptz-dd", "last-spbfin-kuzn", "last-kuzn-spbfin") }
+    val routes = remember(data) { data.speedRoutes.sortedBy { route -> preferredOrder.indexOf(route.id).let { if (it < 0) 1_000 + data.speedRoutes.indexOf(route) else it } } }
+    var selected by remember(routes) { mutableStateOf(routes.firstOrNull()) }
     var expanded by remember { mutableStateOf(false) }
     NativeReferenceScaffold("Справочник скоростей", close) {
         item { PremiumSelector("ПОЕЗД И УЧАСТОК", selected?.let { "${it.train} · ${it.route}" } ?: "Нет данных") { expanded = true } }
         selected?.let { route ->
             if (route.note.isNotBlank()) item { Text(route.note, color = Color(0xFFAFBAC8), fontSize = 13.sp, lineHeight = 21.sp, modifier=Modifier.background(Color(0xFF0C1016),RoundedCornerShape(16.dp)).border(1.dp,Color(0xFF29313C),RoundedCornerShape(16.dp)).padding(15.dp)) }
-            item { Row(Modifier.fillMaxWidth().padding(vertical=3.dp),horizontalArrangement=Arrangement.spacedBy(18.dp)){Text("● Главный путь",color=Color(0xFFFF4057),fontSize=12.sp);Text("● Боковой путь",color=Color(0xFFFFC14B),fontSize=12.sp)} }
+            item { Row(Modifier.fillMaxWidth().padding(vertical=3.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)){Text("● Гл.п",color=Color(0xFF3DDB87),fontSize=12.sp);Text("● Бок.п",color=Color(0xFFFFC14B),fontSize=12.sp);Text("● скорость 25 км/ч",color=Color(0xFFFF4057),fontSize=12.sp)} }
             route.groups.forEach { group ->
                 item { Text(group.title, color = PiketRed, fontSize = 19.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
                 items(group.rows) { row ->
                     Card(colors = CardDefaults.cardColors(containerColor = Color.Transparent),shape=RoundedCornerShape(17.dp)) {
                         Row(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(Color(0xFF1B212B),Color(0xFF0C0E13))),RoundedCornerShape(17.dp)).border(1.dp,Color(0xFF2E3743),RoundedCornerShape(17.dp)).padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(row.name, Modifier.weight(1f))
-                            row.mainSpeed?.let { SpeedBadge(it, PiketRedDark) }
-                            row.sideSpeed?.let { Spacer(Modifier.width(7.dp)); SpeedBadge(it, Color(0xFF735411)) }
+                            row.mainSpeed?.let { SpeedBadge(it, if (it == 25) Color(0xFFD91D2B) else Color(0xFF177548)) }
+                            row.sideSpeed?.let { Spacer(Modifier.width(7.dp)); SpeedBadge(it, if (it == 25) Color(0xFFD91D2B) else Color(0xFF735411)) }
                         }
                     }
                 }
@@ -192,7 +210,7 @@ fun NativeSpeedReferenceScreen(data: NativeReferenceData, close: () -> Unit) {
         }
     }
     if (expanded) PremiumPickerSheet("Выбери справочник", { expanded = false }) {
-        data.speedRoutes.forEach { route -> PremiumPickerRow(route.train, route.route, selected == route) { selected = route; expanded = false } }
+        routes.forEach { route -> PremiumPickerRow(route.train, route.route, selected == route) { selected = route; expanded = false } }
     }
 }
 

@@ -7,7 +7,8 @@
 **Километр · пикет · метр · скорость · предупреждения**
 
 [![Скачать APK](https://img.shields.io/github/v/release/Raiuchi/piket?label=СКАЧАТЬ%20APK&color=D91D2B&style=for-the-badge)](https://github.com/Raiuchi/piket/releases/latest)
-[![Открыть Web](https://img.shields.io/badge/🌐_ОТКРЫТЬ-WEB_ВЕРСИЮ-2563EB?style=for-the-badge)](https://raiuchi.github.io/piket-web/)
+[![Открыть на iPhone/iPad](https://img.shields.io/badge/_ОТКРЫТЬ-ВЕРСИЮ_ДЛЯ_iPHONE-2563EB?style=for-the-badge)](https://raiuchi.github.io/piket-web/)
+[![Репозиторий iPhone/iPad](https://img.shields.io/badge/GITHUB-РЕПОЗИТОРИЙ_iPHONE-181717?style=for-the-badge)](https://github.com/Raiuchi/piket-web)
 
 **Android 8.0+ · работает офлайн · данные остаются на телефоне**
 
@@ -111,7 +112,7 @@
 
 APK использует Android foreground service и продолжает отслеживание при свёрнутом приложении и погашенном экране. Для стабильной работы отключи ограничение батареи для ПИКЕТА и разреши постоянный доступ к геолокации в настройках телефона.
 
-## ✅ Проверки версии 2.0.23
+## ✅ Проверки версии 2.0.24
 
 | Контур | Результат |
 |---|:---:|
@@ -134,14 +135,14 @@ APK использует Android foreground service и продолжает от
 
 | Возможность | Android APK | Web / PWA |
 |---|:---:|:---:|
-| Android | ✅ | ✅ |
+| Android | ✅ | — |
 | iPhone и iPad | — | ✅ |
 | Интерфейс без сети | ✅ | ✅ |
 | Локальное хранение | ✅ | ✅ |
 | Работа при погашенном экране | ✅ | ❌ на iPhone; зависит от Android-браузера |
 | Системная фоновая служба | ✅ | — |
 
-Для продолжительной работы на Android рекомендуется APK. Web-версия удобна для iPhone, iPad и быстрого запуска без установки APK.
+Для Android используйте APK. Отдельная [Web/PWA-версия и её репозиторий](https://github.com/Raiuchi/piket-web) предназначены исключительно для iPhone и iPad.
 
 > **Важно для iPhone/iPad:** во время поездки не блокируй экран и не сворачивай ПИКЕТ надолго. iOS приостанавливает GPS и таймеры веб-приложений. После возврата ПИКЕТ заново подключит GPS и откорректируется по новой координате, но точно восстановить путь, который iPhone не передавал при заблокированном экране, технически невозможно.
 

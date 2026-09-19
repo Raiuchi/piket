@@ -147,6 +147,11 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("data-dial=\"m\""))
         assertTrue(html.contains("half?\":30\":\"\""))
         assertTrue(html.contains(".srBadge.speed25"))
-        assertTrue(html.contains("🔴 25 — скорость 25 км/ч"))
+        assertTrue(html.contains("🔴 скорость 25 км/ч"))
+        assertTrue(html.contains("genericTimeHalf"))
+        assertTrue(html.contains("+a[2]||0"))
+        assertTrue(html.contains("SPEED_ROUTE_ORDER=[\"sap-spb-msk\",\"sap-msk-spb\",\"last-spb-msk\",\"last-msk-spb\",\"last-spbfin-kamenn\",\"last-kamenn-spbfin\",\"last-luga\",\"last-dd-ptz\",\"last-ptz-dd\",\"last-spbfin-kuzn\",\"last-kuzn-spbfin\"]"))
+        assertTrue(html.contains(">10</text>") && html.contains(">20</text>") && html.contains(">30</text>") && html.contains(">40</text>") && html.contains(">50</text>"))
+        assertFalse(html.contains("id=\"pkMinus\"") || html.contains("id=\"pkPlus\""))
     }
 }

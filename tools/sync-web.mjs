@@ -10,5 +10,4 @@ fs.writeFileSync(path.join(target,'index.html'),html);
 for(const name of ['piket-core.js','piket-schedules.js'])fs.copyFileSync(`${assets}/assets/${name}`,path.join(target,'assets',name));
 let sw=fs.readFileSync(path.join(target,'sw.js'),'utf8').replace(/const CACHE_VERSION = '[^']+';/,`const CACHE_VERSION = 'piket-web-v${version}';`).replace(/\?v=[^']+/g,`?v=${version}`);
 fs.writeFileSync(path.join(target,'sw.js'),sw);
-fs.copyFileSync('README.md',path.join(target,'README.md'));
 console.log(`Web synchronized to ${version}`);

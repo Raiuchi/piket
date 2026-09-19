@@ -91,10 +91,7 @@ class PiketViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
     fun setManualCalibration(value: Double) { manualOfficialM = value }
-    fun shiftPicket(deltaM: Double) {
-        val base = manualOfficialM ?: snapshot.officialM ?: return
-        manualOfficialM = (base + deltaM).coerceAtLeast(0.0)
-    }
+
     fun add(item: RestrictionRecord): Boolean { val next = restrictions + item; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun remove(id: String): Boolean { val next = restrictions.filterNot { it.id == id }; return repository.saveRestrictions(next).also { if (it) restrictions = next } }
     fun updateSettings(value: PiketSettings) { if (repository.saveSettings(value)) settings = value }
@@ -158,12 +155,7 @@ private fun TripScreen(model: PiketViewModel, calibrate: () -> Unit, onStart: (N
         item { RouteSelector(model) }
         item { Speedometer(state.speedKmh) }
         item { PositionCard(state) }
-        item {
-            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                PremiumOutlineButton("− пикет", Modifier.weight(1f)) { model.shiftPicket(-100.0) }
-                PremiumOutlineButton("＋ пикет", Modifier.weight(1f)) { model.shiftPicket(100.0) }
-            }
-        }
+
         if (state.alertId != null) item { AlertCard(state, model.restrictions.firstOrNull { it.id == state.alertId }) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
