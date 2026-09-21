@@ -43,6 +43,7 @@ class NativeRepositoryContractTest {
 
     @Test fun premiumWebAssetsCalibrationAndNativeBridgeAreBundled() {
         val html = projectFile("app/src/main/assets/index.html").readText()
+        val main = projectFile("app/src/main/java/net/raiuchi/piket/MainActivity.kt").readText()
         val service = projectFile("app/src/main/java/net/raiuchi/piket/TrackingService.kt").readText()
         assertTrue(projectFile("app/src/main/assets/icons/piket-signal.gif").length() > 100_000)
         assertTrue(projectFile("app/src/main/assets/assets/piket-core.js").length() > 50_000)
