@@ -56,7 +56,7 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("sap_lastStop") && html.contains("keepStopped"))
         assertFalse(html.contains("Демо-режим") || html.contains("settings.demo"))
         assertTrue(html.contains("label!==\"Все участки\"") && html.contains("state.ctx.peregon===\"Все участки\""))
-        assertTrue(html.contains("syncNativeRouteContext();") && html.contains("window.Android.startTracking();"))
+        assertTrue(html.contains("syncNativeRouteContext();") && html.contains("window.Android.startTracking()"))
         assertTrue(html.contains("rt.nativeSessionId=+window.Android.startTracking()||0"))
         assertTrue(html.contains("if(rt.nativeSessionId&&+nativeSessionId!==+rt.nativeSessionId)return"))
         assertTrue(main.contains("nativeStartGate.accepts(s.route, s.direction)"))
