@@ -105,6 +105,9 @@ class TrackingService : Service() {
     private lateinit var diagnostics: DiagnosticsLogger
     private var lastDiagnosticSampleAt = 0L
     private var lastDiagnosticQuality = ""
+    private var lastRecoveryState: Boolean? = null
+    private var lastTransitionProbeAt = 0L
+    private var lastTransitionProbeKey = ""
 
     override fun onCreate() {
         super.onCreate()
@@ -355,6 +358,16 @@ class TrackingService : Service() {
             val transition = journeyRouter?.consider(journeyId, routeLabel, state.direction,
                 state.physicalM, boundary, currentSnap?.distanceM, nextSnap?.distanceM,
                 currentSnap?.physicalM, stoppedForJunction)
+            if (nearBoundary && next != null) {
+                val probeStatus = when {
+                    next.requireStop && !stoppedForJunction -> "waiting_stop"
+                    nextSnap == null -> "next_projection_unavailable"
+                    transition != null -> "confirmed"
+                    else -> "confirming_or_ambiguous"
+                }
+                recordTransitionProbe(next, probeStatus, boundary, state.physicalM,
+                    currentSnap?.distanceM, nextSnap?.distanceM, stoppedForJunction)
+            }
             if (transition != null && nextSnap != null) {
                 diagnostics.event("route_transition", mapOf("from" to routeLabel,
                     "to" to transition.route, "direction" to transition.direction,
@@ -371,8 +384,10 @@ class TrackingService : Service() {
         // its own two-fix recovery confirmation, so a good position remains safe.
         val positionAccepted = result.accepted && result.quality in setOf("good", "stationary")
         val engineSpeed = result.filteredSpeedMps
+        val beforeUpdate = tripEngine?.save()
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
             engineSpeed, positionAccepted, currentSnap, result.stationary))
+        recordPositionRecovery(beforeUpdate, output, currentSnap, positionAccepted)
         tripEngine?.save()?.let(::persistTripState)
         output?.let {
             updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))
@@ -388,6 +403,39 @@ class TrackingService : Service() {
         }
     }
 
+    private fun recordPositionRecovery(before: NativeTripEngine.SavedState?, output: NativeTripEngine.Output?,
+        snap: NativeRouteEngine.Snap?, positionAccepted: Boolean) {
+        if (output == null) return
+        val previous = lastRecoveryState
+        if (previous == true && !output.recovering && positionAccepted && snap != null) {
+            val beforePhysical = before?.physicalM
+            val appliedPhysical = output.physicalM
+            diagnostics.event("position_reconciled", mapOf(
+                "route" to routeLabel, "direction" to before?.direction,
+                "before_physical_m" to beforePhysical, "gps_physical_m" to snap.physicalM,
+                "applied_physical_m" to appliedPhysical,
+                "correction_m" to if (beforePhysical != null && appliedPhysical != null)
+                    appliedPhysical - beforePhysical else null,
+                "official_m" to output.officialM, "distance_to_route_m" to snap.distanceM,
+                "source" to output.source))
+        }
+        lastRecoveryState = output.recovering
+    }
+
+    private fun recordTransitionProbe(next: NativeJourneyRouter.Transition, status: String,
+        boundaryM: Double?, physicalM: Double?, currentDistanceM: Double?, nextDistanceM: Double?,
+        stopped: Boolean) {
+        val now = SystemClock.elapsedRealtime()
+        val key = "$routeLabel|${next.route}|$status|$stopped"
+        if (key == lastTransitionProbeKey && now - lastTransitionProbeAt < 10_000L) return
+        lastTransitionProbeKey = key; lastTransitionProbeAt = now
+        diagnostics.event("route_transition_probe", mapOf(
+            "from" to routeLabel, "to" to next.route, "direction" to next.direction,
+            "status" to status, "boundary_m" to boundaryM, "physical_m" to physicalM,
+            "current_route_distance_m" to currentDistanceM,
+            "next_route_distance_m" to nextDistanceM, "stopped" to stopped,
+            "requires_stop" to next.requireStop))
+    }
     private fun recordDiagnosticSample(location: Location, result: NativeMotionFilter.Result,
         snap: NativeRouteEngine.Snap?, output: NativeTripEngine.Output?, fromDirectGps: Boolean) {
         val now = SystemClock.elapsedRealtime()
@@ -491,7 +539,10 @@ class TrackingService : Service() {
         val nextDirection = root.optString("direction", "tuda")
         val nextActive = root.optBoolean("active")
         if ((previousState?.active != true && nextActive) || previousState?.route != routeLabel ||
-            previousState?.direction != nextDirection) { completedAlertIds.clear(); warnedAlertIds.clear() }
+            previousState?.direction != nextDirection) {
+            completedAlertIds.clear(); warnedAlertIds.clear()
+            lastRecoveryState = null; lastTransitionProbeKey = ""; lastTransitionProbeAt = 0L
+        }
         tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
             nextActive, restrictions)
         diagnostics.event("trip_configured", mapOf("route" to routeLabel, "journey" to journeyId,

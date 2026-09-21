@@ -1462,7 +1462,8 @@ window.addEventListener("error",function(e){
     $("#scheduleTrainText").textContent="Поезд № "+train.number+" · "+train.title;
     var rows=scheduleRowsForContext(),mapped=[];
     train.stops.forEach(function(stop,index){var station=scheduleStation(stop.station,rows);mapped.push({stop:stop,index:index,name:station?station[0]:scheduleStationName(stop.station),m:station?station[1]:null,displayM:station?(station[2]==null?station[1]:station[2]):null,mark:station?station[3]:null,arr:scheduleTime(train,index,"arr",stop.arr),dep:scheduleTime(train,index,"dep",stop.dep)});});
-    var live=scheduleLiveIndex(mapped,train);
+    var live=scheduleLiveIndex(mapped,train),liveFrom=mapped[live],liveTo=mapped[live+1],livePos=scheduleLiveM();
+    if(rt.tracking&&livePos!=null&&liveFrom){var diagnosticCardKey=[state.ctx.peregon,journeyTowards(),train.number,live].join("|");if(rt.lastScheduleDiagnosticKey!==diagnosticCardKey){rt.lastScheduleDiagnosticKey=diagnosticCardKey;appDiagnostic("schedule_card_changed",{route:state.ctx.peregon,direction:journeyTowards(),train:train.number,index:live,from:liveFrom.name,to:liveTo?liveTo.name:"",physical_m:livePos});}}
     var renderKey=JSON.stringify([state.ctx,train.number,live,scheduleOverrides,state.restrictions],function(key,value){return key.charAt(0)==="_"?undefined:value;});
     if(rt.scheduleRenderKey===renderKey){updateScheduleLivePace(false);return;}
     rt.scheduleRenderKey=renderKey;
@@ -1785,6 +1786,12 @@ window.addEventListener("error",function(e){
       while(rows.length>1500)rows.shift();
       localStorage.setItem(diagnosticKey,JSON.stringify(rows));
     } catch(e){ if(!diagnosticLast)toast("Не удалось сохранить журнал браузера"); }
+  }
+  function appDiagnostic(event,fields){
+    try{
+      if(window.Android&&window.Android.logUiDiagnostic)window.Android.logUiDiagnostic(event,JSON.stringify(fields||{}));
+      else webLog(event,fields);
+    }catch(e){}
   }
   function onPos(p,fromBackup){
     try { return processBrowserPosition(p,fromBackup); }

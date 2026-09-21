@@ -147,6 +147,23 @@ class NativeJourneyRouterTest {
         assertTrue(novgorod.requireStop)
     }
 
+    @Test fun vyborgCabChangeToleratesPlatformStoppingPointOffsetInBothDirections() {
+        val cases = listOf(
+            Triple("СПбФин - Выборг", "tuda", 129_100.0),
+            Triple("Выборг - Каменногорск", "obratno", 800.0)
+        )
+        cases.forEach { (current, direction, stoppedPhysical) ->
+            val fresh = NativeJourneyRouter.fromTimingJson(timingSource, journeySource)
+            val transition = fresh.nextLeg(null, current, direction)!!
+            assertTrue(kotlin.math.abs(stoppedPhysical - transition.boundaryM!!) <= 800.0)
+            assertNull(fresh.consider(null, current, direction, stoppedPhysical,
+                transition.boundaryM, 220.0, 30.0, stoppedPhysical, stopped = true))
+            val switched = fresh.consider(null, current, direction, stoppedPhysical,
+                transition.boundaryM, 220.0, 30.0, stoppedPhysical, stopped = true)
+            assertEquals(transition.route, switched?.route)
+            assertEquals(transition.direction, switched?.direction)
+        }
+    }
     @Test fun cabChangeWaitsForStopAndTwoReliableFixes() {
         assertNull(router.consider(null, "СПбФин - Выборг", "tuda",
             128_900.0, 128_900.0, 0.0, 48.0, 128_900.0, stopped = false))

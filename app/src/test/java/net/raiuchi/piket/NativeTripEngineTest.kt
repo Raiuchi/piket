@@ -47,6 +47,21 @@ class NativeTripEngineTest {
         assertEquals(route.points[1].physicalM, second.physicalM!!, 0.1)
     }
 
+    @Test fun confirmedGpsRecoversOneHundredMetresAfterJammingCountDrift() {
+        val start = route.points.first().physicalM
+        engine.update(NativeTripEngine.Input(1_000, 20f, true, snap(0)))
+        engine.markSignalUnavailable()
+        val counted = engine.update(NativeTripEngine.Input(6_000, 20f, false, null))
+        val targetM = start + 200.0
+        val recoveredSnap = NativeRouteEngine.Snap(route.label, targetM,
+            routes.officialMeters(route.label, targetM)!!, 4.0, 0)
+        assertEquals(100.0, kotlin.math.abs(counted.physicalM!! - targetM), 0.01)
+        assertTrue(engine.update(NativeTripEngine.Input(7_000, 0f, true, recoveredSnap, true)).recovering)
+        val recovered = engine.update(NativeTripEngine.Input(8_000, 0f, true, recoveredSnap, true))
+        assertFalse(recovered.recovering)
+        assertEquals(targetM, recovered.physicalM!!, 0.01)
+        assertEquals(recoveredSnap.officialM, recovered.officialM!!, 0.01)
+    }
     @Test fun findsRestrictionByPhysicalDistanceNotBrokenOfficialSubtraction() {
         val restriction = NativeTripEngine.Restriction("r1", route.label, "tuda",
             route.chainageM[1], route.chainageM[1], 1_500.0)

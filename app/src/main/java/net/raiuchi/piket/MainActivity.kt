@@ -373,6 +373,18 @@ class MainActivity : Activity() {
         @JavascriptInterface fun vibrate(kind:String)=runOnUiThread{val v=if(Build.VERSION.SDK_INT>=31)(getSystemService(VIBRATOR_MANAGER_SERVICE)as VibratorManager).defaultVibrator else getSystemService(VIBRATOR_SERVICE)as Vibrator;val p=if(kind=="danger")longArrayOf(0,160,80,160,80,260)else longArrayOf(0,120,90,120);if(Build.VERSION.SDK_INT>=26)v.vibrate(VibrationEffect.createWaveform(p,-1))else v.vibrate(p,-1)}
         @JavascriptInterface fun beep(kind:String){}
         @JavascriptInterface fun updatePosition(text:String){}
+        @JavascriptInterface fun logUiDiagnostic(event:String, json:String) {
+            if (event != "schedule_card_changed") return
+            runCatching {
+                val row = JSONObject(json)
+                diagnostics.event(event, mapOf(
+                    "route" to row.optString("route"), "direction" to row.optString("direction"),
+                    "train" to row.optString("train"), "index" to row.optInt("index"),
+                    "from" to row.optString("from"), "to" to row.optString("to"),
+                    "physical_m" to row.optDouble("physical_m").takeIf { row.has("physical_m") }
+                ))
+            }
+        }
         @JavascriptInterface fun openUrl(url:String)=runOnUiThread{openExternal(Uri.parse(url))}
         @JavascriptInterface fun shareText(subject:String,text:String)=runOnUiThread{runCatching{startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply{type="text/plain";putExtra(Intent.EXTRA_SUBJECT,subject);putExtra(Intent.EXTRA_TEXT,text)},"Экспорт"))}}
         @JavascriptInterface fun shareDiagnostics()=runOnUiThread{

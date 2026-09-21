@@ -38,6 +38,12 @@ for (let index = 1; index < configurations.length; index++) {
 }
 const power = events.filter(e => e.event === 'power_sample');
 const temperatures = power.map(e => Number(e.battery_temperature_c)).filter(Number.isFinite);
+const reconciliations = events.filter(e => e.event === 'position_reconciled');
+const corrections = reconciliations.map(e => Math.abs(Number(e.correction_m))).filter(Number.isFinite);
+const transitionProbes = events.filter(e => e.event === 'route_transition_probe');
+const transitionProbeStatuses = Object.fromEntries([...new Set(transitionProbes.map(e => e.status))]
+  .sort().map(status => [status, transitionProbes.filter(e => e.status === status).length]));
+const scheduleCards = events.filter(e => e.event === 'schedule_card_changed');
 const report = {
   file: path.basename(input),
   events: events.length,
@@ -46,6 +52,11 @@ const report = {
   movingSamplesWithFilteredZero: frozenSpeed,
   frozenPositionSteps: frozenPosition,
   routeTransitions: events.filter(e => e.event === 'route_transition').length,
+  routeTransitionProbes: transitionProbes.length,
+  routeTransitionProbeStatuses: transitionProbeStatuses,
+  positionReconciliations: reconciliations.length,
+  maxPositionCorrectionM: corrections.length ? Math.max(...corrections) : null,
+  scheduleCardChanges: scheduleCards.length,
   rapidConfigurationReplacements,
   gpsReserveStarts: events.filter(e => e.event === 'direct_gps_started').length,
   gpsReserveStops: events.filter(e => e.event === 'direct_gps_stopped').length,
