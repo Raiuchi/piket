@@ -2410,7 +2410,7 @@ window.addEventListener("error",function(e){
       // Этот видимый экран запускает службу и сразу переходит в режим зеркала — читает
       // позицию/скорость из её снэпшота, не пытаясь сам слушать onNativeLocation (туда больше
       // ничего не приходит, см. TrackingService).
-      window.Android.startTracking();
+      rt.nativeSessionId=+window.Android.startTracking()||0;
       IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
       toast("Отслеживание включено");
       return;
@@ -2442,8 +2442,11 @@ window.addEventListener("error",function(e){
     setTrackBtn(true); warmVoice(); toast(isIOSWeb()?"iPhone: при блокировке GPS приостановится, после разблокировки восстановлю":"Отслеживание включено"); }
 
   // Координаты от нативного Fused Location (Android) — собираем в объект как у браузерного API и пускаем по той же логике
-  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection,nativeFrequentInterference){
+  window.onNativeLocation=function(lat,lon,acc,speedMps,time,fixAgeMs,bearingDeg,satellitesUsed,averageCn0,gnssTelemetry,constellationDiversity,mockLocation,speedAccuracyMps,nativeQuality,nativeReason,nativePhysicalM,nativeOfficialM,nativeRouteDistanceM,nativeTripPhysicalM,nativeTripOfficialM,nativeTripRecovering,nativeTripSource,nativeAlertId,nativeAlertDistanceM,nativeAlertInZone,nativeRoute,nativeDirection,nativeFrequentInterference,nativeSessionId){
     if(!rt.tracking)return;
+    // A snapshot queued before Start belongs to the previous trip. Never let it replace
+    // the route/direction/train the driver has just selected for the new native session.
+    if(rt.nativeSessionId&&+nativeSessionId!==+rt.nativeSessionId)return;
     renderSatellites(satellitesUsed,gnssTelemetry===true);
     var nativeStructureChanged=!!(nativeRoute&&nativeRoute!==state.ctx.peregon),nativeAlertChanged=nativeAlertId!==rt.nativeAlertId||nativeAlertInZone!==rt.nativeAlertInZone;
     if(nativeStructureChanged){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}

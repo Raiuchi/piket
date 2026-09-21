@@ -27,6 +27,15 @@ for (const e of moving) {
       Math.abs(e.engine_physical_m - prior.engine_physical_m) < 2) frozenPosition++;
   prior = e;
 }
+const configurations = events.filter(e => e.event === 'trip_configured');
+let rapidConfigurationReplacements = 0;
+for (let index = 1; index < configurations.length; index++) {
+  const previous = configurations[index - 1], current = configurations[index];
+  const previousKey = [previous.route, previous.direction, previous.train].join('|');
+  const currentKey = [current.route, current.direction, current.train].join('|');
+  if (Number(current.time) - Number(previous.time) <= 1_500 && previousKey !== currentKey)
+    rapidConfigurationReplacements++;
+}
 const power = events.filter(e => e.event === 'power_sample');
 const temperatures = power.map(e => Number(e.battery_temperature_c)).filter(Number.isFinite);
 const report = {
@@ -37,6 +46,7 @@ const report = {
   movingSamplesWithFilteredZero: frozenSpeed,
   frozenPositionSteps: frozenPosition,
   routeTransitions: events.filter(e => e.event === 'route_transition').length,
+  rapidConfigurationReplacements,
   gpsReserveStarts: events.filter(e => e.event === 'direct_gps_started').length,
   gpsReserveStops: events.filter(e => e.event === 'direct_gps_stopped').length,
   restrictionAlerts: events.filter(e => e.event === 'restriction_alert').length,
@@ -46,4 +56,5 @@ console.log(JSON.stringify(report, null, 2));
 
 // A historical log may legitimately expose a regression. The replay command reports it
 // without failing. CI/synthetic fixtures can request strict expectations explicitly.
-if (process.argv.includes('--expect-clean') && (frozenSpeed > 0 || frozenPosition > 0)) process.exit(1);
+if (process.argv.includes('--expect-clean') &&
+    (frozenSpeed > 0 || frozenPosition > 0 || rapidConfigurationReplacements > 0)) process.exit(1);

@@ -6,6 +6,15 @@ import org.junit.Test
 import java.io.File
 
 class NativeRepositoryContractTest {
+    @Test fun staleRestoredRouteCannotReplaceTheTripSelectedAtStart() {
+        val gate = NativeStartGate()
+        gate.expect("СПбФин - Выборг", "tuda")
+        assertFalse(gate.accepts("СпбГл - Москва", "obratno"))
+        assertFalse(gate.accepts("СПбФин - Выборг", "obratno"))
+        assertTrue(gate.accepts("СПбФин - Выборг", "tuda"))
+        assertTrue("normal route transitions remain available after acknowledgement",
+            gate.accepts("СПбФин - Каменногорск", "tuda"))
+    }
     private fun projectFile(path: String): File = listOf(File(path), File("../$path")).first { it.exists() }
     private fun json(path: String) = JSONObject(projectFile("app/src/main/assets/data/$path").readText())
 
@@ -47,6 +56,10 @@ class NativeRepositoryContractTest {
         assertFalse(html.contains("Демо-режим") || html.contains("settings.demo"))
         assertTrue(html.contains("label!==\"Все участки\"") && html.contains("state.ctx.peregon===\"Все участки\""))
         assertTrue(html.contains("syncNativeRouteContext();") && html.contains("window.Android.startTracking();"))
+        assertTrue(html.contains("rt.nativeSessionId=+window.Android.startTracking()||0"))
+        assertTrue(html.contains("if(rt.nativeSessionId&&+nativeSessionId!==+rt.nativeSessionId)return"))
+        assertTrue(main.contains("nativeStartGate.accepts(s.route, s.direction)"))
+        assertTrue(main.contains("nativeSessionCounter.incrementAndGet()") && main.contains("\$nativeSessionId);"))
         assertTrue(html.contains("manualOfficialM:manual") && html.contains("m:+r.m||0") && html.contains("journey:nativeJourney"))
         assertTrue(html.contains("return 128900+rt.posM"))
         assertTrue(html.contains("r.kmE!=null?metersOf(r.kmE,r.pkE):start+100"))

@@ -20,6 +20,25 @@ import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicLong
+
+internal class NativeStartGate {
+    private var route: String? = null
+    private var direction: String? = null
+
+    fun expect(route: String?, direction: String?) {
+        this.route = route
+        this.direction = direction
+    }
+
+    fun accepts(route: String, direction: String): Boolean {
+        val expectedRoute = this.route ?: return true
+        if (route != expectedRoute || direction != this.direction) return false
+        this.route = null
+        this.direction = null
+        return true
+    }
+}
 
 /** The restored premium HTML is a view. GPS, routes, recovery and alerts stay native. */
 @Suppress("DEPRECATION", "SetJavaScriptEnabled")
@@ -34,6 +53,9 @@ class MainActivity : Activity() {
     @Volatile private var uiReady = false
     @Volatile private var uiStartupError: String? = null
     private var pendingConfig: String? = null
+    private val nativeSessionCounter = AtomicLong()
+    private var nativeSessionId = 0L
+    private val nativeStartGate = NativeStartGate()
     private val handler = Handler(Looper.getMainLooper())
     private val repository by lazy { PiketRepository(this) }
     private val diagnostics by lazy { DiagnosticsLogger(this) }
@@ -125,13 +147,23 @@ class MainActivity : Activity() {
     }
 
     private fun publishSnapshot(s:TripSnapshot){
+        if (!nativeStartGate.accepts(s.route, s.direction)) {
+            diagnostics.event("stale_native_snapshot_ignored", mapOf("route" to s.route,
+                "direction" to s.direction, "session_id" to nativeSessionId))
+            return
+        }
         val q={v:String->v.replace("\\","\\\\").replace("'","\\'")}
-        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.source)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone},'${q(s.route)}','${q(s.direction)}',${s.frequentInterference});"
+        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.source)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone},'${q(s.route)}','${q(s.direction)}',${s.frequentInterference},$nativeSessionId);"
         web?.evaluateJavascript(js,null)
     }
-    private fun startNative(rawConfig:String?){
+    private fun startNative(rawConfig:String?, sessionId:Long){
         val raw=rawConfig?:pendingConfig?:return
         val active=runCatching{JSONObject(raw).put("active",true).toString()}.getOrDefault(raw);pendingConfig=active
+        runCatching { JSONObject(active) }.getOrNull()?.let {
+            nativeStartGate.expect(it.optString("route").takeIf(String::isNotBlank),
+                it.optString("direction", "tuda"))
+        }
+        nativeSessionId=sessionId
         ContextCompat.startForegroundService(this,Intent(this,TrackingService::class.java).apply{action=TrackingService.ACTION_CONFIGURE_NATIVE;putExtra(TrackingService.EXTRA_NATIVE_CONFIG,active)})
     }
     private fun configureRunning(raw:String){
@@ -318,7 +350,15 @@ class MainActivity : Activity() {
         @JavascriptInterface fun notifyUiReady() { uiReady = true }
         @JavascriptInterface fun notifyUiStartupError(message: String) { uiStartupError = message }
         @JavascriptInterface fun configureNativeTrip(json:String)=runOnUiThread{configureRunning(json)}
-        @JavascriptInterface fun startTracking()=runOnUiThread{if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)startNative(pendingConfig)else{requestPermissionsIfNeeded();web?.evaluateJavascript("if(window.toast)toast('Разреши точную геолокацию')",null)}}
+        @JavascriptInterface fun startTracking():Long {
+            if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){
+                val sessionId=nativeSessionCounter.incrementAndGet()
+                runOnUiThread{startNative(pendingConfig,sessionId)}
+                return sessionId
+            }
+            runOnUiThread{requestPermissionsIfNeeded();web?.evaluateJavascript("if(window.toast)toast('Разреши точную геолокацию')",null)}
+            return 0L
+        }
         @JavascriptInterface fun stopTracking()=runOnUiThread{stopService(Intent(this@MainActivity,TrackingService::class.java))}
         @JavascriptInterface fun recalibrate()=runOnUiThread{pendingConfig?.let(::configureRunning)}
         @JavascriptInterface fun setKeepScreen(enabled:Boolean)=runOnUiThread{if(enabled)window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)}

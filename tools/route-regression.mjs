@@ -91,4 +91,12 @@ assert.ok(html.includes('state.settings.screenMode="auto";delete state.settings.
   html.includes('Автозатемнение включено, яркость снижена'),
   'accepting the heat warning must persist Auto dimming in settings');
 
-console.log('Browser route regression: axes, Moscow 205/210 transition, thermal UI and all documented through-route junctions passed');
+const schedules=JSON.parse(fs.readFileSync('app/src/main/assets/data/schedules.json','utf8')).trains;
+const vyborgForward=schedules.filter(train=>train.route==='СПбФин - Выборг'&&train.direction==='tuda').map(train=>train.number);
+const vyborgReverse=schedules.filter(train=>train.route==='СПбФин - Выборг'&&train.direction==='obratno').map(train=>train.number);
+assert.deepEqual(vyborgForward,['821','823','825'],'Finland Station forward must keep only odd trains');
+assert.deepEqual(vyborgReverse,['822','824','826'],'Finland Station reverse must keep only even trains');
+assert.ok(html.includes('function scheduleTrainKey(){return scheduleSourceRoute()+"|"+journeyTowards()+"|"+(activeThrough()||"direct");}'),
+  'saved train choices must remain isolated by route, direction and through journey');
+
+console.log('Browser route regression: axes, trains, Moscow 205/210 transition, thermal UI and all documented through-route junctions passed');
