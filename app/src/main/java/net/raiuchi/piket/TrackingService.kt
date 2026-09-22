@@ -51,6 +51,7 @@ class TrackingService : Service() {
     private var lastFixReceivedAt = 0L
     private var lastFusedRestartAt = 0L
     private var signalUnavailableMarked = false
+    private var lastLocationAvailable: Boolean? = null
     private var lastUsableFixAt = 0L
     private var unusableFixMarked = false
     private var watchdog: Runnable? = null
@@ -91,6 +92,8 @@ class TrackingService : Service() {
     private var soundEnabled = true
     private var vibrationEnabled = true
     private val alertSpeech = mutableMapOf<String, String>()
+    private val alertSpeed = mutableMapOf<String, Int>()
+    private val alertReason = mutableMapOf<String, String>()
     private var lastAlertId: String? = null
     private var lastAlertInZone = false
     private val completedAlertIds = mutableSetOf<String>()
@@ -108,10 +111,84 @@ class TrackingService : Service() {
     private var lastRecoveryState: Boolean? = null
     private var lastTransitionProbeAt = 0L
     private var lastTransitionProbeKey = ""
+    private var tripSessionId: String? = null
+    private var tripStartedAt = 0L
+    private var acceptedGpsSamples = 0L
+    private var rejectedGpsSamples = 0L
+    private var gpsOutageStartedAt = 0L
+    private var gpsOutageCount = 0
+    private var gpsOutageTotalMs = 0L
+    private var longestGpsOutageMs = 0L
+    private var directGpsStartCount = 0
+    private var positionReconciliationCount = 0
+    private var maxPositionCorrectionM = 0.0
+    private var routeTransitionCount = 0
+    private var maxBatteryTemperatureC: Double? = null
+    private var lastEngineOutput: NativeTripEngine.Output? = null
+
+    private fun diagnosticContext() = mapOf(
+        "trip_session_id" to tripSessionId, "route" to routeLabel, "journey" to journeyId,
+        "direction" to tripEngine?.save()?.direction, "train" to trainNumber)
+
+    private fun startTripSession() {
+        finishTripSession("reconfigured")
+        tripSessionId = "${System.currentTimeMillis()}-${SystemClock.elapsedRealtime()}"
+        tripStartedAt = System.currentTimeMillis()
+        acceptedGpsSamples = 0; rejectedGpsSamples = 0
+        gpsOutageStartedAt = 0; gpsOutageCount = 0; gpsOutageTotalMs = 0; longestGpsOutageMs = 0
+        directGpsStartCount = 0; positionReconciliationCount = 0; maxPositionCorrectionM = 0.0
+        routeTransitionCount = 0; maxBatteryTemperatureC = null
+        diagnostics.event("trip_session_started", diagnosticContext() + mapOf(
+            "manual_official_m" to tripEngine?.save()?.manualOfficialM,
+            "physical_m" to tripEngine?.save()?.physicalM))
+    }
+
+    private fun finishTripSession(reason: String) {
+        val session = tripSessionId ?: return
+        val now = System.currentTimeMillis()
+        if (gpsOutageStartedAt > 0L) {
+            val duration = (now - gpsOutageStartedAt).coerceAtLeast(0)
+            gpsOutageTotalMs += duration; longestGpsOutageMs = maxOf(longestGpsOutageMs, duration)
+            gpsOutageStartedAt = 0
+        }
+        diagnostics.event("trip_session_summary", diagnosticContext() + mapOf(
+            "trip_session_id" to session, "reason" to reason,
+            "duration_ms" to (now - tripStartedAt).coerceAtLeast(0),
+            "accepted_gps_samples" to acceptedGpsSamples, "rejected_gps_samples" to rejectedGpsSamples,
+            "gps_outages" to gpsOutageCount, "gps_outage_total_ms" to gpsOutageTotalMs,
+            "longest_gps_outage_ms" to longestGpsOutageMs, "direct_gps_starts" to directGpsStartCount,
+            "position_reconciliations" to positionReconciliationCount,
+            "max_position_correction_m" to maxPositionCorrectionM,
+            "route_transitions" to routeTransitionCount,
+            "max_battery_temperature_c" to maxBatteryTemperatureC,
+            "final_physical_m" to tripEngine?.save()?.physicalM,
+            "final_official_m" to lastEngineOutput?.officialM))
+        tripSessionId = null
+    }
+
+    private fun markGpsOutage(cause: String, fields: Map<String, Any?> = emptyMap()) {
+        if (tripSessionId == null || gpsOutageStartedAt > 0L) return
+        gpsOutageStartedAt = System.currentTimeMillis(); gpsOutageCount++
+        diagnostics.event("gps_outage_started", diagnosticContext() + fields + mapOf(
+            "cause" to cause, "physical_m" to tripEngine?.save()?.physicalM,
+            "official_m" to lastEngineOutput?.officialM))
+    }
+
+    private fun recoverGpsOutage(source: String) {
+        if (gpsOutageStartedAt <= 0L) return
+        val duration = (System.currentTimeMillis() - gpsOutageStartedAt).coerceAtLeast(0)
+        gpsOutageTotalMs += duration; longestGpsOutageMs = maxOf(longestGpsOutageMs, duration)
+        diagnostics.event("gps_outage_recovered", diagnosticContext() + mapOf(
+            "duration_ms" to duration, "source" to source,
+            "physical_m" to tripEngine?.save()?.physicalM,
+            "official_m" to lastEngineOutput?.officialM))
+        gpsOutageStartedAt = 0
+    }
 
     override fun onCreate() {
         super.onCreate()
         mainHandler = Handler(Looper.getMainLooper())
+        DiagnosticsLogger.installCrashHandler(this)
         diagnostics = DiagnosticsLogger(this)
         diagnostics.event("service_started", mapOf("version" to packageManager.getPackageInfo(packageName, 0).versionName))
         createChannel()
@@ -123,6 +200,7 @@ class TrackingService : Service() {
                 readAsset("data/timing.json"), readAsset("data/journeys.json"))
             tripEngine = NativeTripEngine(requireNotNull(routeEngine))
             restoreTripState()
+            if (tripEngine?.save()?.active == true) startTripSession()
             startTripTicker()
         }.onFailure { routeEngine = null; journeyRouter = null; tripEngine = null }
 
@@ -195,8 +273,9 @@ class TrackingService : Service() {
                 processLocation(location, false)
             }
             override fun onLocationAvailability(value: LocationAvailability) {
-                // Android may toggle this flag for a fraction of a second even while
-                // fixes continue. The watchdog below confirms a real silence first.
+                diagnostics.event("location_availability", diagnosticContext() + mapOf(
+                    "available" to value.isLocationAvailable))
+                // The watchdog confirms a real silence before changing the trip state.
             }
         }
         lastFixReceivedAt = System.currentTimeMillis()
@@ -210,6 +289,8 @@ class TrackingService : Service() {
         locationManager = getSystemService(LOCATION_SERVICE) as? LocationManager
         if (locationManager == null || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         gnssCallback = object : GnssStatus.Callback() {
+            override fun onStarted() { diagnostics.event("gnss_status", diagnosticContext() + mapOf("state" to "started")) }
+            override fun onFirstFix(ttffMillis: Int) { diagnostics.event("gnss_first_fix", diagnosticContext() + mapOf("ttff_ms" to ttffMillis)) }
             override fun onSatelliteStatusChanged(status: GnssStatus) {
                 gnssTelemetrySeen = true
                 var used = 0; var sum = 0f
@@ -218,7 +299,10 @@ class TrackingService : Service() {
                 }
                 satellitesUsed = used; averageCn0 = if (used > 0) sum / used else 0f
             }
-            override fun onStopped() { satellitesUsed = 0; averageCn0 = 0f }
+            override fun onStopped() {
+                satellitesUsed = 0; averageCn0 = 0f
+                diagnostics.event("gnss_status", diagnosticContext() + mapOf("state" to "stopped"))
+            }
         }
         runCatching { locationManager?.registerGnssStatusCallback(gnssCallback!!, mainHandler) }
     }
@@ -232,6 +316,7 @@ class TrackingService : Service() {
                 if (silence > 8_000 && !signalUnavailableMarked) {
                     signalUnavailableMarked = true
                     motionFilter.markSignalUnavailable(); tripEngine?.markSignalUnavailable()
+                    markGpsOutage("location_silence", mapOf("silence_ms" to silence))
                     persistSnapshot(null, 999f)
                 } else if (silence <= 3_000) signalUnavailableMarked = false
                 if (silence > 10_000 && !networkBackupActive) startNetworkBackup()
@@ -273,12 +358,16 @@ class TrackingService : Service() {
             fusedClient?.requestLocationUpdates(
                 locationRequest(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 3_000), networkCallback!!, Looper.getMainLooper())
             networkBackupActive = true
-        }
+            diagnostics.event("network_gps_reserve_started", diagnosticContext())
+        }.onFailure { diagnostics.event("network_gps_reserve_error", diagnosticContext() + mapOf(
+            "error" to it.javaClass.simpleName)) }
     }
 
     private fun stopNetworkBackup() {
         networkCallback?.let { runCatching { fusedClient?.removeLocationUpdates(it) } }
-        networkCallback = null; networkBackupActive = false
+        networkCallback = null
+        if (networkBackupActive) diagnostics.event("network_gps_reserve_stopped", diagnosticContext())
+        networkBackupActive = false
     }
 
     private fun startDirectGps(now: Long, silence: Long, unusableFor: Long) {
@@ -287,22 +376,29 @@ class TrackingService : Service() {
             !manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) = processLocation(location, true)
-            override fun onProviderDisabled(provider: String) = Unit
-            override fun onProviderEnabled(provider: String) = Unit
+            override fun onProviderDisabled(provider: String) {
+                diagnostics.event("location_provider_changed", diagnosticContext() + mapOf(
+                    "provider" to provider, "enabled" to false))
+            }
+            override fun onProviderEnabled(provider: String) {
+                diagnostics.event("location_provider_changed", diagnosticContext() + mapOf(
+                    "provider" to provider, "enabled" to true))
+            }
             @Deprecated("Deprecated in Android")
             override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
         }
         runCatching {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
             directGpsListener = listener; directGpsActive = true; directGpsStartedAt = now
-            fusedRecoveryFixes = 0
-            diagnostics.event("direct_gps_started", mapOf("silence_ms" to silence, "unusable_ms" to unusableFor))
+            fusedRecoveryFixes = 0; directGpsStartCount++
+            diagnostics.event("direct_gps_started", diagnosticContext() + mapOf(
+                "silence_ms" to silence, "unusable_ms" to unusableFor))
         }
     }
 
     private fun stopDirectGps(reason: String) {
         directGpsListener?.let { runCatching { locationManager?.removeUpdates(it) } }
-        if (directGpsActive) diagnostics.event("direct_gps_stopped", mapOf("reason" to reason,
+        if (directGpsActive) diagnostics.event("direct_gps_stopped", diagnosticContext() + mapOf("reason" to reason,
             "active_ms" to (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0)))
         directGpsListener = null; directGpsActive = false
         lastDirectGpsStopAt = System.currentTimeMillis(); fusedRecoveryFixes = 0
@@ -324,7 +420,9 @@ class TrackingService : Service() {
             location.speedAccuracyMetersPerSecond.takeIf { location.hasSpeedAccuracy() },
             location.isMock, satellitesUsed, averageCn0, gnssTelemetrySeen))
         val wallNow = System.currentTimeMillis()
+        if (result.accepted) acceptedGpsSamples++ else rejectedGpsSamples++
         if (result.accepted && result.quality in setOf("good", "stationary")) {
+            recoverGpsOutage(if (fromDirectGps) "direct-gps" else location.provider ?: "fused")
             lastUsableFixAt = wallNow
             unusableFixMarked = false
             if (directGpsActive && !fromDirectGps) fusedRecoveryFixes++
@@ -335,7 +433,9 @@ class TrackingService : Service() {
             unusableFixMarked = true
             motionFilter.markSignalUnavailable()
             tripEngine?.markSignalUnavailable()
-            diagnostics.event("usable_gps_lost", mapOf("accuracy_m" to accuracy,
+            markGpsOutage("unusable_fix", mapOf("accuracy_m" to accuracy,
+                "quality" to result.quality, "reason" to result.reason))
+            diagnostics.event("usable_gps_lost", diagnosticContext() + mapOf("accuracy_m" to accuracy,
                 "quality" to result.quality, "reason" to result.reason))
         }
         val state = tripEngine?.save()
@@ -369,7 +469,8 @@ class TrackingService : Service() {
                     currentSnap?.distanceM, nextSnap?.distanceM, stoppedForJunction)
             }
             if (transition != null && nextSnap != null) {
-                diagnostics.event("route_transition", mapOf("from" to routeLabel,
+                routeTransitionCount++
+                diagnostics.event("route_transition", diagnosticContext() + mapOf("from" to routeLabel,
                     "to" to transition.route, "direction" to transition.direction,
                     "physical_m" to nextSnap.physicalM, "official_m" to nextSnap.officialM))
                 routeLabel = transition.route
@@ -387,6 +488,7 @@ class TrackingService : Service() {
         val beforeUpdate = tripEngine?.save()
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
             engineSpeed, positionAccepted, currentSnap, result.stationary))
+        lastEngineOutput = output
         recordPositionRecovery(beforeUpdate, output, currentSnap, positionAccepted)
         tripEngine?.save()?.let(::persistTripState)
         output?.let {
@@ -410,12 +512,15 @@ class TrackingService : Service() {
         if (previous == true && !output.recovering && positionAccepted && snap != null) {
             val beforePhysical = before?.physicalM
             val appliedPhysical = output.physicalM
-            diagnostics.event("position_reconciled", mapOf(
+            positionReconciliationCount++
+            val correction = if (beforePhysical != null && appliedPhysical != null)
+                appliedPhysical - beforePhysical else null
+            maxPositionCorrectionM = maxOf(maxPositionCorrectionM, abs(correction ?: 0.0))
+            diagnostics.event("position_reconciled", diagnosticContext() + mapOf(
                 "route" to routeLabel, "direction" to before?.direction,
                 "before_physical_m" to beforePhysical, "gps_physical_m" to snap.physicalM,
                 "applied_physical_m" to appliedPhysical,
-                "correction_m" to if (beforePhysical != null && appliedPhysical != null)
-                    appliedPhysical - beforePhysical else null,
+                "correction_m" to correction,
                 "official_m" to output.officialM, "distance_to_route_m" to snap.distanceM,
                 "source" to output.source))
         }
@@ -429,7 +534,7 @@ class TrackingService : Service() {
         val key = "$routeLabel|${next.route}|$status|$stopped"
         if (key == lastTransitionProbeKey && now - lastTransitionProbeAt < 10_000L) return
         lastTransitionProbeKey = key; lastTransitionProbeAt = now
-        diagnostics.event("route_transition_probe", mapOf(
+        diagnostics.event("route_transition_probe", diagnosticContext() + mapOf(
             "from" to routeLabel, "to" to next.route, "direction" to next.direction,
             "status" to status, "boundary_m" to boundaryM, "physical_m" to physicalM,
             "current_route_distance_m" to currentDistanceM,
@@ -442,8 +547,8 @@ class TrackingService : Service() {
         val qualityChanged = result.quality != lastDiagnosticQuality
         if (!qualityChanged && now - lastDiagnosticSampleAt < 5_000) return
         lastDiagnosticSampleAt = now; lastDiagnosticQuality = result.quality
-        diagnostics.event(if (qualityChanged) "gps_quality_changed" else "gps_sample", mapOf(
-            "route" to routeLabel, "journey" to journeyId,
+        diagnostics.event(if (qualityChanged) "gps_quality_changed" else "gps_sample", diagnosticContext() + mapOf(
+            "route" to routeLabel, "journey" to journeyId, "train" to trainNumber,
             "direction" to tripEngine?.save()?.direction,
             "lat" to location.latitude, "lon" to location.longitude,
             "accuracy_m" to location.accuracy,
@@ -452,12 +557,15 @@ class TrackingService : Service() {
             "fix_age_ms" to ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0),
             "speed_accuracy_mps" to if (location.hasSpeedAccuracy()) location.speedAccuracyMetersPerSecond else null,
             "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
+            "bearing_deg" to if (location.hasBearing()) location.bearing else null,
             "filtered_speed_kmh" to result.filteredSpeedMps?.times(3.6f),
             "accepted" to result.accepted, "stationary" to result.stationary,
             "quality" to result.quality, "reason" to result.reason,
             "satellites" to satellitesUsed, "average_cn0" to averageCn0,
             "distance_to_route_m" to snap?.distanceM,
             "snapped_physical_m" to snap?.physicalM,
+            "snap_minus_engine_m" to if (snap != null && output?.physicalM != null)
+                snap.physicalM - output.physicalM else null,
             "engine_physical_m" to output?.physicalM,
             "official_m" to output?.officialM,
             "source" to output?.source, "recovering" to output?.recovering
@@ -512,7 +620,8 @@ class TrackingService : Service() {
             savedSpeed, 0))
     }
 
-    private fun applyConfig(raw: String?) = runCatching {
+    private fun applyConfig(raw: String?) {
+        runCatching {
         val root = JSONObject(raw ?: return@runCatching)
         val previousState = tripEngine?.save()
         routeLabel = root.optString("route", "Все участки")
@@ -520,7 +629,8 @@ class TrackingService : Service() {
         trainNumber = root.optString("train").takeUnless { it.isBlank() || it == "null" }
         updateSpeedCeiling()
         soundEnabled = root.optBoolean("sound", true); vibrationEnabled = root.optBoolean("vibration", true)
-        alertSpeech.clear()
+        alertSpeech.clear(); alertSpeed.clear(); alertReason.clear()
+        val restrictionDiagnostics = org.json.JSONArray()
         val restrictions = buildList {
             val items = root.optJSONArray("restrictions") ?: return@buildList
             repeat(items.length()) { index ->
@@ -533,7 +643,15 @@ class TrackingService : Service() {
                 add(NativeTripEngine.Restriction(id, item.optString("peregon", "Все участки"),
                     item.optString("dir", "both"), start, end, root.optDouble("lead", 3_000.0),
                     startTrackHint, endTrackHint))
-                alertSpeech[id] = "${item.optInt("speed")} километров в час. ${item.optString("reason", "Ограничение")}" 
+                val speed = item.optInt("speed")
+                val reason = item.optString("reason", "Ограничение")
+                alertSpeed[id] = speed; alertReason[id] = reason
+                alertSpeech[id] = "$speed километров в час. $reason"
+                restrictionDiagnostics.put(JSONObject().put("id", id).put("route", item.optString("peregon", "Все участки"))
+                    .put("direction", item.optString("dir", "both")).put("start_m", start)
+                    .put("end_m", end).put("speed_kmh", speed).put("reason", reason)
+                    .put("track_start_m", startTrackHint ?: JSONObject.NULL)
+                    .put("track_end_m", endTrackHint ?: JSONObject.NULL))
             }
         }
         val nextDirection = root.optString("direction", "tuda")
@@ -545,11 +663,27 @@ class TrackingService : Service() {
         }
         tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
             nextActive, restrictions)
-        diagnostics.event("trip_configured", mapOf("route" to routeLabel, "journey" to journeyId,
+        val startsNewSession = nextActive && (previousState?.active != true ||
+            previousState?.route != routeLabel || previousState?.direction != nextDirection)
+        if (startsNewSession) startTripSession() else if (!nextActive) finishTripSession("configured-inactive")
+        diagnostics.event("trip_configured", diagnosticContext() + mapOf("route" to routeLabel, "journey" to journeyId,
             "train" to trainNumber, "speed_ceiling_kmh" to RouteSpeedCeilings.maxKmh(routeLabel, trainNumber),
             "trusted_speed_ceiling_kmh" to RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber),
             "direction" to nextDirection, "active" to nextActive,
-            "manual_official_m" to root.optDouble("manualOfficialM"), "restrictions" to restrictions.size))
+            "manual_official_m" to root.optDouble("manualOfficialM"),
+            "lead_m" to root.optDouble("lead", 3_000.0), "sound" to soundEnabled,
+            "vibration" to vibrationEnabled, "restrictions" to restrictions.size))
+        diagnostics.event("restrictions_configured", diagnosticContext() + mapOf(
+            "lead_m" to root.optDouble("lead", 3_000.0), "items" to restrictionDiagnostics))
+        if (previousState?.manualOfficialM != null &&
+            abs(previousState.manualOfficialM - root.optDouble("manualOfficialM")) >= 0.5)
+            diagnostics.event("manual_calibration_changed", diagnosticContext() + mapOf(
+                "from_official_m" to previousState.manualOfficialM,
+                "to_official_m" to root.optDouble("manualOfficialM"),
+                "delta_m" to root.optDouble("manualOfficialM") - previousState.manualOfficialM))
+        }.onFailure { diagnostics.event("trip_config_error", diagnosticContext() + mapOf(
+            "error" to it.javaClass.simpleName, "message" to it.message,
+            "payload_length" to (raw?.length ?: 0))) }
     }
 
     private fun handleAlert(output: NativeTripEngine.Output?) {
@@ -562,9 +696,11 @@ class TrackingService : Service() {
         }
         val entered = output.alertInZone && (id != lastAlertId || !lastAlertInZone)
         if (entered || (!output.alertInZone && warnedAlertIds.add(completedKey))) {
-            diagnostics.event("restriction_alert", mapOf("id" to id, "route" to routeLabel,
-                "distance_m" to output.alertDistanceM, "in_zone" to entered,
-                "official_m" to output.officialM))
+            diagnostics.event("restriction_alert", diagnosticContext() + mapOf(
+                "id" to id, "route" to routeLabel, "speed_kmh" to alertSpeed[id],
+                "reason" to alertReason[id], "distance_m" to output.alertDistanceM,
+                "in_zone" to entered, "official_m" to output.officialM,
+                "physical_m" to output.physicalM))
             val kind = if (entered) "danger" else "warning"
             val distance = output.alertDistanceM ?: 0.0
             val ahead = if (distance >= 1_000) String.format(Locale.forLanguageTag("ru"), "Через %.1f километра. ", distance / 1_000)
@@ -583,6 +719,7 @@ class TrackingService : Service() {
                 recordPowerSample()
                 tripEngine?.let { engine ->
                     val output = engine.update(NativeTripEngine.Input(SystemClock.elapsedRealtime(), null, false, null))
+                    lastEngineOutput = output
                     updateInterferenceMemory(output, output.recovering && System.currentTimeMillis() - lastFixReceivedAt > 5_000)
                     if (output.active) persistTripState(engine.save())
                     persistSnapshot(output, 999f); handleAlert(output)
@@ -597,12 +734,16 @@ class TrackingService : Service() {
         if (now - lastPowerSampleAt < 60_000L) return
         val cpu = android.os.Process.getElapsedCpuTime()
         val battery = registerReceiver(null, android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-        diagnostics.event("power_sample", mapOf(
+        val batteryTemperature = battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)
+            ?.takeIf { it >= 0 }?.div(10.0)
+        if (batteryTemperature != null)
+            maxBatteryTemperatureC = maxOf(maxBatteryTemperatureC ?: batteryTemperature, batteryTemperature)
+        diagnostics.event("power_sample", diagnosticContext() + mapOf(
             "sample_ms" to if (lastPowerSampleAt == 0L) null else now - lastPowerSampleAt,
             "process_cpu_ms" to if (lastPowerSampleAt == 0L) null else cpu - lastProcessCpuMs,
             "battery_level" to battery?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1),
             "battery_scale" to battery?.getIntExtra(BatteryManager.EXTRA_SCALE, -1),
-            "battery_temperature_c" to battery?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1)?.takeIf { it >= 0 }?.div(10.0),
+            "battery_temperature_c" to batteryTemperature,
             "thermal_status" to if (Build.VERSION.SDK_INT >= 29)
                 (getSystemService(POWER_SERVICE) as? PowerManager)?.currentThermalStatus else null,
             "direct_gps_reserve" to directGpsActive,
@@ -645,6 +786,8 @@ class TrackingService : Service() {
     private fun readAsset(path: String) = assets.open(path).bufferedReader().use { it.readText() }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        diagnostics.event("service_command_received", diagnosticContext() + mapOf(
+            "action" to intent?.action, "start_id" to startId, "flags" to flags))
         if (intent?.action == ACTION_CONFIGURE_NATIVE) applyConfig(intent.getStringExtra(EXTRA_NATIVE_CONFIG))
         return START_STICKY
     }
@@ -654,9 +797,10 @@ class TrackingService : Service() {
     }
 
     override fun onDestroy() {
-        diagnostics.event("service_stopped", mapOf("route" to routeLabel,
+        diagnostics.event("service_stopped", diagnosticContext() + mapOf("route" to routeLabel,
             "physical_m" to tripEngine?.save()?.physicalM,
             "manual_official_m" to tripEngine?.save()?.manualOfficialM))
+        finishTripSession("service-stopped")
         tripTicker?.let(mainHandler::removeCallbacks); watchdog?.let(mainHandler::removeCallbacks)
         tripTicker = null; watchdog = null; stopNetworkBackup(); stopDirectGps("service-stopped")
         mainLocationCallback?.let { fusedClient?.removeLocationUpdates(it) }

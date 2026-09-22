@@ -1,0 +1,11 @@
+{"time":1000,"event":"trip_session_started","trip_session_id":"trip-1","route":"СПбФин - Выборг","direction":"tuda","train":"823"}
+{"time":1100,"event":"trip_configured","trip_session_id":"trip-1","route":"СПбФин - Выборг","direction":"tuda","train":"823","lead_m":2000}
+{"time":2000,"event":"gps_outage_started","trip_session_id":"trip-1","route":"СПбФин - Выборг","cause":"location_silence"}
+{"time":42000,"event":"gps_outage_recovered","trip_session_id":"trip-1","route":"СПбФин - Выборг","duration_ms":40000}
+{"time":43000,"event":"position_reconciled","trip_session_id":"trip-1","route":"СПбФин - Выборг","correction_m":650}
+{"time":44000,"event":"route_transition_probe","trip_session_id":"trip-1","route":"СПбФин - Выборг","from":"СПбФин - Выборг","to":"Выборг - Каменногорск","status":"next_projection_unavailable"}
+{"time":45000,"event":"schedule_card_changed","trip_session_id":"trip-1","route":"СПбФин - Выборг","direction":"tuda","train":"823","index":2}
+{"time":46000,"event":"schedule_card_changed","trip_session_id":"trip-1","route":"СПбФин - Выборг","direction":"tuda","train":"823","index":1}
+{"time":47000,"event":"restriction_alert","trip_session_id":"trip-1","route":"СПбФин - Выборг","direction":"tuda","train":"823","id":"r1","in_zone":false,"distance_m":3100}
+{"time":48000,"event":"power_sample","trip_session_id":"trip-1","route":"СПбФин - Выборг","battery_temperature_c":46}
+{"time":49000,"event":"trip_session_summary","trip_session_id":"trip-1","route":"СПбФин - Выборг","duration_ms":48000,"gps_outages":1}

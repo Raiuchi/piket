@@ -65,7 +65,10 @@ class MainActivity : Activity() {
     private var thermalListener: PowerManager.OnThermalStatusChangedListener? = null
     private var screenMode = "auto"
     private var screenDimmed = false
-    private val autoDim = Runnable { if (screenMode == "auto") setWindowBrightness(0.16f, true) }
+    private val autoDim = Runnable { if (screenMode == "auto") {
+        setWindowBrightness(0.16f, true)
+        diagnostics.event("screen_brightness_changed", mapOf("reason" to "auto-dim", "brightness" to 0.16))
+    } }
     private val snapshotPump = object : Runnable {
         override fun run() {
             if (pageReady) publishSnapshot(repository.loadSnapshot())
@@ -85,6 +88,11 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (intent.getBooleanExtra(EXTRA_LIFECYCLE_TEST, false)) { setContentView(android.widget.FrameLayout(this)); return }
+        DiagnosticsLogger.installCrashHandler(this)
+        diagnostics.event("app_opened", mapOf(
+            "version" to packageManager.getPackageInfo(packageName, 0).versionName,
+            "android_sdk" to Build.VERSION.SDK_INT, "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL))
         initTts()
         web = WebView(this).also { view ->
             view.settings.apply {
@@ -112,7 +120,9 @@ class MainActivity : Activity() {
         val power = getSystemService(POWER_SERVICE) as? PowerManager ?: return
         thermalStatus = power.currentThermalStatus
         thermalListener = PowerManager.OnThermalStatusChangedListener { status ->
+            val previous = thermalStatus
             thermalStatus = status
+            diagnostics.event("thermal_status_changed", mapOf("from" to previous, "to" to status))
             runOnUiThread(::publishThermalState)
         }.also(power::addThermalStatusListener)
     }
@@ -128,7 +138,9 @@ class MainActivity : Activity() {
     }
 
     private fun applyScreenMode(mode: String) {
+        val previous = screenMode
         screenMode = mode.takeIf { it in setOf("always", "auto", "system") } ?: "auto"
+        diagnostics.event("screen_mode_changed", mapOf("from" to previous, "to" to screenMode))
         handler.removeCallbacks(autoDim)
         when (screenMode) {
             "always" -> { window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); setWindowBrightness(-1f, false) }
@@ -170,12 +182,36 @@ class MainActivity : Activity() {
         pendingConfig=raw;if(!serviceRunning())return
         startService(Intent(this,TrackingService::class.java).apply{action=TrackingService.ACTION_CONFIGURE_NATIVE;putExtra(TrackingService.EXTRA_NATIVE_CONFIG,raw)})
     }
+    private fun logTripUiAction(event: String, raw: String?) {
+        runCatching {
+            val row = JSONObject(raw ?: return@runCatching)
+            diagnostics.event(event, mapOf(
+                "route" to row.optString("route"), "journey" to row.optString("journey"),
+                "direction" to row.optString("direction"), "train" to row.optString("train"),
+                "active" to row.optBoolean("active"),
+                "manual_official_m" to row.optDouble("manualOfficialM").takeIf { row.has("manualOfficialM") },
+                "lead_m" to row.optDouble("lead").takeIf { row.has("lead") },
+                "restrictions" to (row.optJSONArray("restrictions")?.length() ?: 0)))
+        }.onFailure { diagnostics.event("ui_config_error", mapOf(
+            "event_name" to event, "error" to it.javaClass.simpleName)) }
+    }
+
     private fun serviceRunning():Boolean=(getSystemService(ACTIVITY_SERVICE)as? ActivityManager)?.getRunningServices(Int.MAX_VALUE)?.any{it.service.className==TrackingService::class.java.name}==true
     private fun requestPermissionsIfNeeded(){
         val need=mutableListOf<String>();if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)need+=Manifest.permission.ACCESS_FINE_LOCATION
         if(checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)need+=Manifest.permission.ACCESS_COARSE_LOCATION
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)need+=Manifest.permission.POST_NOTIFICATIONS
-        if(need.isNotEmpty())requestPermissions(need.toTypedArray(),REQUEST_PERMISSIONS)
+        if(need.isNotEmpty()){
+            diagnostics.event("permissions_requested", mapOf("permissions" to need.joinToString(",")))
+            requestPermissions(need.toTypedArray(),REQUEST_PERMISSIONS)
+        }
+    }
+    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray){
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults)
+        if(requestCode==REQUEST_PERMISSIONS)diagnostics.event("permissions_result",mapOf(
+            "results" to permissions.indices.joinToString(","){index->
+                "${permissions[index]}=${if(grantResults.getOrNull(index)==PackageManager.PERMISSION_GRANTED)"granted" else "denied"}"
+            }))
     }
     private fun openExternal(uri:Uri?):Boolean{if(uri==null||uri.toString()==APP_URL)return false;if(uri.scheme in listOf("http","https"))runCatching{startActivity(Intent(Intent.ACTION_VIEW,uri))};return true}
     private fun checkForUpdate(force:Boolean=false){
@@ -322,6 +358,7 @@ class MainActivity : Activity() {
 
     override fun onResume(){
         super.onResume()
+        diagnostics.event("app_lifecycle", mapOf("state" to "foreground", "tracking" to serviceRunning()))
         web?.onResume()
         web?.resumeTimers()
         pendingInstallFile?.let { file ->
@@ -332,6 +369,7 @@ class MainActivity : Activity() {
         if(pageReady)checkForUpdate()
     }
     override fun onPause(){
+        diagnostics.event("app_lifecycle", mapOf("state" to "background", "tracking" to serviceRunning()))
         handler.removeCallbacks(snapshotPump)
         web?.onPause()
         web?.pauseTimers()
@@ -349,21 +387,38 @@ class MainActivity : Activity() {
     inner class PiketBridge{
         @JavascriptInterface fun notifyUiReady() { uiReady = true }
         @JavascriptInterface fun notifyUiStartupError(message: String) { uiStartupError = message }
-        @JavascriptInterface fun configureNativeTrip(json:String)=runOnUiThread{configureRunning(json)}
+        @JavascriptInterface fun configureNativeTrip(json:String)=runOnUiThread{
+            logTripUiAction("trip_config_submitted", json); configureRunning(json)
+        }
         @JavascriptInterface fun startTracking():Long {
             if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED){
                 val sessionId=nativeSessionCounter.incrementAndGet()
-                runOnUiThread{startNative(pendingConfig,sessionId)}
+                runOnUiThread{
+                    logTripUiAction("trip_start_requested", pendingConfig)
+                    diagnostics.event("native_ui_session_started", mapOf("native_session_id" to sessionId))
+                    startNative(pendingConfig,sessionId)
+                }
                 return sessionId
             }
-            runOnUiThread{requestPermissionsIfNeeded();web?.evaluateJavascript("if(window.toast)toast('Разреши точную геолокацию')",null)}
+            runOnUiThread{
+                diagnostics.event("tracking_permission_missing", mapOf("permission" to Manifest.permission.ACCESS_FINE_LOCATION))
+                requestPermissionsIfNeeded();web?.evaluateJavascript("if(window.toast)toast('Разреши точную геолокацию')",null)
+            }
             return 0L
         }
-        @JavascriptInterface fun stopTracking()=runOnUiThread{stopService(Intent(this@MainActivity,TrackingService::class.java))}
-        @JavascriptInterface fun recalibrate()=runOnUiThread{pendingConfig?.let(::configureRunning)}
+        @JavascriptInterface fun stopTracking()=runOnUiThread{
+            diagnostics.event("trip_stop_requested", mapOf("native_session_id" to nativeSessionId))
+            stopService(Intent(this@MainActivity,TrackingService::class.java))
+        }
+        @JavascriptInterface fun recalibrate()=runOnUiThread{
+            logTripUiAction("recalibration_requested", pendingConfig); pendingConfig?.let(::configureRunning)
+        }
         @JavascriptInterface fun setKeepScreen(enabled:Boolean)=runOnUiThread{if(enabled)window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)}
         @JavascriptInterface fun setScreenMode(mode:String)=runOnUiThread{applyScreenMode(mode)}
-        @JavascriptInterface fun lowerBrightness()=runOnUiThread{setWindowBrightness(0.18f,true)}
+        @JavascriptInterface fun lowerBrightness()=runOnUiThread{
+            setWindowBrightness(0.18f,true)
+            diagnostics.event("screen_brightness_changed", mapOf("reason" to "thermal-prompt", "brightness" to 0.18))
+        }
         @JavascriptInterface fun isServiceTracking()=serviceRunning()
         @JavascriptInterface fun isHeadless()=false
         @JavascriptInterface fun isTtsReady()=ttsReady
@@ -381,7 +436,8 @@ class MainActivity : Activity() {
                     "route" to row.optString("route"), "direction" to row.optString("direction"),
                     "train" to row.optString("train"), "index" to row.optInt("index"),
                     "from" to row.optString("from"), "to" to row.optString("to"),
-                    "physical_m" to row.optDouble("physical_m").takeIf { row.has("physical_m") }
+                    "physical_m" to row.optDouble("physical_m").takeIf { row.has("physical_m") && it.isFinite() },
+                    "native_session_id" to nativeSessionId
                 ))
             }
         }
