@@ -1506,7 +1506,7 @@ window.addEventListener("error",function(e){
   }
   function saveWebTripSession(active){
     if(window.Android)return;
-    save("sap_web_active",{active:active===true,ts:Date.now(),peregon:state.ctx.peregon,towards:state.ctx.towards,through:state.ctx.through||null,odo:+rt.odo||0,posM:rt.posM==null?null:+rt.posM,physicalM:rt.physicalM==null?null:+rt.physicalM,fixQuality:rt.fixQuality||null});
+    save("sap_web_active",{active:active===true,ts:Date.now(),peregon:state.ctx.peregon,towards:state.ctx.towards,through:state.ctx.through||null,odo:+rt.odo||0,posM:rt.posM==null?null:+rt.posM,physicalM:rt.physicalM==null?null:+rt.physicalM,fixQuality:rt.fixQuality||null,diagnosticSessionId:rt.diagnosticSessionId||null});
   }
   function resumeWebTrip(reason){
     if(!rt.tracking||window.Android||document.visibilityState!=="visible")return;
@@ -1724,7 +1724,7 @@ window.addEventListener("error",function(e){
             toast("Смена кабины — откалибруйся по новому столбу");
           }
           var vyborgAxisChange=isVyborgLeg(state.ctx.peregon)&&isVyborgLeg(label),dachaAxisChange=isDachaLeg(state.ctx.peregon)&&isDachaLeg(label);
-          state.ctx.peregon=label; persist(); renderTrip(); toast(chainNext.trainChange?("Великий Новгород: смена поезда "+chainNext.trainChange):(chainNext.cabChange?("Чудово: смена кабины, маршрут продолжен автоматически"):(activeThrough()==="chudovo"?((chainNext.place||"Маршрут")+": участок и километровая ось переключены автоматически"):(vyborgAxisChange?"Выборг: километровая ось переключена автоматически":(dachaAxisChange?(label.indexOf("Горы")>=0?"Горы: километровая ось переключена автоматически":"Маршрут продолжен автоматически"):("Перегон: "+label)))))); setSeg("#dirSeg",journeyTowards(),"d");
+          var previousChainPeregon=state.ctx.peregon;state.ctx.peregon=label;webLog("route_transition",{from:previousChainPeregon,to:label,kind:"journey-chain",place:chainNext.place||null,physical_m:currentTrackMeters()}); persist(); renderTrip(); toast(chainNext.trainChange?("Великий Новгород: смена поезда "+chainNext.trainChange):(chainNext.cabChange?("Чудово: смена кабины, маршрут продолжен автоматически"):(activeThrough()==="chudovo"?((chainNext.place||"Маршрут")+": участок и километровая ось переключены автоматически"):(vyborgAxisChange?"Выборг: километровая ось переключена автоматически":(dachaAxisChange?(label.indexOf("Горы")>=0?"Горы: километровая ось переключена автоматически":"Маршрут продолжен автоматически"):("Перегон: "+label)))))); setSeg("#dirSeg",journeyTowards(),"d");
         }
         return;
       }
@@ -1764,7 +1764,8 @@ window.addEventListener("error",function(e){
           if(rt.peregonCandCount<3) return;
           rt.peregonCandLabel=null; rt.peregonCandCount=0;
         }
-        state.ctx.peregon=label; persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
+        var previousPeregon=state.ctx.peregon;
+        state.ctx.peregon=label; webLog("route_transition",{from:previousPeregon,to:label,distance_to_route_m:bestDist,physical_m:currentTrackMeters()}); persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
       } else if(strictMode){ rt.peregonCandLabel=null; rt.peregonCandCount=0; }
     }
   }
@@ -1782,8 +1783,10 @@ window.addEventListener("error",function(e){
     if(window.Android) return;
     try {
       var rows=JSON.parse(localStorage.getItem(diagnosticKey)||"[]");
-      rows.push(Object.assign({time:Date.now(),event:event,source:"browser",route:state.ctx.peregon,official_m:rt.posM,speed_kmh:rt.speed,quality:rt.fixQuality},fields||{}));
-      while(rows.length>1500)rows.shift();
+      rt.diagnosticSeq=(rt.diagnosticSeq||0)+1;
+      var selectedTrain=selectedScheduleTrain();
+      rows.push(Object.assign({time:Date.now(),elapsed_ms:(window.performance&&performance.now)?Math.round(performance.now()):null,seq:rt.diagnosticSeq,event:event,source:"browser",trip_session_id:rt.diagnosticSessionId||null,route:state.ctx.peregon,direction:journeyTowards(),train:selectedTrain?selectedTrain.number:null,official_m:rt.posM,physical_m:rt.physicalM,speed_kmh:rt.speed,quality:rt.fixQuality,gps_state:rt.gpsState},fields||{}));
+      while(rows.length>5000)rows.shift();
       localStorage.setItem(diagnosticKey,JSON.stringify(rows));
     } catch(e){ if(!diagnosticLast)toast("Не удалось сохранить журнал браузера"); }
   }
@@ -1916,7 +1919,10 @@ window.addEventListener("error",function(e){
     // координаты реально смещаются (доплер недоступен/нестабилен И обычный fallback выше
     // не сработал, например из-за частых мелких dt). Без этого счётчик мог намертво
     // зависнуть на всю поездку, даже когда поезд реально едет.
-    if(spd!=null && signalGood){ rt.signalLostAt=0; rt.lastLossDecayAt=0; }
+    if(spd!=null && signalGood){
+      if(rt.signalLostAt){webLog("gps_outage_recovered",{duration_ms:Math.max(0,now-rt.signalLostAt),accuracy_m:acc,backup:!!fromBackup,snapped_physical_m:currentTrackMeters()});}
+      rt.signalLostAt=0; rt.lastLossDecayAt=0;
+    }
     if(rt.speed<=0.5){
       if(rt.zeroSpeedSince==null){ rt.zeroSpeedSince=now; rt.zeroSpeedAnchor=rt.last; }
       else if(rt.zeroSpeedAnchor==null) rt.zeroSpeedAnchor=rt.last; // застой начался на самом первом фиксе — якорь подхватываем как только появится первая точка
@@ -2217,7 +2223,9 @@ window.addEventListener("error",function(e){
     autoDetectPeregon(c.latitude, c.longitude, acc);
     updateAndroidNotification();
     renderTripAdaptive(false); evalAlerts(); }
-  function onErr(e){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; // watchdog ориентируется только на последнюю пригодную позицию
+  function onErr(e){
+    if(!rt.signalLostAt){rt.signalLostAt=Date.now();webLog("gps_outage_started",{error_code:e&&e.code||null,stale:!!(e&&e.stale),last_accuracy_m:rt.lastAccuracy});}
+    rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; // watchdog ориентируется только на последнюю пригодную позицию
     if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
       // КРИТИЧНО: при полной потере сигнала скорость раньше оставалась ЗАСТЫВШЕЙ на
       // последнем известном значении - если перед самой потерей был случайный шумовой
@@ -2396,13 +2404,14 @@ window.addEventListener("error",function(e){
 
   function startTrack(){
     alertState={};rt.nativeSnapshot=false;
-    webLog("trip_started");
 
     if(state.calib==null || state.calib._manual!==true){
       toast("Сначала обязательная калибровка по километровому столбу");
       openCal();
       return;
     }
+    rt.diagnosticSessionId=rt.restoredDiagnosticSessionId||(Date.now()+"-"+Math.random().toString(36).slice(2,8));rt.restoredDiagnosticSessionId=null;rt.diagnosticSeq=0;
+    webLog("trip_started",{manual_official_m:state.calib.m,calibration_track_m:state.calib._trackM,lead_m:state.settings.lead,restrictions:state.restrictions.length});
     rt.stoppedPositionM=null;rt.stoppedRoute=null;rt.stoppedDirection=null;save("sap_lastStop",null);
     rt.autoCalWeakStreak=0; rt.autoCalNullStreak=0; rt.zoneWarnedKey=null; rt.trackingSince=Date.now();
     // Старт разрешён только после ручной калибровки. Автоматической остаётся именно
@@ -2484,7 +2493,7 @@ window.addEventListener("error",function(e){
 
   function setTrackBtn(on){ var b=$("#btnTrack"); if(on){ b.textContent="■ Стоп"; b.classList.remove("primary"); b.classList.add("stop"); } else { b.textContent="▶ Старт"; b.classList.add("primary"); b.classList.remove("stop"); }
     var dirSeg=$("#dirSeg"); if(dirSeg) dirSeg.style.opacity = on ? "0.5" : "1"; }
-  function stopTrack(){ webLog("trip_stopped"); if(rt.posM!=null){rt.stoppedPositionM=+rt.posM;rt.stoppedRoute=state.ctx.peregon;rt.stoppedDirection=state.ctx.towards;save("sap_lastStop",{position:rt.stoppedPositionM,route:rt.stoppedRoute,direction:rt.stoppedDirection,time:Date.now()});} rt.tracking=false;saveWebTripSession(false);
+  function stopTrack(){ webLog("trip_session_summary",{duration_ms:rt.trackingSince?Math.max(0,Date.now()-rt.trackingSince):null,final_official_m:rt.posM,final_physical_m:rt.physicalM});webLog("trip_stopped"); if(rt.posM!=null){rt.stoppedPositionM=+rt.posM;rt.stoppedRoute=state.ctx.peregon;rt.stoppedDirection=state.ctx.towards;save("sap_lastStop",{position:rt.stoppedPositionM,route:rt.stoppedRoute,direction:rt.stoppedDirection,time:Date.now()});} rt.tracking=false;saveWebTripSession(false);
     var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.remove("on");
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
     if(rt.backupWatchId!=null){ try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){} rt.backupWatchId=null; }
@@ -3135,7 +3144,7 @@ window.addEventListener("error",function(e){
     // Если поездка не была остановлена вручную, восстанавливаем её последнее честное состояние.
     var webTrip=load("sap_web_active",null),webTripAge=webTrip?Date.now()-(+webTrip.ts||0):Infinity;
     if(webTrip&&webTrip.active&&webTripAge>=0&&webTripAge<43200000&&state.calib&&state.calib._manual===true&&webTrip.peregon===state.ctx.peregon&&webTrip.towards===state.ctx.towards){
-      rt.odo=Math.max(0,+webTrip.odo||0);rt.posM=webTrip.posM==null?currentMeters():+webTrip.posM;rt.physicalM=webTrip.physicalM==null?null:+webTrip.physicalM;rt.fixQuality="recovering";
+      rt.odo=Math.max(0,+webTrip.odo||0);rt.posM=webTrip.posM==null?currentMeters():+webTrip.posM;rt.physicalM=webTrip.physicalM==null?null:+webTrip.physicalM;rt.fixQuality="recovering";rt.restoredDiagnosticSessionId=webTrip.diagnosticSessionId||null;
       setTimeout(function(){if(!rt.tracking){startTrack();webLog("web_trip_auto_resumed",{background_ms:webTripAge});toast("Поездка восстановлена, уточняю GPS…");}},0);
     }
   }
