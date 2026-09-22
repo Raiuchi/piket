@@ -1,0 +1,7 @@
+ПИКЕТ — диагностический журнал
+Тестовый журнал без реальных координат.
+
+{"time":1000,"elapsed_ms":900,"seq":1,"event":"trip_session_started","trip_session_id":"fixture-clean","route":"СПбФин - Выборг","journey":"null","direction":"tuda","train":"823","manual_official_m":1300.0,"physical_m":null}
+{"time":1001,"elapsed_ms":901,"seq":2,"event":"trip_configured","trip_session_id":"fixture-clean","route":"СПбФин - Выборг","journey":"null","direction":"tuda","train":"823","active":true,"manual_official_m":1300.0,"lead_m":3000.0,"restrictions":0}
+{"time":1002,"elapsed_ms":902,"seq":3,"event":"restrictions_configured","trip_session_id":"fixture-clean","route":"СПбФин - Выборг","journey":"null","direction":"tuda","train":"823","lead_m":3000.0,"items":[]}
+{"time":3000,"elapsed_ms":3000,"seq":4,"event":"replay_trace_batch","trip_session_id":"fixture-clean","schema":1,"records":[["t",1000,null,null,0.0,"native-count",false,null,null,false,"СПбФин - Выборг","tuda"],["t",2000,null,null,0.0,"native-count",false,null,null,false,"СПбФин - Выборг","tuda"]]}

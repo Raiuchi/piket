@@ -28,7 +28,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6
 
       - name: Run native GPS and route unit tests
-        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+        run: ./gradlew testDebugUnitTest :replay:test :replay:replayDiagnostics -PdiagnosticsFile=tools/fixtures/diagnostics-replay-clean.txt -PexpectClean=true --no-daemon --stacktrace
 
       - name: Check browser route regression
         run: |

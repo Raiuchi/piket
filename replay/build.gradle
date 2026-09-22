@@ -1,0 +1,48 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    id 'application'
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+
+dependencies {
+    implementation 'org.json:json:20240303'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+application {
+    mainClass = 'net.raiuchi.piket.replay.DiagnosticReplayKt'
+}
+
+sourceSets {
+    main {
+        kotlin {
+            srcDir 'src/main/kotlin'
+            srcDir '../app/src/main/java'
+            include 'net/raiuchi/piket/NativeMotionFilter.kt'
+            include 'net/raiuchi/piket/NativeRouteEngine.kt'
+            include 'net/raiuchi/piket/NativeTripEngine.kt'
+            include 'net/raiuchi/piket/NativeJourneyRouter.kt'
+            include 'net/raiuchi/piket/RouteSpeedCeilings.kt'
+            include 'net/raiuchi/piket/replay/**'
+        }
+        resources.srcDir '../app/src/main/assets'
+        resources.srcDir '../tools/fixtures'
+    }
+}
+
+tasks.register('replayDiagnostics', JavaExec) {
+    group = 'verification'
+    description = 'Replays an exported PIKET diagnostic log through the production trip engine.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = application.mainClass
+    doFirst {
+        def input = providers.gradleProperty('diagnosticsFile').orNull
+        if (!input) throw new GradleException('Укажите -PdiagnosticsFile=путь-к-piket-diagnostics.txt')
+        args input
+        if (providers.gradleProperty('replayJson').orNull == 'true') args '--json'
+        if (providers.gradleProperty('expectClean').orNull == 'true') args '--expect-clean'
+    }
+}

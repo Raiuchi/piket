@@ -125,6 +125,8 @@ class TrackingService : Service() {
     private var routeTransitionCount = 0
     private var maxBatteryTemperatureC: Double? = null
     private var lastEngineOutput: NativeTripEngine.Output? = null
+    private var replayTrace = org.json.JSONArray()
+    private var lastReplayTraceFlushAt = 0L
 
     private fun diagnosticContext() = mapOf(
         "trip_session_id" to tripSessionId, "route" to routeLabel, "journey" to journeyId,
@@ -145,6 +147,7 @@ class TrackingService : Service() {
 
     private fun finishTripSession(reason: String) {
         val session = tripSessionId ?: return
+        flushReplayTrace(true)
         val now = System.currentTimeMillis()
         if (gpsOutageStartedAt > 0L) {
             val duration = (now - gpsOutageStartedAt).coerceAtLeast(0)
@@ -183,6 +186,47 @@ class TrackingService : Service() {
             "physical_m" to tripEngine?.save()?.physicalM,
             "official_m" to lastEngineOutput?.officialM))
         gpsOutageStartedAt = 0
+    }
+
+    private fun recordReplayGps(location: Location, result: NativeMotionFilter.Result,
+        snap: NativeRouteEngine.Snap?, output: NativeTripEngine.Output?, fromDirectGps: Boolean) {
+        if (tripSessionId == null) return
+        replayTrace.put(org.json.JSONArray()
+            .put("g").put(location.elapsedRealtimeNanos / 1_000_000)
+            .put(location.latitude).put(location.longitude)
+            .put(((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0))
+            .put(if (location.hasAccuracy()) location.accuracy else 999f)
+            .put(if (location.hasSpeed()) location.speed else JSONObject.NULL)
+            .put(if (location.hasSpeedAccuracy()) location.speedAccuracyMetersPerSecond else JSONObject.NULL)
+            .put(location.isMock).put(satellitesUsed).put(averageCn0).put(gnssTelemetrySeen)
+            .put(fromDirectGps).put(result.accepted)
+            .put(result.filteredSpeedMps ?: JSONObject.NULL).put(result.stationary)
+            .put(result.quality).put(result.reason)
+            .put(snap?.physicalM ?: JSONObject.NULL).put(snap?.distanceM ?: JSONObject.NULL)
+            .put(output?.physicalM ?: JSONObject.NULL).put(output?.officialM ?: JSONObject.NULL)
+            .put(output?.source ?: JSONObject.NULL).put(output?.recovering ?: JSONObject.NULL)
+            .put(routeLabel).put(tripEngine?.save()?.direction ?: JSONObject.NULL))
+        flushReplayTrace(false)
+    }
+
+    private fun recordReplayTick(elapsedMs: Long, output: NativeTripEngine.Output) {
+        if (tripSessionId == null) return
+        replayTrace.put(org.json.JSONArray().put("t").put(elapsedMs)
+            .put(output.physicalM ?: JSONObject.NULL).put(output.officialM ?: JSONObject.NULL)
+            .put(output.speedMps).put(output.source).put(output.recovering)
+            .put(output.alertId ?: JSONObject.NULL).put(output.alertDistanceM ?: JSONObject.NULL)
+            .put(output.alertInZone).put(routeLabel).put(tripEngine?.save()?.direction ?: JSONObject.NULL))
+        flushReplayTrace(false)
+    }
+
+    private fun flushReplayTrace(force: Boolean) {
+        if (replayTrace.length() == 0) return
+        val now = SystemClock.elapsedRealtime()
+        if (!force && replayTrace.length() < 120 && now - lastReplayTraceFlushAt < 30_000L) return
+        val batch = replayTrace
+        replayTrace = org.json.JSONArray(); lastReplayTraceFlushAt = now
+        diagnostics.event("replay_trace_batch", diagnosticContext() + mapOf(
+            "schema" to 1, "records" to batch))
     }
 
     override fun onCreate() {
@@ -496,6 +540,7 @@ class TrackingService : Service() {
         }
         persistSnapshot(output, accuracy); handleAlert(output)
         recordDiagnosticSample(location, result, currentSnap, output, fromDirectGps)
+        recordReplayGps(location, result, currentSnap, output, fromDirectGps)
         output?.officialM?.let { official ->
             val text=NativePositionLabel.kmPk(official)
             val now=SystemClock.elapsedRealtime()
@@ -554,7 +599,9 @@ class TrackingService : Service() {
             "accuracy_m" to location.accuracy,
             "provider" to location.provider,
             "direct_gps_reserve" to fromDirectGps,
+            "fix_elapsed_ms" to location.elapsedRealtimeNanos / 1_000_000,
             "fix_age_ms" to ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0),
+            "mock" to location.isMock, "gnss_telemetry" to gnssTelemetrySeen,
             "speed_accuracy_mps" to if (location.hasSpeedAccuracy()) location.speedAccuracyMetersPerSecond else null,
             "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
             "bearing_deg" to if (location.hasBearing()) location.bearing else null,
@@ -718,8 +765,10 @@ class TrackingService : Service() {
             override fun run() {
                 recordPowerSample()
                 tripEngine?.let { engine ->
-                    val output = engine.update(NativeTripEngine.Input(SystemClock.elapsedRealtime(), null, false, null))
+                    val tickElapsed = SystemClock.elapsedRealtime()
+                    val output = engine.update(NativeTripEngine.Input(tickElapsed, null, false, null))
                     lastEngineOutput = output
+                    recordReplayTick(tickElapsed, output)
                     updateInterferenceMemory(output, output.recovering && System.currentTimeMillis() - lastFixReceivedAt > 5_000)
                     if (output.active) persistTripState(engine.save())
                     persistSnapshot(output, 999f); handleAlert(output)

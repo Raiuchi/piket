@@ -55,7 +55,7 @@ class DiagnosticsLogger(context: Context) {
     }
 
     companion object {
-        private const val MAX_BYTES = 3_000_000L
+        private const val MAX_BYTES = 6_000_000L
         private val writeLock = Any()
         private val sequence = AtomicLong()
         private val crashHandlerInstalled = AtomicBoolean()
