@@ -530,8 +530,21 @@ class TrackingService : Service() {
         val positionAccepted = result.accepted && result.quality in setOf("good", "stationary")
         val engineSpeed = result.filteredSpeedMps
         val beforeUpdate = tripEngine?.save()
+        // A fresh coarse fix near the selected route is good enough to remember where
+        // the manual calibration was made. It is never shown as a trusted GPS fix; the
+        // normal two-fix recovery still confirms the first precise position.
+        val provisionalCalibrationFix = beforeUpdate?.physicalM == null && !positionAccepted &&
+            isFreshRealFix(location) && accuracy in 1f..120f &&
+            currentSnap?.distanceM?.let { it <= 120.0 } == true &&
+            (satellitesUsed > 0 || !gnssTelemetrySeen)
         val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
-            engineSpeed, positionAccepted, currentSnap, result.stationary))
+            engineSpeed, positionAccepted, currentSnap, result.stationary, provisionalCalibrationFix))
+        if (provisionalCalibrationFix && beforeUpdate?.physicalM == null && output?.physicalM != null) {
+            diagnostics.event("calibration_anchor_provisional", diagnosticContext() + mapOf(
+                "accuracy_m" to accuracy, "satellites" to satellitesUsed,
+                "distance_to_route_m" to currentSnap?.distanceM,
+                "physical_m" to output.physicalM, "official_m" to output.officialM))
+        }
         lastEngineOutput = output
         recordPositionRecovery(beforeUpdate, output, currentSnap, positionAccepted)
         tripEngine?.save()?.let(::persistTripState)

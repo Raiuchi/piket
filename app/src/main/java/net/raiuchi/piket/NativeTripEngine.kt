@@ -9,7 +9,8 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
                            val startOfficialM: Double, val endOfficialM: Double, val leadM: Double,
                            val startTrackHintM: Double? = null, val endTrackHintM: Double? = null)
     data class Input(val elapsedMs: Long, val speedMps: Float?, val acceptedFix: Boolean,
-                     val snap: NativeRouteEngine.Snap?, val stationary: Boolean = false)
+                     val snap: NativeRouteEngine.Snap?, val stationary: Boolean = false,
+                     val provisionalCalibrationFix: Boolean = false)
     data class Output(val active: Boolean, val physicalM: Double?, val officialM: Double?,
                       val speedMps: Float, val recovering: Boolean, val source: String,
                       val alertId: String?, val alertDistanceM: Double?, val alertInZone: Boolean)
@@ -63,13 +64,17 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
             speedMps = (speedMps * 0.997.pow(dt)).toFloat()
         }
 
-        val snap = input.snap?.takeIf { input.acceptedFix && it.routeLabel == route && it.distanceM <= 120.0 }
-        if (physicalM == null && snap != null) {
-            physicalM = snap.physicalM
-            val base = routes.officialMeters(route, snap.physicalM, direction) ?: manualOfficialM
+        val calibrationSnap = input.snap?.takeIf {
+            (input.acceptedFix || input.provisionalCalibrationFix) &&
+                it.routeLabel == route && it.distanceM <= 120.0
+        }
+        val snap = calibrationSnap?.takeIf { input.acceptedFix }
+        if (physicalM == null && calibrationSnap != null) {
+            physicalM = calibrationSnap.physicalM
+            val base = routes.officialMeters(route, calibrationSnap.physicalM, direction) ?: manualOfficialM
             officialOffsetM = (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
-            recovering = false
-            return output("native-gps")
+            recovering = !input.acceptedFix
+            return output(if (input.acceptedFix) "native-gps" else "native-count")
         }
         if (snap != null && physicalM != null) {
             // Do not let harmless GPS drift move the kilometre while the train is

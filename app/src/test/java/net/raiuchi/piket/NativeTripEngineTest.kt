@@ -28,6 +28,28 @@ class NativeTripEngineTest {
         assertEquals(route.chainageM.first(), output.officialM!!, 0.01)
     }
 
+    @Test fun coarseStartAnchorPreservesMovementBeforeFirstPreciseFix() {
+        val start = snap(0)
+        val precise = snap(1)
+        val manualOffset = 250.0
+        val manualAtStart = routes.officialMeters(route.label, start.physicalM, "tuda")!! + manualOffset
+        engine.configure(route.label, "tuda", manualAtStart, true, emptyList())
+
+        val provisional = engine.update(NativeTripEngine.Input(
+            1_000, null, false, start, false, provisionalCalibrationFix = true))
+        assertTrue(provisional.recovering)
+        assertEquals("native-count", provisional.source)
+        assertEquals(manualAtStart, provisional.officialM!!, 0.01)
+
+        assertTrue(engine.update(NativeTripEngine.Input(120_000, 0f, true, precise)).recovering)
+        val recovered = engine.update(NativeTripEngine.Input(121_000, 0f, true, precise))
+        val expectedNow = routes.officialMeters(route.label, precise.physicalM, "tuda")!! + manualOffset
+        assertFalse(recovered.recovering)
+        assertEquals(precise.physicalM, recovered.physicalM!!, 0.01)
+        assertEquals(expectedNow, recovered.officialM!!, 0.01)
+        assertTrue(recovered.officialM!! > manualAtStart)
+    }
+
     @Test fun continuesCountingDuringSignalLoss() {
         engine.update(NativeTripEngine.Input(1_000, 20f, true, snap(0)))
         engine.markSignalUnavailable()
