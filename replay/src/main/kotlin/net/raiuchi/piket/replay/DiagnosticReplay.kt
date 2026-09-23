@@ -199,8 +199,12 @@ object DiagnosticReplay {
                             }
                         }
                         val positionAccepted = filtered.accepted && filtered.quality in setOf("good", "stationary")
+                        val provisionalCalibrationFix = trip.save().physicalM == null && !positionAccepted &&
+                            fix.ageMs <= 5_000 && !fix.mock && fix.accuracyM in 1f..120f &&
+                            snap?.distanceM?.let { it <= 120.0 } == true &&
+                            (fix.satellitesUsed > 0 || !fix.hasGnssTelemetry)
                         val output = trip.update(NativeTripEngine.Input(elapsed, filtered.filteredSpeedMps,
-                            positionAccepted, snap, filtered.stationary))
+                            positionAccepted, snap, filtered.stationary, provisionalCalibrationFix))
                         compareValue(elapsed, "GPS accepted", record.optBoolean(13), filtered.accepted)
                         compareDouble(elapsed, "filtered speed", record.optNullableDouble(14), filtered.filteredSpeedMps?.toDouble(), 0.02)
                         compareValue(elapsed, "stationary", record.optBoolean(15), filtered.stationary)
