@@ -16,7 +16,8 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
                       val alertId: String?, val alertDistanceM: Double?, val alertInZone: Boolean)
     data class SavedState(val active: Boolean, val route: String, val direction: String,
                           val manualOfficialM: Double, val physicalM: Double?, val offsetM: Double,
-                          val speedMps: Float, val lastElapsedMs: Long)
+                          val speedMps: Float, val lastElapsedMs: Long,
+                          val calibrationWaitStartedElapsedMs: Long = 0L)
 
     private var active = false
     private var route = "Все участки"
@@ -26,6 +27,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     private var officialOffsetM = 0.0
     private var speedMps = 0f
     private var lastElapsedMs = 0L
+    private var calibrationWaitStartedElapsedMs = 0L
     private var recovering = false
     private var recoveryCandidateM: Double? = null
     private var recoveryConfirmations = 0
@@ -45,6 +47,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
             officialOffsetM = 0.0
             recoveryCandidateM = null
             recoveryConfirmations = 0
+            calibrationWaitStartedElapsedMs = 0L
         }
     }
 
@@ -56,6 +59,8 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
 
     fun update(input: Input): Output {
         if (!active) return output("inactive")
+        if (physicalM == null && calibrationWaitStartedElapsedMs == 0L)
+            calibrationWaitStartedElapsedMs = input.elapsedMs
         val dt = if (lastElapsedMs > 0L) ((input.elapsedMs - lastElapsedMs).coerceIn(0L, 5_000L) / 1000.0) else 0.0
         lastElapsedMs = input.elapsedMs
         input.speedMps?.let { speedMps = it.coerceIn(0f, 83.34f) }
@@ -72,7 +77,14 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         if (physicalM == null && calibrationSnap != null) {
             physicalM = calibrationSnap.physicalM
             val base = routes.officialMeters(route, calibrationSnap.physicalM, direction) ?: manualOfficialM
-            officialOffsetM = (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
+            // If departure had no usable on-route anchor, a precise fix arriving much
+            // later is the train's current place, not the old manually entered place.
+            val delayedFirstFix = input.acceptedFix && !input.provisionalCalibrationFix &&
+                input.elapsedMs - calibrationWaitStartedElapsedMs >= 30_000L &&
+                abs(manualOfficialM - base) > 250.0
+            officialOffsetM = if (delayedFirstFix) 0.0
+                else (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
+            calibrationWaitStartedElapsedMs = 0L
             recovering = !input.acceptedFix
             return output(if (input.acceptedFix) "native-gps" else "native-count")
         }
@@ -108,12 +120,13 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     }
 
     fun save(): SavedState = SavedState(active, route, direction, manualOfficialM, physicalM,
-        officialOffsetM, speedMps, lastElapsedMs)
+        officialOffsetM, speedMps, lastElapsedMs, calibrationWaitStartedElapsedMs)
 
     fun restore(saved: SavedState) {
         active = saved.active; route = saved.route; direction = saved.direction
         manualOfficialM = saved.manualOfficialM; physicalM = saved.physicalM
         officialOffsetM = saved.offsetM; speedMps = saved.speedMps; lastElapsedMs = saved.lastElapsedMs
+        calibrationWaitStartedElapsedMs = saved.calibrationWaitStartedElapsedMs
         recovering = true
     }
 

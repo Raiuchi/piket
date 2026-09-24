@@ -51,10 +51,10 @@ class NativeJourneyRouter private constructor(
         return when {
             current == "СПбФин - Выборг" && direction == "tuda" && next.route == "Выборг - Каменногорск" ->
                 Transition(next.route, next.direction, boundaryM = 128_900.0,
-                    maxNextDistanceM = 150.0, requireStop = true)
+                    maxNextDistanceM = 1_000.0, requireStop = true)
             current == "Выборг - Каменногорск" && direction == "obratno" && next.route == "СПбФин - Выборг" ->
                 Transition(next.route, next.direction, boundaryM = 1_000.0,
-                    maxNextDistanceM = 150.0, requireStop = true)
+                    maxNextDistanceM = 1_000.0, requireStop = true)
             journey == "819" && current == "Волховстрой - Чудово" && direction == "obratno" ->
                 Transition(next.route, next.direction, boundaryM = 1_000.0, maxNextDistanceM = 150.0)
             journey == "820" && current == "Горы - Петрозаводск" && direction == "obratno" ->

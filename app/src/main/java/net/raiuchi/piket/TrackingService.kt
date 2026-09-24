@@ -65,6 +65,7 @@ class TrackingService : Service() {
     private var directGpsStartedAt = 0L
     private var lastDirectGpsStopAt = 0L
     private var fusedRecoveryFixes = 0
+    private var directGpsExtendedLogged = false
     private var lastProcessedFixNanos = 0L
     @Volatile private var satellitesUsed = 0
     @Volatile private var averageCn0 = 0f
@@ -368,8 +369,13 @@ class TrackingService : Service() {
                 val unusableFor = now - lastUsableFixAt
                 if (!directGpsActive && unusableFor > 10_000 && now - lastDirectGpsStopAt > 30_000)
                     startDirectGps(now, silence, unusableFor)
-                if (directGpsActive && (fusedRecoveryFixes >= 3 || now - directGpsStartedAt > 120_000))
-                    stopDirectGps(if (fusedRecoveryFixes >= 3) "fused-recovered" else "battery-window")
+                if (directGpsActive && fusedRecoveryFixes >= 3) stopDirectGps("fused-recovered")
+                else if (directGpsActive && !directGpsExtendedLogged && now - directGpsStartedAt > 120_000) {
+                    directGpsExtendedLogged = true
+                    diagnostics.event("direct_gps_extended", diagnosticContext() + mapOf(
+                        "active_ms" to (now - directGpsStartedAt),
+                        "reason" to "primary-not-recovered"))
+                }
                 // Fresh network fixes can mask a stalled precise-GPS stream.
                 // Bound retries to avoid continually restarting acquisition in interference.
                 if ((silence > 15_000 || now - lastUsableFixAt > 30_000) && now - lastFusedRestartAt > 120_000) {
@@ -434,7 +440,7 @@ class TrackingService : Service() {
         runCatching {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
             directGpsListener = listener; directGpsActive = true; directGpsStartedAt = now
-            fusedRecoveryFixes = 0; directGpsStartCount++
+            fusedRecoveryFixes = 0; directGpsExtendedLogged = false; directGpsStartCount++
             diagnostics.event("direct_gps_started", diagnosticContext() + mapOf(
                 "silence_ms" to silence, "unusable_ms" to unusableFor))
         }
@@ -446,6 +452,7 @@ class TrackingService : Service() {
             "active_ms" to (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0)))
         directGpsListener = null; directGpsActive = false
         lastDirectGpsStopAt = System.currentTimeMillis(); fusedRecoveryFixes = 0
+        directGpsExtendedLogged = false
     }
 
     private fun isFreshRealFix(location: Location): Boolean {
@@ -537,8 +544,18 @@ class TrackingService : Service() {
             isFreshRealFix(location) && accuracy in 1f..120f &&
             currentSnap?.distanceM?.let { it <= 120.0 } == true &&
             (satellitesUsed > 0 || !gnssTelemetrySeen)
-        val output = tripEngine?.update(NativeTripEngine.Input(location.elapsedRealtimeNanos / 1_000_000,
-            engineSpeed, positionAccepted, currentSnap, result.stationary, provisionalCalibrationFix))
+        val fixElapsedMs = location.elapsedRealtimeNanos / 1_000_000
+        val output = tripEngine?.update(NativeTripEngine.Input(fixElapsedMs, engineSpeed,
+            positionAccepted, currentSnap, result.stationary, provisionalCalibrationFix))
+        if (beforeUpdate?.physicalM == null && output?.physicalM != null && positionAccepted &&
+            !provisionalCalibrationFix && beforeUpdate.calibrationWaitStartedElapsedMs > 0L &&
+            fixElapsedMs - beforeUpdate.calibrationWaitStartedElapsedMs >= 30_000L) {
+            diagnostics.event("calibration_anchor_recovered_late", diagnosticContext() + mapOf(
+                "wait_ms" to (fixElapsedMs - beforeUpdate.calibrationWaitStartedElapsedMs),
+                "manual_official_m" to beforeUpdate.manualOfficialM,
+                "gps_physical_m" to currentSnap?.physicalM, "official_m" to output.officialM,
+                "distance_to_route_m" to currentSnap?.distanceM))
+        }
         if (provisionalCalibrationFix && beforeUpdate?.physicalM == null && output?.physicalM != null) {
             diagnostics.event("calibration_anchor_provisional", diagnosticContext() + mapOf(
                 "accuracy_m" to accuracy, "satellites" to satellitesUsed,
@@ -659,6 +676,7 @@ class TrackingService : Service() {
         val json = JSONObject().put("active", state.active).put("route", state.route)
             .put("direction", state.direction).put("manualOfficialM", state.manualOfficialM)
             .put("offsetM", state.offsetM).put("speedMps", state.speedMps)
+            .put("calibrationWaitStartedElapsedMs", state.calibrationWaitStartedElapsedMs)
         state.physicalM?.let { json.put("physicalM", it) }
         journeyId?.let { json.put("journey", it) }
         trainNumber?.let { json.put("train", it) }
@@ -677,7 +695,7 @@ class TrackingService : Service() {
         tripEngine?.restore(NativeTripEngine.SavedState(json.optBoolean("active"), routeLabel,
             json.optString("direction", "tuda"), json.optDouble("manualOfficialM"),
             json.optDouble("physicalM").takeIf { json.has("physicalM") }, json.optDouble("offsetM"),
-            savedSpeed, 0))
+            savedSpeed, 0, json.optLong("calibrationWaitStartedElapsedMs", 0L)))
     }
 
     private fun applyConfig(raw: String?) {

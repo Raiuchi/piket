@@ -50,6 +50,21 @@ class NativeTripEngineTest {
         assertTrue(recovered.officialM!! > manualAtStart)
     }
 
+    @Test fun delayedFirstOnRouteFixUsesCurrentGpsInsteadOfStaleDepartureKilometer() {
+        val start = snap(0)
+        val later = snap((route.points.lastIndex / 3).coerceAtLeast(1))
+        val manualAtDeparture = routes.officialMeters(route.label, start.physicalM, "tuda")!!
+        engine.configure(route.label, "tuda", manualAtDeparture, true, emptyList())
+
+        // Bad or spoofed callbacks existed, but none could anchor the selected route.
+        engine.update(NativeTripEngine.Input(1_000, null, false, null))
+        val recovered = engine.update(NativeTripEngine.Input(121_000, 20f, true, later))
+
+        assertEquals(later.physicalM, recovered.physicalM!!, 0.01)
+        assertEquals(routes.officialMeters(route.label, later.physicalM, "tuda")!!,
+            recovered.officialM!!, 0.01)
+        assertTrue(kotlin.math.abs(recovered.officialM!! - manualAtDeparture) > 1_500.0)
+    }
     @Test fun continuesCountingDuringSignalLoss() {
         engine.update(NativeTripEngine.Input(1_000, 20f, true, snap(0)))
         engine.markSignalUnavailable()

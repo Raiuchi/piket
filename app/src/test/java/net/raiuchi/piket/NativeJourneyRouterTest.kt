@@ -131,7 +131,7 @@ class NativeJourneyRouterTest {
         val vyborg = router.nextLeg(null, "СПбФин - Выборг", "tuda")!!
         assertEquals(128_900.0, vyborg.boundaryM!!, 0.01)
         assertTrue(vyborg.requireStop)
-        assertEquals(150.0, vyborg.maxNextDistanceM, 0.01)
+        assertEquals(1_000.0, vyborg.maxNextDistanceM, 0.01)
 
         val volkhov = router.nextLeg("820", "Горы - Петрозаводск", "obratno")!!
         assertEquals(124_400.0, volkhov.boundaryM!!, 0.01)
@@ -163,6 +163,14 @@ class NativeJourneyRouterTest {
             assertEquals(transition.route, switched?.route)
             assertEquals(transition.direction, switched?.direction)
         }
+    }
+    @Test fun vyborgTransitionAcceptsObservedEightHundredMetrePolylineGap() {
+        val fresh = NativeJourneyRouter.fromTimingJson(timingSource, journeySource)
+        assertNull(fresh.consider(null, "СПбФин - Выборг", "tuda",
+            128_830.0, 128_900.0, 20.0, 830.0, 128_830.0, stopped = true))
+        val switched = fresh.consider(null, "СПбФин - Выборг", "tuda",
+            128_830.0, 128_900.0, 20.0, 830.0, 128_830.0, stopped = true)
+        assertEquals("Выборг - Каменногорск", switched?.route)
     }
     @Test fun cabChangeWaitsForStopAndTwoReliableFixes() {
         assertNull(router.consider(null, "СПбФин - Выборг", "tuda",
