@@ -547,12 +547,15 @@ class TrackingService : Service() {
         val fixElapsedMs = location.elapsedRealtimeNanos / 1_000_000
         val output = tripEngine?.update(NativeTripEngine.Input(fixElapsedMs, engineSpeed,
             positionAccepted, currentSnap, result.stationary, provisionalCalibrationFix))
-        if (beforeUpdate?.physicalM == null && output?.physicalM != null && positionAccepted &&
-            !provisionalCalibrationFix && beforeUpdate.calibrationWaitStartedElapsedMs > 0L &&
-            fixElapsedMs - beforeUpdate.calibrationWaitStartedElapsedMs >= 30_000L) {
+        val lateCalibration = beforeUpdate?.takeIf {
+            it.physicalM == null && it.calibrationWaitStartedElapsedMs > 0L &&
+                fixElapsedMs - it.calibrationWaitStartedElapsedMs >= 30_000L
+        }
+        if (lateCalibration != null && output?.physicalM != null && positionAccepted &&
+            !provisionalCalibrationFix) {
             diagnostics.event("calibration_anchor_recovered_late", diagnosticContext() + mapOf(
-                "wait_ms" to (fixElapsedMs - beforeUpdate.calibrationWaitStartedElapsedMs),
-                "manual_official_m" to beforeUpdate.manualOfficialM,
+                "wait_ms" to (fixElapsedMs - lateCalibration.calibrationWaitStartedElapsedMs),
+                "manual_official_m" to lateCalibration.manualOfficialM,
                 "gps_physical_m" to currentSnap?.physicalM, "official_m" to output.officialM,
                 "distance_to_route_m" to currentSnap?.distanceM))
         }
