@@ -241,12 +241,13 @@
   .author{text-align:center;padding:22px 10px 8px;color:var(--dim2);font-size:12px;line-height:1.6}
   .author b{color:var(--steel);font-weight:700} .author .mk{letter-spacing:.2em;font-size:10px;color:var(--dim2)}
 
-  .update-banner{display:none;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(160,10,37,.96),rgba(45,8,20,.96));border:1px solid rgba(255,65,94,.72);box-shadow:0 12px 34px rgba(209,16,51,.24),inset 0 1px 0 rgba(255,255,255,.12);border-radius:18px;padding:14px 15px;margin-bottom:14px}
-  .update-banner.on{display:flex}
-  .update-banner .ico{font-size:23px;flex:none;filter:drop-shadow(0 0 9px rgba(255,210,120,.55))}
-  .update-banner .txt{flex:1;font-size:12px;line-height:1.35;color:#ffdbe2}.update-banner .txt strong{display:block;color:#fff;font-size:14px;margin-bottom:2px}.update-banner .txt b{color:#ffd27d}
-  .update-banner .ub-dl{flex:none;background:linear-gradient(180deg,#fff,#ffe2e7);color:#9c0b29;font-size:12.5px;font-weight:800;padding:9px 12px;border-radius:10px;box-shadow:0 5px 14px rgba(0,0,0,.2)}
-  .update-banner .ub-x{flex:none;color:#ffd0d9;font-size:17px;padding:4px 1px}
+  .update-banner{display:none;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(160,10,37,.96),rgba(45,8,20,.96));border:1px solid rgba(255,65,94,.72);box-shadow:0 12px 34px rgba(209,16,51,.24),inset 0 1px 0 rgba(255,255,255,.12);border-radius:18px;padding:14px 15px;margin-bottom:14px;overflow:hidden}
+  .update-banner.on{display:grid}
+  .update-banner .ico{font-size:23px;filter:drop-shadow(0 0 9px rgba(255,210,120,.55))}
+  .update-banner .txt{min-width:0;font-size:12px;line-height:1.35;color:#ffdbe2;overflow-wrap:anywhere}.update-banner .txt strong{display:block;color:#fff;font-size:14px;margin-bottom:2px}.update-banner .txt b{color:#ffd27d;white-space:nowrap}
+  .update-banner .ub-dl{max-width:100%;white-space:normal;text-align:center;line-height:1.15;background:linear-gradient(180deg,#fff,#ffe2e7);color:#9c0b29;font-size:12.5px;font-weight:800;padding:9px 12px;border-radius:10px;box-shadow:0 5px 14px rgba(0,0,0,.2)}
+  .update-banner .ub-x{color:#ffd0d9;font-size:17px;padding:4px 1px}
+  @media(max-width:480px){.update-banner{grid-template-columns:auto minmax(0,1fr) auto;gap:10px;padding:13px}.update-banner .ub-dl{grid-column:1/-1;width:100%;min-height:40px}.update-banner .ub-x{grid-column:3;grid-row:1}}
 
   .srGroup{margin-bottom:18px}
   .srGroup h3{font-size:13px;color:var(--blue-l);letter-spacing:.06em;margin:0 2px 8px;text-transform:uppercase;font-weight:700}
@@ -561,7 +562,7 @@
   </div>
 
   <section class="view on" id="v-trip">
-    <div class="update-banner" id="updateBanner">
+    <div class="update-banner" id="updateBanner" role="status" aria-live="polite">
       <span class="ico">✦</span>
       <span class="txt"><strong>Вышло обновление <b id="ubVer"></b></strong>Скачайте новую версию ПИКЕТ</span>
       <button class="ub-dl" id="ubDownload">Скачать и установить</button>

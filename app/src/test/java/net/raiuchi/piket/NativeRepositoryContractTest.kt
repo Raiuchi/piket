@@ -53,6 +53,9 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("CHUDOVO_DUTY=\"Чудово - Петрозаводск\""))
         assertTrue(html.contains("Вышло обновление") && html.contains("id=\"ubDownload\""))
         assertTrue(html.contains("window.Android.downloadUpdate") && html.contains("onUpdateDownloadProgress"))
+        assertTrue(html.contains("grid-template-columns:auto minmax(0,1fr) auto auto") &&
+            html.contains("@media(max-width:480px)") && html.contains("overflow-wrap:anywhere"))
+        assertTrue(html.contains("role=\"status\" aria-live=\"polite\""))
         assertTrue(html.contains("sap_lastStop") && html.contains("keepStopped"))
         assertFalse(html.contains("Демо-режим") || html.contains("settings.demo"))
         assertTrue(html.contains("label!==\"Все участки\"") && html.contains("state.ctx.peregon===\"Все участки\""))
