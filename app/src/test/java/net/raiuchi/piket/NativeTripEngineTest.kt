@@ -272,4 +272,25 @@ class NativeTripEngineTest {
         assertTrue(output.officialM!!.isFinite())
         assertTrue(output.recovering)
     }
+
+    @Test fun deadReckoningStaysInsideEveryRouteInBothDirections() {
+        routes.labels().forEach { label ->
+            val testedRoute = routes.route(label)!!
+            listOf("tuda" to testedRoute.points.maxBy { it.physicalM },
+                "obratno" to testedRoute.points.minBy { it.physicalM }).forEach { (direction, boundary) ->
+                val local = NativeTripEngine(routes)
+                val official = routes.officialMeters(label, boundary.physicalM, direction)!!
+                val boundarySnap = NativeRouteEngine.Snap(label, boundary.physicalM,
+                    official, 0.0, 0)
+                local.configure(label, direction, official, true, emptyList())
+                local.update(NativeTripEngine.Input(1_000, 40f, true, boundarySnap))
+                local.markSignalUnavailable()
+
+                val output = local.update(NativeTripEngine.Input(6_000, 40f, false, null))
+
+                assertEquals("$label $direction", boundary.physicalM, output.physicalM!!, 0.01)
+                assertTrue("$label $direction", output.officialM!!.isFinite())
+            }
+        }
+    }
 }

@@ -1577,7 +1577,7 @@ window.addEventListener("error",function(e){
   function currentMeters(){
     if(state.calib==null)return null;
     if(state.calib._trackM!=null && state.ctx.peregon!=="Все участки"){
-      var physicalNow=state.calib._trackM+(dirDown()?-1:1)*rt.odo;
+      var physicalNow=boundedTrackMetersForTransition(state.calib._trackM+(dirDown()?-1:1)*rt.odo);
       return officialTrackM(physicalNow,state.ctx.peregon);
     }
     return metersOf(state.calib.km,state.calib.pk,state.calib.m)+(dirDown()?-1:1)*rt.odo;
@@ -1607,8 +1607,8 @@ window.addEventListener("error",function(e){
   function nextInChain(){
     // Vyborg is an internal cab-change junction at 128.9 km, not the 130.0 km
     // endpoint of the coordinate array. Keep both axes in one trip and switch only stopped.
-    if(state.ctx.peregon==="СПбФин - Выборг"&&state.ctx.towards==="tuda")return{label:"Выборг - Каменногорск",towards:"tuda",recalibrate:true,place:"Выборг",boundaryM:128900,cabChange:true};
-    if(state.ctx.peregon==="Выборг - Каменногорск"&&state.ctx.towards==="obratno")return{label:"СПбФин - Выборг",towards:"obratno",recalibrate:true,place:"Выборг",boundaryM:1000,cabChange:true};
+    if(state.ctx.peregon==="СПбФин - Выборг"&&state.ctx.towards==="tuda")return{label:"Выборг - Каменногорск",towards:"tuda",recalibrate:true,place:"Выборг",boundaryM:128900,boundaryToleranceM:1500,cabChange:true};
+    if(state.ctx.peregon==="Выборг - Каменногорск"&&state.ctx.towards==="obratno")return{label:"СПбФин - Выборг",towards:"obratno",recalibrate:true,place:"Выборг",boundaryM:1000,boundaryToleranceM:1500,cabChange:true};
     if(activeThrough()==="chudovo"){
       var duty=journeyTowards();
       if(duty==="tuda"&&state.ctx.peregon==="Волховстрой - Чудово"&&state.ctx.towards==="obratno")return{label:"Горы - Петрозаводск",towards:"tuda",recalibrate:true,place:"Волховстрой"};
@@ -1624,6 +1624,17 @@ window.addEventListener("error",function(e){
       if(idx>=0 && idx<rc.chain.length-1) return { label: rc.chain[idx+1], recalibrate: rc.recalibrate };
     }
     return null;
+  }
+
+  // Never let dead reckoning continue through a known junction on the old axis.
+  // It waits at the boundary until two reliable fixes switch to the next route.
+  function boundedTrackMetersForTransition(trackM){
+    if(!isFinite(trackM))return trackM;
+    var next=nextInChain(),idx=TRACK.labels.indexOf(state.ctx.peregon);
+    if(!next||idx<0)return trackM;
+    var seg=TRACK.segs[idx],boundary=next.boundaryM!=null?next.boundaryM:
+      (dirDown()?seg[0][2]:seg[seg.length-1][2]);
+    return dirDown()?Math.max(trackM,boundary):Math.min(trackM,boundary);
   }
 
   function autoDetectPeregon(lat, lon, acc){
@@ -1653,7 +1664,7 @@ window.addEventListener("error",function(e){
     if(rt.awaitingManualCalib) return;
     if(strictMode && currentIdx>=0 && state.calib){
       var curSeg0=TRACK.segs[currentIdx];
-      var curM0=metersOf(state.calib.km,state.calib.pk,state.calib.m)+(rt.tracking?(dirDown()?-1:1)*rt.odo:0);
+      var curM0=boundedTrackMetersForTransition(metersOf(state.calib.km,state.calib.pk,state.calib.m)+(rt.tracking?(dirDown()?-1:1)*rt.odo:0));
       if(curM0 > curSeg0[0][2]+500 && curM0 < curSeg0[curSeg0.length-1][2]-500){
         rt.peregonCandLabel=null; rt.peregonCandCount=0;
         return;
@@ -1665,8 +1676,15 @@ window.addEventListener("error",function(e){
       // в первых секундах после старта). Едем "Туда" (растущий км) - выход через конец
       // сегмента. Едем "Обратно" - выход через начало.
       var chainNext = nextInChain();
-      var exitingThroughRight = chainNext&&chainNext.boundaryM!=null
-        ? Math.abs(curM0-chainNext.boundaryM)<=800
+      var boundaryTolerance=chainNext&&chainNext.boundaryToleranceM!=null?chainNext.boundaryToleranceM:800;
+      var chainBoundary=chainNext?(chainNext.boundaryM!=null?chainNext.boundaryM:
+        (dirDown()?curSeg0[0][2]:curSeg0[curSeg0.length-1][2])):null;
+      var currentFix=chainNext?findNearestSegment(lat,lon,curSeg0,null,null):null;
+      var observedCurM=currentFix&&currentFix.dist<=1000
+        ? curSeg0[currentFix.i][2]+currentFix.frac*(curSeg0[currentFix.i+1][2]-curSeg0[currentFix.i][2]) : null;
+      var exitingThroughRight = chainNext
+        ? (Math.abs(curM0-chainBoundary)<=boundaryTolerance ||
+          (observedCurM!=null&&Math.abs(observedCurM-chainBoundary)<=boundaryTolerance))
         : (dirDown() ? (curM0 <= curSeg0[0][2]+500) : (curM0 >= curSeg0[curSeg0.length-1][2]-500));
       if(!exitingThroughRight){ rt.peregonCandLabel=null; rt.peregonCandCount=0; return; }
       // Если для текущего направления есть заранее известный следующий участок в
@@ -2508,7 +2526,7 @@ window.addEventListener("error",function(e){
 
   function currentTrackMeters(){
     if(state.calib==null || state.calib._trackM==null) return null;
-    return state.calib._trackM+(dirDown()?-1:1)*rt.odo;
+    return boundedTrackMetersForTransition(state.calib._trackM+(dirDown()?-1:1)*rt.odo);
   }
   function officialToTrackCandidates(officialM,label,direction){
     var si=TRACK.labels.indexOf(label);

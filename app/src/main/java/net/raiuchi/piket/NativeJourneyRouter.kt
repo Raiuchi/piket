@@ -14,8 +14,8 @@ class NativeJourneyRouter private constructor(
         val direction: String,
         /** Physical metre on the current route where this particular junction lives. */
         val boundaryM: Double? = null,
-        /** Allowed offset between the documented junction and a real platform stop. */
-        val maxBoundaryOffsetM: Double = 80.0,
+        /** Allowed GPS/counting offset between the documented junction and its real location. */
+        val maxBoundaryOffsetM: Double = 800.0,
         /** Some documented electronic-map junctions do not share an identical GPS polyline. */
         val maxNextDistanceM: Double = 80.0,
         /** Cab/train changes must never be applied while the train is moving. */

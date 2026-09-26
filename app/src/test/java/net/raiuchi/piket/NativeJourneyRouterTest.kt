@@ -86,6 +86,37 @@ class NativeJourneyRouterTest {
         }
     }
 
+    @Test fun everyKnownTransitionRecoversFromGpsNearBoundaryDespiteCountDrift() {
+        val cases = listOf(
+            Triple<String?, String, String>(null, "Д. Долг - Павлово", "tuda"),
+            Triple<String?, String, String>(null, "Павлово - Горы II путь", "tuda"),
+            Triple<String?, String, String>(null, "Горы - Петрозаводск", "obratno"),
+            Triple<String?, String, String>(null, "Горы - Павлово I путь", "obratno"),
+            Triple<String?, String, String>(null, "СПбФин - Выборг", "tuda"),
+            Triple<String?, String, String>(null, "Выборг - Каменногорск", "obratno"),
+            Triple<String?, String, String>("819", "Волховстрой - Чудово", "obratno"),
+            Triple<String?, String, String>("820", "Горы - Петрозаводск", "obratno"),
+            Triple<String?, String, String>("820", "Волховстрой - Чудово", "tuda"),
+            Triple<String?, String, String>("820", "Чудово - Новгород", "tuda")
+        )
+        cases.forEach { (journey, current, direction) ->
+            val fresh = NativeJourneyRouter.fromTimingJson(timingSource, journeySource)
+            val transition = fresh.nextLeg(journey, current, direction)!!
+            val currentRoute = routes.route(current)!!
+            val boundary = transition.boundaryM ?: if (direction == "obratno")
+                currentRoute.points.minOf { it.physicalM } else currentRoute.points.maxOf { it.physicalM }
+            val offset = transition.maxBoundaryOffsetM * 0.75
+            val observed = if (direction == "obratno") boundary - offset else boundary + offset
+            val counted = if (direction == "obratno") boundary + offset + 300.0 else boundary - offset - 300.0
+            assertNull(fresh.consider(journey, current, direction, counted, boundary,
+                500.0, 10.0, observed, stopped = transition.requireStop))
+            val switched = fresh.consider(journey, current, direction, counted, boundary,
+                500.0, 10.0, observed, stopped = transition.requireStop)
+            assertEquals("$journey $current $direction", transition.route, switched?.route)
+            assertEquals(transition.direction, switched?.direction)
+        }
+    }
+
     @Test fun bronevayaLugaHasNoAutomaticAxisTransition() {
         assertNull(router.nextRoute("Броневая - Луга", "tuda"))
         assertNull(router.nextRoute("Броневая - Луга", "obratno"))
@@ -141,6 +172,7 @@ class NativeJourneyRouterTest {
 
         val volkhov = router.nextLeg("820", "Горы - Петрозаводск", "obratno")!!
         assertEquals(124_400.0, volkhov.boundaryM!!, 0.01)
+        assertEquals(800.0, volkhov.maxBoundaryOffsetM, 0.01)
         assertFalse(volkhov.requireStop)
 
         val chudovo = router.nextLeg("820", "Волховстрой - Чудово", "tuda")!!

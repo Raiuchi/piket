@@ -11,8 +11,9 @@ const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
   state:{ctx:{peregon:'Павлово - Горы II путь'}}, rt:{tracking:true,posM:31000,physicalM:0},
   activeThrough:()=> 'dacha'};
 box.journeyTowards=()=>box.state.ctx.towards||'tuda';
+box.dirDown=()=>box.state.ctx.towards==='obratno';
 vm.createContext(box);
-for (const name of ['exactAxisProfile','profileOfficial','baseOfficialTrackM','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes']) {
+for (const name of ['exactAxisProfile','profileOfficial','baseOfficialTrackM','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes','nextInChain','boundedTrackMetersForTransition']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = html.indexOf('\n  function ', start + 1);
@@ -51,8 +52,21 @@ for (const [route,a,b] of [['Павлово - Горы II путь',29807,33500]
     assert.equal(box.scheduleLiveM(),expected,`${route} ${physical}`);
   }
 }
-assert.ok(html.includes('boundaryM:128900,cabChange:true') && html.includes('boundaryM:1000,cabChange:true'),
+assert.ok(html.includes('boundaryM:128900,boundaryToleranceM:1500,cabChange:true') &&
+  html.includes('boundaryM:1000,boundaryToleranceM:1500,cabChange:true'),
   'Vyborg must switch at the documented stopped junction in both directions');
+box.state.ctx={peregon:'СПбФин - Выборг',towards:'tuda'};
+assert.equal(box.boundedTrackMetersForTransition(130000),128900,
+  'forward Vyborg count must wait at 128.9 km for the axis switch');
+box.state.ctx={peregon:'Выборг - Каменногорск',towards:'obratno'};
+assert.equal(box.boundedTrackMetersForTransition(-500),1000,
+  'reverse Vyborg count must never run below its 1 km junction');
+box.state.ctx={peregon:'Павлово - Горы II путь',towards:'tuda'};
+assert.equal(box.boundedTrackMetersForTransition(40000),33500,
+  'every chained forward route must wait at its mapped endpoint');
+box.state.ctx={peregon:'Горы - Павлово I путь',towards:'obratno'};
+assert.equal(box.boundedTrackMetersForTransition(20000),28200,
+  'every chained reverse route must wait at its mapped endpoint');
 assert.ok(html.includes('boundaryM:124400') && html.includes('boundaryM:101000,cabChange:true') &&
   html.includes('boundaryM:75175,trainChange'),
   'Volkhov, Chudovo and Novgorod must use their production junction boundaries');
