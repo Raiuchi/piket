@@ -88,13 +88,22 @@ class MainActivityLifecycleTest {
                       document.getElementById('btnCalib').click();
                       document.getElementById('cKm').value='128'; document.getElementById('cPk').value='9'; document.getElementById('cM').value='42';
                       document.getElementById('calSave').click();
-                      return document.getElementById('peregonVal').textContent+'|'+document.getElementById('oKm').textContent+'|'+document.getElementById('oPk').textContent+'|'+document.getElementById('oM').textContent;
+                      window.showUpdateBanner('99.99.99-build-with-a-very-long-name','https://github.com/Raiuchi/piket/releases/latest/download/piket.apk');
+                      window.onUpdateDownloadProgress(48);
+                      var banner=document.getElementById('updateBanner'), text=banner.querySelector('.txt'), button=document.getElementById('ubDownload'), close=document.getElementById('ubClose');
+                      function overlap(a,b){var x=a.getBoundingClientRect(),y=b.getBoundingClientRect();return Math.min(x.right,y.right)>Math.max(x.left,y.left)&&Math.min(x.bottom,y.bottom)>Math.max(x.top,y.top);}
+                      var updateLayout=banner.scrollWidth<=banner.clientWidth+1&&!overlap(text,button)&&!overlap(text,close)&&!overlap(button,close)&&button.textContent.indexOf('48%')>=0;
+                      window.onUpdateDownloadError('Проверка ошибки');
+                      updateLayout=updateLayout&&button.textContent==='Повторить'&&!button.disabled;
+                      return document.getElementById('peregonVal').textContent+'|'+document.getElementById('oKm').textContent+'|'+document.getElementById('oPk').textContent+'|'+document.getElementById('oM').textContent+'|update-layout='+updateLayout;
                     })()
                 """.trimIndent()) { value -> result.set(value); completed.countDown() }
             }
             assertTrue("WebView did not finish the interaction", completed.await(15, TimeUnit.SECONDS))
             println("PIKET_WEB_TEST_RESULT=${result.get()}")
             assertTrue("Unified route or calibration did not persist: ${result.get()}", result.get().contains("СПбФин - Каменногорск|128|9|42"))
+            assertTrue("Update banner overlaps or loses its state on a narrow screen: ${result.get()}",
+                result.get().contains("update-layout=true"))
         }
     }
 }

@@ -218,8 +218,9 @@ class MainActivity : Activity() {
         val now=System.currentTimeMillis()
         if(updateCheckRunning||(!force&&now-lastUpdateCheckAt<60_000))return
         updateCheckRunning=true;lastUpdateCheckAt=now
+        diagnostics.event("update_check_started", mapOf("forced" to force))
         Thread{
-            val success=runCatching{
+            val result=runCatching{
                 val connection=(URL("https://api.github.com/repos/Raiuchi/piket/releases/latest").openConnection() as HttpURLConnection).apply{
                     connectTimeout=7_000;readTimeout=7_000
                     useCaches=false
@@ -244,9 +245,15 @@ class MainActivity : Activity() {
                     }
                     latestUpdateVersion=latest
                     latestUpdateUrl=download
+                    diagnostics.event("update_available", mapOf("current" to current, "latest" to latest,
+                        "asset" to Uri.parse(download).lastPathSegment))
                     handler.post{web?.evaluateJavascript("if(window.showUpdateBanner)window.showUpdateBanner('${jsQuote(latest)}','${jsQuote(download)}')",null)}
-                }
-            }.isSuccess
+                } else diagnostics.event("update_check_complete", mapOf("current" to current,
+                    "latest" to latest, "update_available" to false))
+            }
+            result.onFailure { diagnostics.event("update_check_error", mapOf(
+                "error" to it.javaClass.simpleName, "message" to it.message)) }
+            val success=result.isSuccess
             updateCheckRunning=false
             if(success)updateRetryCount=0 else if(updateRetryCount<3){
                 updateRetryCount++
@@ -263,11 +270,13 @@ class MainActivity : Activity() {
         val source = latestUpdateUrl
         val version = latestUpdateVersion
         if (source.isNullOrBlank() || version.isNullOrBlank()) {
+            diagnostics.event("update_download_error", mapOf("stage" to "missing-release"))
             updateDownloadJs("if(window.onUpdateDownloadError)window.onUpdateDownloadError('Сначала проверь обновление')")
             checkForUpdate(true)
             return
         }
         updateDownloadRunning = true
+        diagnostics.event("update_download_started", mapOf("version" to version))
         updateDownloadJs("if(window.onUpdateDownloadProgress)window.onUpdateDownloadProgress(0)")
         Thread {
             var partial: File? = null
@@ -320,12 +329,16 @@ class MainActivity : Activity() {
                 }
                 handler.post {
                     updateDownloadRunning = false
+                    diagnostics.event("update_download_ready", mapOf("version" to version,
+                        "bytes" to target.length()))
                     web?.evaluateJavascript("if(window.onUpdateDownloadReady)window.onUpdateDownloadReady()", null)
                     promptInstall(target)
                 }
             }.onFailure { error ->
                 partial?.delete()
                 updateDownloadRunning = false
+                diagnostics.event("update_download_error", mapOf("version" to version,
+                    "error" to error.javaClass.simpleName, "message" to error.message))
                 updateDownloadJs(
                     "if(window.onUpdateDownloadError)window.onUpdateDownloadError('${jsQuote(error.message ?: "Не удалось скачать APK")}')"
                 )
@@ -337,6 +350,7 @@ class MainActivity : Activity() {
         if (!file.exists()) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
             pendingInstallFile = file
+            diagnostics.event("update_install_permission_requested", mapOf("file" to file.name))
             runCatching {
                 startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
             }.onFailure {
@@ -351,7 +365,11 @@ class MainActivity : Activity() {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             })
+            diagnostics.event("update_installer_opened", mapOf("file" to file.name,
+                "bytes" to file.length()))
         }.onFailure {
+            diagnostics.event("update_installer_error", mapOf("error" to it.javaClass.simpleName,
+                "message" to it.message))
             updateDownloadJs("if(window.onUpdateDownloadError)window.onUpdateDownloadError('Не удалось открыть установщик Android')")
         }
     }

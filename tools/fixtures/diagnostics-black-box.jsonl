@@ -9,3 +9,7 @@
 {"time":47000,"event":"restriction_alert","trip_session_id":"trip-1","route":"СПбФин - Выборг","direction":"tuda","train":"823","id":"r1","in_zone":false,"distance_m":3100}
 {"time":48000,"event":"power_sample","trip_session_id":"trip-1","route":"СПбФин - Выборг","battery_temperature_c":46}
 {"time":49000,"event":"trip_session_summary","trip_session_id":"trip-1","route":"СПбФин - Выборг","duration_ms":48000,"gps_outages":1}
+{"time":50000,"event":"ui_error","trip_session_id":"trip-1","route":"СПбФин - Выборг","message":"render failed","source_url":"index.html","line":42}
+{"time":51000,"event":"voice_error","trip_session_id":"trip-1","route":"СПбФин - Выборг","stage":"utterance","error":"audio-busy"}
+{"time":52000,"event":"service_worker_error","route":"СПбФин - Выборг","stage":"update-pageshow","error":"offline"}
+{"time":53000,"event":"update_download_error","route":"СПбФин - Выборг","stage":"download","message":"network"}

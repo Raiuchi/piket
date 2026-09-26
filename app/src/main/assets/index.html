@@ -893,8 +893,20 @@
 <div class="toast" id="toast"></div>
 
 <script>
+window.__piketEarlyDiagnostics=[];
+function piketQueueEarlyDiagnostic(event,fields){
+  try{
+    if(window.piketDiagnostic){window.piketDiagnostic(event,fields||{});return;}
+    window.__piketEarlyDiagnostics.push({event:event,fields:fields||{}});
+  }catch(ignore){}
+}
 window.addEventListener("error",function(e){
+  piketQueueEarlyDiagnostic("ui_error",{message:String(e.message||"unknown"),source_url:String(e.filename||""),line:+e.lineno||0,column:+e.colno||0});
   try{if(window.Android&&window.Android.notifyUiStartupError)window.Android.notifyUiStartupError(String(e.message||"unknown")+" @ "+String(e.lineno||0)+":"+String(e.colno||0));}catch(ignore){}
+});
+window.addEventListener("unhandledrejection",function(e){
+  var reason=e&&e.reason, message=reason&&reason.message?reason.message:String(reason||"unknown");
+  piketQueueEarlyDiagnostic("unhandled_rejection",{message:message});
 });
 </script>
 <script src="assets/piket-core.js?v=1.5.0"></script>
@@ -1332,14 +1344,14 @@ window.addEventListener("error",function(e){
   var toastT; function toast(m){ var e=$("#toast"); e.textContent=m; e.classList.add("on"); clearTimeout(toastT); toastT=setTimeout(function(){e.classList.remove("on");},2200); }
 
   function beep(kind){ if(!state.settings.sound)return;
-    try{ if(window.Android&&window.Android.beep){ window.Android.beep(kind); return; } }catch(e){}
+    try{ if(window.Android&&window.Android.beep){ window.Android.beep(kind); return; } }catch(e){appDiagnostic("audio_error",{stage:"native-beep",kind:kind,error:String(e&&e.message||e)});}
     try{
     if(!rt.audio)rt.audio=new (window.AudioContext||window.webkitAudioContext)(); var ac=rt.audio; if(ac.state==="suspended")ac.resume();
     var seq=kind==="danger"?[880,0,880,0,880]:[660,0,660],t=ac.currentTime;
     seq.forEach(function(f,i){ if(!f)return; var o=ac.createOscillator(),g=ac.createGain(); o.type="square"; o.frequency.value=f;
       var st=t+i*0.14,en=st+0.11; g.gain.setValueAtTime(0.0001,st); g.gain.exponentialRampToValueAtTime(0.22,st+0.01);
       g.gain.exponentialRampToValueAtTime(0.0001,en); o.connect(g); g.connect(ac.destination); o.start(st); o.stop(en+0.02); });
-  }catch(e){} }
+  }catch(e){appDiagnostic("audio_error",{stage:"browser-beep",kind:kind,error:String(e&&e.message||e)});} }
   function vibe(kind){ if(!state.settings.vibe)return;
     // Нативная вибрация (Android.vibrate) работает гарантированно и в headless-службе —
     // в отличие от navigator.vibrate(), который может не сработать в скрытом WebView.
@@ -1351,12 +1363,12 @@ window.addEventListener("error",function(e){
     var fem=ruv.find(function(v){return /female|женск|milena|katya|alyona|alena|irina|svetlana|tatyana|google/i.test(v.name||"");});
     return fem||ruv[0]||null; }
   function say(t){ if(!state.settings.voice)return;
-    try{ if(window.Android&&window.Android.speak){ window.Android.speak(t); return; } }catch(e){}
-    if(!("speechSynthesis"in window))return; try{ speechSynthesis.cancel();
-    var u=new SpeechSynthesisUtterance(t); u.lang="ru-RU"; u.rate=1.0; u.pitch=1.05; var v=pickVoice(); if(v)u.voice=v; speechSynthesis.speak(u);}catch(e){} }
+    try{ if(window.Android&&window.Android.speak){ window.Android.speak(t); return; } }catch(e){appDiagnostic("voice_error",{stage:"native-speak",error:String(e&&e.message||e)});}
+    if(!("speechSynthesis"in window)){appDiagnostic("voice_error",{stage:"unsupported"});return;} try{ speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(t); u.lang="ru-RU"; u.rate=1.0; u.pitch=1.05; var v=pickVoice(); if(v)u.voice=v;u.onerror=function(ev){appDiagnostic("voice_error",{stage:"utterance",error:String(ev&&ev.error||"unknown")});}; speechSynthesis.speak(u);}catch(e){appDiagnostic("voice_error",{stage:"browser-speak",error:String(e&&e.message||e)});} }
   function warmVoice(){ if(!state.settings.voice)return;
-    try{ if(window.Android&&window.Android.speak){ window.Android.speak("Контроль включён"); return; } }catch(e){}
-    if(!("speechSynthesis"in window))return; try{ speechSynthesis.cancel(); var w=new SpeechSynthesisUtterance("Контроль включён"); w.lang="ru-RU"; w.pitch=1.05; var v=pickVoice(); if(v)w.voice=v; speechSynthesis.speak(w);}catch(e){} }
+    try{ if(window.Android&&window.Android.speak){ window.Android.speak("Контроль включён"); return; } }catch(e){appDiagnostic("voice_error",{stage:"native-warmup",error:String(e&&e.message||e)});}
+    if(!("speechSynthesis"in window)){appDiagnostic("voice_error",{stage:"unsupported-warmup"});return;} try{ speechSynthesis.cancel(); var w=new SpeechSynthesisUtterance("Контроль включён"); w.lang="ru-RU"; w.pitch=1.05; var v=pickVoice(); if(v)w.voice=v;w.onerror=function(ev){appDiagnostic("voice_error",{stage:"warmup-utterance",error:String(ev&&ev.error||"unknown")});}; speechSynthesis.speak(w);}catch(e){appDiagnostic("voice_error",{stage:"browser-warmup",error:String(e&&e.message||e)});} }
   function sayPhrase(r){ var p=""; if(r.reason)p+=r.reason.toLowerCase(); if(r.spd!=null){ p+=(p?", ":"")+"ограничение скорости "+r.spd; } return p||"внимание"; }
   function distWords(m){ return m>=1000?("через "+(m/1000).toFixed(1).replace(".",",")+" километра"):("через "+(Math.round(m/100)*100)+" метров"); }
 
@@ -1565,13 +1577,14 @@ window.addEventListener("error",function(e){
         // iOS 13+ требует явного разрешения по жесту пользователя — startTrack() вызывается
         // по реальному тапу на кнопку Старт, это и есть подходящий момент для запроса.
         DeviceMotionEvent.requestPermission().then(function(resp){
+          appDiagnostic("motion_permission",{result:String(resp)});
           if(resp==="granted") window.addEventListener("devicemotion",handleMotion);
-        }).catch(function(){});
+        }).catch(function(e){appDiagnostic("motion_permission",{result:"error",error:String(e&&e.message||e)});});
       } else {
         // Android и более старые версии iOS не требуют отдельного разрешения для этого API.
         window.addEventListener("devicemotion",handleMotion);
       }
-    }catch(e){}
+    }catch(e){appDiagnostic("motion_permission",{result:"exception",error:String(e&&e.message||e)});}
   }
   function stopAccelHelper(){ try{ window.removeEventListener("devicemotion",handleMotion); }catch(e){} rt.accelMag=0; rt.accelAvailable=false; }
 
@@ -1818,6 +1831,14 @@ window.addEventListener("error",function(e){
       else webLog(event,fields);
     }catch(e){}
   }
+  window.piketDiagnostic=appDiagnostic;
+  function currentBuildId(){
+    try{var src=(document.querySelector('script[src*="piket-core.js"]')||{}).src||"";return new URL(src,location.href).searchParams.get("v")||"unknown";}catch(e){return"unknown";}
+  }
+  var earlyDiagnostics=window.__piketEarlyDiagnostics||[];
+  window.__piketEarlyDiagnostics=[];
+  earlyDiagnostics.forEach(function(row){appDiagnostic(row.event,row.fields);});
+  appDiagnostic("web_runtime_started",{build_id:currentBuildId(),standalone:!!(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches),user_agent:navigator.userAgent});
   function onPos(p,fromBackup){
     try { return processBrowserPosition(p,fromBackup); }
     finally { if(Date.now()-diagnosticLast>=5000){
@@ -3177,13 +3198,17 @@ window.addEventListener("error",function(e){
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', function () {
     navigator.serviceWorker.register('./sw.js', {updateViaCache:'none'}).then(function (registration) {
+      if(window.piketDiagnostic)window.piketDiagnostic('service_worker_status',{stage:'registered',scope:registration.scope});
       // Safari иногда откладывает штатную проверку PWA. Проверяем обновление при каждом
       // открытии и возврате приложения, не трогая локальные ограничения и настройки.
-      registration.update().catch(function () {});
+      registration.update().then(function(){if(window.piketDiagnostic)window.piketDiagnostic('service_worker_status',{stage:'update-checked',reason:'load'});})
+        .catch(function (e) {if(window.piketDiagnostic)window.piketDiagnostic('service_worker_error',{stage:'update-load',error:String(e&&e.message||e)});});
       window.addEventListener('pageshow', function () {
-        registration.update().catch(function () {});
+        registration.update().then(function(){if(window.piketDiagnostic)window.piketDiagnostic('service_worker_status',{stage:'update-checked',reason:'pageshow'});})
+          .catch(function (e) {if(window.piketDiagnostic)window.piketDiagnostic('service_worker_error',{stage:'update-pageshow',error:String(e&&e.message||e)});});
       });
-    }).catch(function () {
+    }).catch(function (e) {
+      if(window.piketDiagnostic)window.piketDiagnostic('service_worker_error',{stage:'register',error:String(e&&e.message||e)});
       // Основное приложение продолжает работать онлайн, даже если PWA-кэш недоступен.
     });
   });

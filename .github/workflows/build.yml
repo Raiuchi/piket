@@ -33,6 +33,7 @@ jobs:
       - name: Check browser route regression
         run: |
           node tools/route-regression.mjs
+          node tools/transition-matrix.mjs
           node tools/alert-regression.mjs
           node tools/speed-order-regression.mjs
           node tools/replay-diagnostics.mjs tools/fixtures/diagnostics-clean.jsonl --expect-clean

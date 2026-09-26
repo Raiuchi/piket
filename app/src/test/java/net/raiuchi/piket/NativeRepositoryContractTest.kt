@@ -35,6 +35,10 @@ class NativeRepositoryContractTest {
         assertFalse("foreground GPS must not hold the CPU awake for the whole trip", manifest.contains("android.permission.WAKE_LOCK"))
         assertTrue(service.contains("latestSnapshotJson") && service.contains("now-lastSnapshotDiskAt>=10_000"))
         assertTrue(service.contains("now-lastNotificationAt>=10_000"))
+        assertTrue(service.contains("direct_gps_active_ms") && service.contains("location_callbacks") &&
+            service.contains("processed_location_fixes") && service.contains("snapshot_publishes"))
+        assertTrue(main.contains("update_check_error") && main.contains("update_download_error") &&
+            main.contains("update_installer_opened"))
         assertTrue(html.contains("Kotlin is the source of truth"))
         val sourceFiles = sequenceOf(projectFile("app/src/main"), projectFile("app/src/test"), projectFile("app/src/androidTest"))
             .flatMap { it.walkTopDown().asSequence() }.filter { it.isFile }.toList()
@@ -56,6 +60,8 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("grid-template-columns:auto minmax(0,1fr) auto auto") &&
             html.contains("@media(max-width:480px)") && html.contains("overflow-wrap:anywhere"))
         assertTrue(html.contains("role=\"status\" aria-live=\"polite\""))
+        assertTrue(html.contains("unhandled_rejection") && html.contains("service_worker_error") &&
+            html.contains("web_runtime_started") && html.contains("motion_permission"))
         assertTrue(html.contains("sap_lastStop") && html.contains("keepStopped"))
         assertFalse(html.contains("Демо-режим") || html.contains("settings.demo"))
         assertTrue(html.contains("label!==\"Все участки\"") && html.contains("state.ctx.peregon===\"Все участки\""))

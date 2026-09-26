@@ -121,6 +121,12 @@ class TrackingService : Service() {
     private var gpsOutageTotalMs = 0L
     private var longestGpsOutageMs = 0L
     private var directGpsStartCount = 0
+    private var directGpsTotalActiveMs = 0L
+    private var locationCallbackCount = 0L
+    private var processedLocationCount = 0L
+    private var locationRequestRestartCount = 0
+    private var snapshotPublishCount = 0L
+    private var networkReserveStartCount = 0
     private var positionReconciliationCount = 0
     private var maxPositionCorrectionM = 0.0
     private var routeTransitionCount = 0
@@ -139,7 +145,10 @@ class TrackingService : Service() {
         tripStartedAt = System.currentTimeMillis()
         acceptedGpsSamples = 0; rejectedGpsSamples = 0
         gpsOutageStartedAt = 0; gpsOutageCount = 0; gpsOutageTotalMs = 0; longestGpsOutageMs = 0
-        directGpsStartCount = 0; positionReconciliationCount = 0; maxPositionCorrectionM = 0.0
+        directGpsStartCount = 0; directGpsTotalActiveMs = 0; locationCallbackCount = 0
+        processedLocationCount = 0; locationRequestRestartCount = 0; snapshotPublishCount = 0
+        networkReserveStartCount = 0; positionReconciliationCount = 0; maxPositionCorrectionM = 0.0
+        if (directGpsActive) { directGpsStartedAt = tripStartedAt; directGpsStartCount = 1 }
         routeTransitionCount = 0; maxBatteryTemperatureC = null
         diagnostics.event("trip_session_started", diagnosticContext() + mapOf(
             "manual_official_m" to tripEngine?.save()?.manualOfficialM,
@@ -161,6 +170,13 @@ class TrackingService : Service() {
             "accepted_gps_samples" to acceptedGpsSamples, "rejected_gps_samples" to rejectedGpsSamples,
             "gps_outages" to gpsOutageCount, "gps_outage_total_ms" to gpsOutageTotalMs,
             "longest_gps_outage_ms" to longestGpsOutageMs, "direct_gps_starts" to directGpsStartCount,
+            "direct_gps_active_ms" to (directGpsTotalActiveMs + if (directGpsActive)
+                (now - directGpsStartedAt).coerceAtLeast(0) else 0L),
+            "location_callbacks" to locationCallbackCount,
+            "processed_location_fixes" to processedLocationCount,
+            "location_request_restarts" to locationRequestRestartCount,
+            "snapshot_publishes" to snapshotPublishCount,
+            "network_reserve_starts" to networkReserveStartCount,
             "position_reconciliations" to positionReconciliationCount,
             "max_position_correction_m" to maxPositionCorrectionM,
             "route_transitions" to routeTransitionCount,
@@ -313,6 +329,7 @@ class TrackingService : Service() {
         fusedClient = LocationServices.getFusedLocationProviderClient(this)
         mainLocationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
+                locationCallbackCount++
                 val location = result.lastLocation ?: return
                 if (isFreshRealFix(location)) lastFixReceivedAt = System.currentTimeMillis()
                 processLocation(location, false)
@@ -381,6 +398,7 @@ class TrackingService : Service() {
                 if ((silence > 15_000 || now - lastUsableFixAt > 30_000) && now - lastFusedRestartAt > 120_000) {
                     diagnostics.event("location_request_restarted", mapOf("silence_ms" to silence,
                         "unusable_ms" to now - lastUsableFixAt))
+                    locationRequestRestartCount++
                     restartFused(now)
                 }
                 mainHandler.postDelayed(this, 5_000)
@@ -401,13 +419,17 @@ class TrackingService : Service() {
     private fun startNetworkBackup() {
         if (networkBackupActive || fusedClient == null) return
         networkCallback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { processLocation(it, false) } }
+            override fun onLocationResult(result: LocationResult) {
+                locationCallbackCount++
+                result.lastLocation?.let { processLocation(it, false) }
+            }
         }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         runCatching {
             fusedClient?.requestLocationUpdates(
                 locationRequest(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 3_000), networkCallback!!, Looper.getMainLooper())
             networkBackupActive = true
+            networkReserveStartCount++
             diagnostics.event("network_gps_reserve_started", diagnosticContext())
         }.onFailure { diagnostics.event("network_gps_reserve_error", diagnosticContext() + mapOf(
             "error" to it.javaClass.simpleName)) }
@@ -425,7 +447,10 @@ class TrackingService : Service() {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
             !manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return
         val listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) = processLocation(location, true)
+            override fun onLocationChanged(location: Location) {
+                locationCallbackCount++
+                processLocation(location, true)
+            }
             override fun onProviderDisabled(provider: String) {
                 diagnostics.event("location_provider_changed", diagnosticContext() + mapOf(
                     "provider" to provider, "enabled" to false))
@@ -448,8 +473,12 @@ class TrackingService : Service() {
 
     private fun stopDirectGps(reason: String) {
         directGpsListener?.let { runCatching { locationManager?.removeUpdates(it) } }
-        if (directGpsActive) diagnostics.event("direct_gps_stopped", diagnosticContext() + mapOf("reason" to reason,
-            "active_ms" to (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0)))
+        if (directGpsActive) {
+            val activeMs = (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0)
+            directGpsTotalActiveMs += activeMs
+            diagnostics.event("direct_gps_stopped", diagnosticContext() + mapOf("reason" to reason,
+                "active_ms" to activeMs, "trip_active_ms" to directGpsTotalActiveMs))
+        }
         directGpsListener = null; directGpsActive = false
         lastDirectGpsStopAt = System.currentTimeMillis(); fusedRecoveryFixes = 0
         directGpsExtendedLogged = false
@@ -463,6 +492,7 @@ class TrackingService : Service() {
     private fun processLocation(location: Location, fromDirectGps: Boolean) {
         if (location.elapsedRealtimeNanos <= lastProcessedFixNanos) return
         lastProcessedFixNanos = location.elapsedRealtimeNanos
+        processedLocationCount++
         val age = ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0)
         val accuracy = if (location.hasAccuracy()) location.accuracy else 999f
         val result = motionFilter.process(NativeMotionFilter.Fix(
@@ -656,7 +686,7 @@ class TrackingService : Service() {
 
     private fun persistSnapshot(output: NativeTripEngine.Output?, accuracy: Float, force:Boolean=false) = runCatching {
         val now=SystemClock.elapsedRealtime();if(!force&&now-lastSnapshotPersistAt<750)return@runCatching
-        lastSnapshotPersistAt=now
+        lastSnapshotPersistAt=now; snapshotPublishCount++
         val saved = tripEngine?.save()
         val json = JSONObject().put("active", output?.active ?: saved?.active ?: false)
             .put("route", saved?.route ?: routeLabel).put("direction", saved?.direction ?: "tuda")
@@ -832,6 +862,13 @@ class TrackingService : Service() {
             "thermal_status" to if (Build.VERSION.SDK_INT >= 29)
                 (getSystemService(POWER_SERVICE) as? PowerManager)?.currentThermalStatus else null,
             "direct_gps_reserve" to directGpsActive,
+            "direct_gps_active_ms" to (directGpsTotalActiveMs + if (directGpsActive)
+                (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0) else 0L),
+            "location_callbacks" to locationCallbackCount,
+            "processed_location_fixes" to processedLocationCount,
+            "location_request_restarts" to locationRequestRestartCount,
+            "snapshot_publishes" to snapshotPublishCount,
+            "network_reserve_starts" to networkReserveStartCount,
             "plugged" to battery?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)))
         lastPowerSampleAt = now; lastProcessCpuMs = cpu
     }

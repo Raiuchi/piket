@@ -113,6 +113,23 @@ if (hottest && Number(hottest.battery_temperature_c) >= 45)
     `Температура батареи достигла ${Number(hottest.battery_temperature_c).toFixed(1)} °C`, hottest));
 
 const sessionSummaries = events.filter(e => e.event === 'trip_session_summary');
+for (const event of events.filter(e => e.event === 'ui_error' || e.event === 'unhandled_rejection'))
+  issues.push(issue('error', event.event.replaceAll('_', '-'),
+    `Ошибка Web-интерфейса: ${event.message || 'неизвестно'}`, event,
+    { sourceUrl: event.source_url ?? null, line: event.line ?? null }));
+for (const event of events.filter(e => e.event === 'audio_error' || e.event === 'voice_error'))
+  issues.push(issue('warning', event.event.replaceAll('_', '-'),
+    `${event.event === 'audio_error' ? 'Звуковой сигнал' : 'Голос'} не сработал на этапе ${event.stage || '?'}`, event,
+    { errorMessage: event.error ?? null }));
+for (const event of events.filter(e => e.event === 'service_worker_error'))
+  issues.push(issue('warning', 'service-worker-error',
+    `Ошибка обновления Web-кэша на этапе ${event.stage || '?'}`, event,
+    { errorMessage: event.error ?? null }));
+for (const event of events.filter(e => e.event === 'update_check_error' ||
+  e.event === 'update_download_error' || e.event === 'update_installer_error'))
+  issues.push(issue('warning', event.event.replaceAll('_', '-'),
+    `Ошибка обновления APK на этапе ${event.stage || event.event}`, event,
+    { errorMessage: event.message ?? event.error ?? null }));
 for (const event of events.filter(e => e.event === 'uncaught_exception'))
   issues.push(issue('error', 'uncaught-exception',
     `Приложение аварийно завершилось: ${event.type || 'ошибка'}${event.message ? ` — ${event.message}` : ''}`, event,
@@ -165,6 +182,20 @@ const report = {
   manualCalibrationChanges: events.filter(e => e.event === 'manual_calibration_changed').length,
   crashes: events.filter(e => e.event === 'uncaught_exception').length,
   maxBatteryTemperatureC: temperatures.length ? Math.max(...temperatures) : null,
+  webRuntimeStarts: events.filter(e => e.event === 'web_runtime_started').length,
+  uiErrors: events.filter(e => e.event === 'ui_error' || e.event === 'unhandled_rejection').length,
+  audioVoiceErrors: events.filter(e => e.event === 'audio_error' || e.event === 'voice_error').length,
+  serviceWorkerErrors: events.filter(e => e.event === 'service_worker_error').length,
+  updateErrors: events.filter(e => e.event === 'update_check_error' ||
+    e.event === 'update_download_error' || e.event === 'update_installer_error').length,
+  latestEnergyCounters: power.length ? {
+    directGpsActiveMs: power.at(-1).direct_gps_active_ms ?? null,
+    locationCallbacks: power.at(-1).location_callbacks ?? null,
+    processedLocationFixes: power.at(-1).processed_location_fixes ?? null,
+    locationRequestRestarts: power.at(-1).location_request_restarts ?? null,
+    snapshotPublishes: power.at(-1).snapshot_publishes ?? null,
+    networkReserveStarts: power.at(-1).network_reserve_starts ?? null
+  } : null,
   issues
 };
 console.log(JSON.stringify(report, null, 2));

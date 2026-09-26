@@ -10,8 +10,13 @@ const report = JSON.parse(output);
 const codes = new Set(report.issues.map(issue => issue.code));
 for (const code of ['long-gps-outage', 'large-position-reconciliation',
   'transition-next-route-unavailable', 'schedule-card-regression',
-  'restriction-warning-too-early', 'high-battery-temperature']) assert.ok(codes.has(code), code);
+  'restriction-warning-too-early', 'high-battery-temperature', 'ui-error',
+  'voice-error', 'service-worker-error', 'update-download-error']) assert.ok(codes.has(code), code);
 assert.equal(report.tripSessions, 1);
 assert.equal(report.gpsOutages, 1);
 assert.equal(report.scheduleCardRegressions, 1);
+assert.equal(report.uiErrors, 1);
+assert.equal(report.audioVoiceErrors, 1);
+assert.equal(report.serviceWorkerErrors, 1);
+assert.equal(report.updateErrors, 1);
 console.log('Diagnostic black-box replay test passed');
