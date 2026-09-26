@@ -498,10 +498,12 @@ class TrackingService : Service() {
                 if (state.direction == "obratno") it.first().physicalM else it.last().physicalM
             }
             val boundary = next?.boundaryM ?: routeBoundary
-            val stoppedForJunction = state.speedMps <= 1.5f
+            val stoppedForJunction = result.stationary ||
+                (result.filteredSpeedMps ?: state.speedMps) <= 1.5f
+            val boundaryTolerance = next?.maxBoundaryOffsetM ?: 80.0
             val nearBoundary = boundary != null &&
-                ((state.physicalM?.let { abs(it - boundary) <= 800.0 } == true) ||
-                    (currentSnap?.let { abs(it.physicalM - boundary) <= 80.0 } == true))
+                ((state.physicalM?.let { abs(it - boundary) <= maxOf(800.0, boundaryTolerance) } == true) ||
+                    (currentSnap?.let { abs(it.physicalM - boundary) <= boundaryTolerance } == true))
             // Do not scan the entire next route on every fix hundreds of km from its junction.
             val nextSnap = if (nearBoundary && (next?.requireStop != true || stoppedForJunction)) next?.let {
                 routeEngine?.snap(it.route, location.latitude, location.longitude, it.direction)

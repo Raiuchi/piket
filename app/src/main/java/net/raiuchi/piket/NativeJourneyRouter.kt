@@ -14,6 +14,8 @@ class NativeJourneyRouter private constructor(
         val direction: String,
         /** Physical metre on the current route where this particular junction lives. */
         val boundaryM: Double? = null,
+        /** Allowed offset between the documented junction and a real platform stop. */
+        val maxBoundaryOffsetM: Double = 80.0,
         /** Some documented electronic-map junctions do not share an identical GPS polyline. */
         val maxNextDistanceM: Double = 80.0,
         /** Cab/train changes must never be applied while the train is moving. */
@@ -51,10 +53,10 @@ class NativeJourneyRouter private constructor(
         return when {
             current == "СПбФин - Выборг" && direction == "tuda" && next.route == "Выборг - Каменногорск" ->
                 Transition(next.route, next.direction, boundaryM = 128_900.0,
-                    maxNextDistanceM = 1_000.0, requireStop = true)
+                    maxBoundaryOffsetM = 1_500.0, maxNextDistanceM = 1_000.0, requireStop = true)
             current == "Выборг - Каменногорск" && direction == "obratno" && next.route == "СПбФин - Выборг" ->
                 Transition(next.route, next.direction, boundaryM = 1_000.0,
-                    maxNextDistanceM = 1_000.0, requireStop = true)
+                    maxBoundaryOffsetM = 1_500.0, maxNextDistanceM = 1_000.0, requireStop = true)
             journey == "819" && current == "Волховстрой - Чудово" && direction == "obratno" ->
                 Transition(next.route, next.direction, boundaryM = 1_000.0, maxNextDistanceM = 150.0)
             journey == "820" && current == "Горы - Петрозаводск" && direction == "obratno" ->
@@ -82,8 +84,10 @@ class NativeJourneyRouter private constructor(
     ): Transition? {
         val next = nextLeg(journey, current, direction) ?: return reset()
         if (currentPhysicalM == null || currentEndM == null || nextDistanceM == null) return reset()
-        val nearBoundary = kotlin.math.abs(currentPhysicalM - currentEndM) <= 800.0 ||
-            (observedPhysicalM != null && kotlin.math.abs(observedPhysicalM - currentEndM) <= 80.0 &&
+        val nearBoundary = kotlin.math.abs(currentPhysicalM - currentEndM) <=
+            maxOf(800.0, next.maxBoundaryOffsetM) ||
+            (observedPhysicalM != null &&
+                kotlin.math.abs(observedPhysicalM - currentEndM) <= next.maxBoundaryOffsetM &&
                 currentDistanceM != null)
         val neighborReliable = nextDistanceM <= next.maxNextDistanceM
         if (next.requireStop && !stopped) return reset(false)

@@ -64,7 +64,12 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         val dt = if (lastElapsedMs > 0L) ((input.elapsedMs - lastElapsedMs).coerceIn(0L, 5_000L) / 1000.0) else 0.0
         lastElapsedMs = input.elapsedMs
         input.speedMps?.let { speedMps = it.coerceIn(0f, 83.34f) }
-        physicalM?.let { physicalM = it + directionSign() * speedMps * dt }
+        physicalM?.let { current ->
+            val counted = current + directionSign() * speedMps * dt
+            val points = routes.route(route)?.points.orEmpty()
+            physicalM = if (points.isEmpty()) counted else counted.coerceIn(
+                points.minOf { it.physicalM }, points.maxOf { it.physicalM })
+        }
         if (recovering && input.speedMps == null && dt > 0.0) {
             speedMps = (speedMps * 0.997.pow(dt)).toFloat()
         }

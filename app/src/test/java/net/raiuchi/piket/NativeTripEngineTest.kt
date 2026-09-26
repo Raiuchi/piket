@@ -254,4 +254,22 @@ class NativeTripEngineTest {
         // slightly, so recovery must preserve it without requiring exact equality.
         assertEquals(40f, second.speedMps, 0.3f)
     }
+
+    @Test fun reverseDeadReckoningCannotRunBelowRouteGeometry() {
+        val label = "Выборг - Каменногорск"
+        val testedRoute = routes.route(label)!!
+        val boundary = testedRoute.points.minBy { it.physicalM }
+        val boundarySnap = routes.snap(label, boundary.latitude, boundary.longitude)!!
+        val local = NativeTripEngine(routes)
+        val calibrated = routes.officialMeters(label, boundary.physicalM, "obratno")!!
+        local.configure(label, "obratno", calibrated, true, emptyList())
+        local.update(NativeTripEngine.Input(1_000, 20f, true, boundarySnap))
+        local.markSignalUnavailable()
+
+        val output = local.update(NativeTripEngine.Input(6_000, 20f, false, null))
+
+        assertEquals(boundary.physicalM, output.physicalM!!, 0.01)
+        assertTrue(output.officialM!!.isFinite())
+        assertTrue(output.recovering)
+    }
 }
