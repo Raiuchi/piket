@@ -3176,7 +3176,14 @@ window.addEventListener("error",function(e){
 <script>
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js').catch(function () {
+    navigator.serviceWorker.register('./sw.js', {updateViaCache:'none'}).then(function (registration) {
+      // Safari иногда откладывает штатную проверку PWA. Проверяем обновление при каждом
+      // открытии и возврате приложения, не трогая локальные ограничения и настройки.
+      registration.update().catch(function () {});
+      window.addEventListener('pageshow', function () {
+        registration.update().catch(function () {});
+      });
+    }).catch(function () {
       // Основное приложение продолжает работать онлайн, даже если PWA-кэш недоступен.
     });
   });
