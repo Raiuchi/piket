@@ -26,7 +26,9 @@ class NativeRepositoryContractTest {
         assertTrue(main.contains("WebView") && main.contains("publishSnapshot"))
         assertTrue(main.contains("api.github.com/repos/Raiuchi/piket/releases/latest"))
         assertTrue(main.contains("override fun onResume()"))
-        assertTrue(main.contains("handler.postDelayed({checkForUpdate(true)}"))
+        assertFalse("failed update checks must not retry repeatedly during a trip",
+            main.contains("handler.postDelayed({checkForUpdate(true)}"))
+        assertTrue(main.contains("next_check_at") && main.contains("serviceRunning()"))
         assertFalse(main.contains("updateCheckStarted"))
         assertTrue(main.contains("browser_download_url") && main.contains("showUpdateBanner"))
         assertTrue(main.contains("@JavascriptInterface fun downloadUpdate()") && main.contains("promptInstall(target)"))
