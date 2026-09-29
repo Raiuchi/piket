@@ -86,18 +86,30 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
         if (points.isEmpty() || points.size != axis.size || !physicalM.isFinite()) return null
         exactProfile(label, direction)?.let { profileOfficial(it, physicalM)?.let { value -> return value } }
         if (physicalM <= points.first().physicalM) return axis.first() + physicalM - points.first().physicalM
-        for (i in 0 until points.lastIndex) {
-            val a = points[i].physicalM
-            val b = points[i + 1].physicalM
-            if (physicalM > b) continue
+        // Route points are ordered by physical distance. This used to scan from the
+        // beginning for every candidate tested by snap(), turning a 647-point Moscow
+        // route into an O(n^2) calculation once per GPS callback. Binary lookup keeps
+        // the same axis/discontinuity semantics without burning the battery.
+        var low = 0
+        var high = points.lastIndex - 1
+        var segment = points.lastIndex - 1
+        while (low <= high) {
+            val middle = (low + high) ushr 1
+            if (physicalM <= points[middle + 1].physicalM) {
+                segment = middle
+                high = middle - 1
+            } else low = middle + 1
+        }
+        if (physicalM <= points.last().physicalM) {
+            val a = points[segment].physicalM
+            val b = points[segment + 1].physicalM
             val physical = b - a
-            val official = axis[i + 1] - axis[i]
+            val official = axis[segment + 1] - axis[segment]
             val discontinuity = official <= 0.0 || abs(official - physical) > 3_000.0
-            if (discontinuity) {
-                return if (physicalM >= b - 1.0) axis[i + 1] else axis[i] + physicalM - a
-            }
+            if (discontinuity)
+                return if (physicalM >= b - 1.0) axis[segment + 1] else axis[segment] + physicalM - a
             val fraction = if (physical > 0.0) (physicalM - a) / physical else 0.0
-            return axis[i] + fraction * official
+            return axis[segment] + fraction * official
         }
         return axis.last() + physicalM - points.last().physicalM
     }

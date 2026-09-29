@@ -31,10 +31,14 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     private var recovering = false
     private var recoveryCandidateM: Double? = null
     private var recoveryConfirmations = 0
+    private var calibrationHold = false
+    private var calibrationAnchorM: Double? = null
+    private var calibrationMovementM: Double? = null
+    private var calibrationMovementConfirmations = 0
     private var restrictions = emptyList<Restriction>()
 
     fun configure(route: String, direction: String, manualOfficialM: Double,
-                  active: Boolean, restrictions: List<Restriction>) {
+                  active: Boolean, restrictions: List<Restriction>, forceCalibration: Boolean = false) {
         val routeChanged = this.route != route || this.direction != direction
         val calibrationChanged = abs(this.manualOfficialM - manualOfficialM) > 0.5
         this.route = route
@@ -42,13 +46,39 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         this.manualOfficialM = manualOfficialM
         this.active = active
         this.restrictions = restrictions
-        if (routeChanged || calibrationChanged) {
+        if (forceCalibration && !routeChanged && physicalM != null) {
+            // Pressing "Set" is an action, even when the entered number equals the
+            // previous calibration. Re-anchor the displayed axis at the current place
+            // instead of silently ignoring that action.
+            val base = routes.officialMeters(route, physicalM!!, direction) ?: manualOfficialM
+            officialOffsetM = (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
+            speedMps = 0f
+            lastElapsedMs = 0L
+            recovering = false
+            recoveryCandidateM = null
+            recoveryConfirmations = 0
+            calibrationWaitStartedElapsedMs = 0L
+            beginCalibrationHold(physicalM)
+        } else if (routeChanged || calibrationChanged || forceCalibration) {
             physicalM = null
             officialOffsetM = 0.0
             recoveryCandidateM = null
             recoveryConfirmations = 0
             calibrationWaitStartedElapsedMs = 0L
+            if (forceCalibration) beginCalibrationHold(null) else {
+                calibrationHold = false
+                calibrationAnchorM = null
+                calibrationMovementM = null
+                calibrationMovementConfirmations = 0
+            }
         }
+    }
+
+    private fun beginCalibrationHold(anchor: Double?) {
+        calibrationHold = true
+        calibrationAnchorM = anchor
+        calibrationMovementM = null
+        calibrationMovementConfirmations = 0
     }
 
     fun markSignalUnavailable() {
@@ -91,9 +121,29 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
                 else (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
             calibrationWaitStartedElapsedMs = 0L
             recovering = !input.acceptedFix
+            calibrationAnchorM = calibrationSnap.physicalM
+            if (calibrationHold) speedMps = 0f
             return output(if (input.acceptedFix) "native-gps" else "native-count")
         }
         if (snap != null && physicalM != null) {
+            if (calibrationHold) {
+                val anchor = calibrationAnchorM ?: physicalM!!.also { calibrationAnchorM = it }
+                val progress = directionSign() * (snap.physicalM - anchor)
+                val previous = calibrationMovementM
+                val monotonic = previous == null || directionSign() * (snap.physicalM - previous) >= -3.0
+                val moving = !input.stationary && (input.speedMps ?: 0f) >= 1.5f && progress >= 25.0
+                if (moving && monotonic) calibrationMovementConfirmations++
+                else if (progress < 12.0 || input.stationary) calibrationMovementConfirmations = 0
+                calibrationMovementM = snap.physicalM
+                if (calibrationMovementConfirmations < 2) {
+                    physicalM = anchor
+                    speedMps = 0f
+                    return output("native-gps")
+                }
+                calibrationHold = false
+                physicalM = snap.physicalM
+                speedMps = input.speedMps ?: speedMps
+            }
             // Do not let harmless GPS drift move the kilometre while the train is
             // stopped. A recovery after a real outage is still confirmed below.
             if (!recovering && (input.stationary || (input.speedMps != null && input.speedMps <= 0.8f))) {
@@ -133,6 +183,10 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         officialOffsetM = saved.offsetM; speedMps = saved.speedMps; lastElapsedMs = saved.lastElapsedMs
         calibrationWaitStartedElapsedMs = saved.calibrationWaitStartedElapsedMs
         recovering = true
+        calibrationHold = false
+        calibrationAnchorM = null
+        calibrationMovementM = null
+        calibrationMovementConfirmations = 0
     }
 
     fun stop() { active = false; speedMps = 0f }
@@ -145,6 +199,10 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         recoveryCandidateM = null
         recoveryConfirmations = 0
         recovering = false
+        calibrationHold = false
+        calibrationAnchorM = null
+        calibrationMovementM = null
+        calibrationMovementConfirmations = 0
     }
 
     private fun output(source: String): Output {

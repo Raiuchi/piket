@@ -242,6 +242,39 @@ class NativeTripEngineTest {
         assertEquals(0f, output.speedMps)
     }
 
+    @Test fun settingSameManualKilometerAgainReallyRecalibrates() {
+        val start = route.points.first().physicalM
+        val manual = routes.officialMeters(route.label, start, "tuda")!!
+        engine.update(NativeTripEngine.Input(1_000, 20f, true, snap(0)))
+        val moved = engine.update(NativeTripEngine.Input(6_000, 20f, false, null))
+        assertTrue(moved.officialM!! > manual + 90.0)
+
+        engine.configure(route.label, "tuda", manual, true, emptyList(), forceCalibration = true)
+        val recalibrated = engine.update(NativeTripEngine.Input(7_000, null, false, null))
+
+        assertEquals(manual, recalibrated.officialM!!, 0.01)
+        assertEquals(0f, recalibrated.speedMps)
+    }
+
+    @Test fun freshCalibrationIgnoresSmallFalseMovementUntilDepartureIsConfirmed() {
+        val start = route.points.first().physicalM
+        val manual = routes.officialMeters(route.label, start, "tuda")!!
+        engine.update(NativeTripEngine.Input(1_000, 0f, true, snap(0), true))
+        engine.configure(route.label, "tuda", manual, true, emptyList(), forceCalibration = true)
+        fun at(metres: Double) = NativeRouteEngine.Snap(route.label, start + metres,
+            routes.officialMeters(route.label, start + metres, "tuda")!!, 2.0, 0)
+
+        val falseMove = engine.update(NativeTripEngine.Input(2_000, 8f, true, at(13.0)))
+        assertEquals(start, falseMove.physicalM!!, 0.01)
+        assertEquals(manual, falseMove.officialM!!, 0.01)
+        assertEquals(0f, falseMove.speedMps)
+
+        assertEquals(start, engine.update(NativeTripEngine.Input(3_000, 8f, true, at(30.0))).physicalM!!, 0.01)
+        val departed = engine.update(NativeTripEngine.Input(4_000, 8f, true, at(45.0)))
+        assertEquals(start + 45.0, departed.physicalM!!, 0.01)
+        assertEquals(8f, departed.speedMps, 0.01f)
+    }
+
     @Test fun confirmedPositionCanRecoverWhileDopplerSpeedIsUnavailable() {
         engine.update(NativeTripEngine.Input(1_000, 40f, true, snap(0)))
         engine.markSignalUnavailable()

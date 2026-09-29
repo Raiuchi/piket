@@ -10,10 +10,13 @@ import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.*
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import com.google.android.gms.location.*
 import org.json.JSONObject
 import java.util.Locale
@@ -65,6 +68,8 @@ class TrackingService : Service() {
     private var directGpsStartedAt = 0L
     private var lastDirectGpsStopAt = 0L
     private var fusedRecoveryFixes = 0
+    private var lastFusedRecoveryFixNanos = 0L
+    private var lastProcessedFixHealthy = false
     private var directGpsExtendedLogged = false
     private var lastProcessedFixNanos = 0L
     @Volatile private var satellitesUsed = 0
@@ -89,6 +94,22 @@ class TrackingService : Service() {
     private var tripTicker: Runnable? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
+    private val alertAudioAttributes by lazy {
+        AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+            .build()
+    }
+    private val alertAudioFocusRequest by lazy {
+        AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(alertAudioAttributes)
+            .setAcceptsDelayedFocusGain(false)
+            .setOnAudioFocusChangeListener { }
+            .build()
+    }
+    @Volatile private var activeUtteranceId: String? = null
+    private var voiceEnabled = true
     private var vibrator: Vibrator? = null
     private var soundEnabled = true
     private var vibrationEnabled = true
@@ -132,6 +153,7 @@ class TrackingService : Service() {
     private var routeTransitionCount = 0
     private var maxBatteryTemperatureC: Double? = null
     private var lastEngineOutput: NativeTripEngine.Output? = null
+    private var lastCalibrationRevision = 0L
     private var replayTrace = org.json.JSONArray()
     private var lastReplayTraceFlushAt = 0L
 
@@ -289,12 +311,36 @@ class TrackingService : Service() {
             if (status == TextToSpeech.SUCCESS) {
                 val result = tts?.setLanguage(Locale("ru", "RU")) ?: TextToSpeech.LANG_NOT_SUPPORTED
                 ttsReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+                tts?.setAudioAttributes(alertAudioAttributes)
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) = Unit
+                    override fun onDone(utteranceId: String?) = releaseAlertAudioFocus(utteranceId)
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) = releaseAlertAudioFocus(utteranceId)
+                })
             }
         }
     }
 
+    private fun requestAlertAudioFocus() {
+        runCatching { audioManager.requestAudioFocus(alertAudioFocusRequest) }
+    }
+
+    private fun releaseAlertAudioFocus(utteranceId: String? = null) {
+        if (utteranceId != null && utteranceId != activeUtteranceId) return
+        if (utteranceId != null) activeUtteranceId = null
+        runCatching { audioManager.abandonAudioFocusRequest(alertAudioFocusRequest) }
+    }
+
     private fun speak(text: String) {
-        if (ttsReady && text.isNotBlank()) tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "piket_say")
+        if (!ttsReady || text.isBlank()) {
+            mainHandler.postDelayed({ releaseAlertAudioFocus() }, 1_500)
+            return
+        }
+        val utteranceId = "piket_alert_${SystemClock.elapsedRealtime()}"
+        activeUtteranceId = utteranceId
+        val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
+        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
     }
 
     private fun vibrate(kind: String) {
@@ -465,7 +511,8 @@ class TrackingService : Service() {
         runCatching {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
             directGpsListener = listener; directGpsActive = true; directGpsStartedAt = now
-            fusedRecoveryFixes = 0; directGpsExtendedLogged = false; directGpsStartCount++
+            fusedRecoveryFixes = 0; lastFusedRecoveryFixNanos = 0L
+            directGpsExtendedLogged = false; directGpsStartCount++
             diagnostics.event("direct_gps_started", diagnosticContext() + mapOf(
                 "silence_ms" to silence, "unusable_ms" to unusableFor))
         }
@@ -481,6 +528,7 @@ class TrackingService : Service() {
         }
         directGpsListener = null; directGpsActive = false
         lastDirectGpsStopAt = System.currentTimeMillis(); fusedRecoveryFixes = 0
+        lastFusedRecoveryFixNanos = 0L
         directGpsExtendedLogged = false
     }
 
@@ -490,7 +538,19 @@ class TrackingService : Service() {
     }
 
     private fun processLocation(location: Location, fromDirectGps: Boolean) {
-        if (location.elapsedRealtimeNanos <= lastProcessedFixNanos) return
+        if (location.elapsedRealtimeNanos <= lastProcessedFixNanos) {
+            // Fused and direct GPS often deliver the very same hardware fix. If the
+            // direct callback wins the race, the old duplicate guard discarded the
+            // fused callback before it could prove recovery, leaving both providers
+            // active for tens of minutes. Count each healthy fused timestamp once.
+            if (directGpsActive && !fromDirectGps && lastProcessedFixHealthy &&
+                location.elapsedRealtimeNanos == lastProcessedFixNanos &&
+                location.elapsedRealtimeNanos > lastFusedRecoveryFixNanos) {
+                lastFusedRecoveryFixNanos = location.elapsedRealtimeNanos
+                fusedRecoveryFixes++
+            }
+            return
+        }
         lastProcessedFixNanos = location.elapsedRealtimeNanos
         processedLocationCount++
         val age = ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0)
@@ -500,13 +560,18 @@ class TrackingService : Service() {
             location.speed.takeIf { location.hasSpeed() },
             location.speedAccuracyMetersPerSecond.takeIf { location.hasSpeedAccuracy() },
             location.isMock, satellitesUsed, averageCn0, gnssTelemetrySeen))
+        lastProcessedFixHealthy = result.accepted && result.quality in setOf("good", "stationary")
         val wallNow = System.currentTimeMillis()
         if (result.accepted) acceptedGpsSamples++ else rejectedGpsSamples++
         if (result.accepted && result.quality in setOf("good", "stationary")) {
             recoverGpsOutage(if (fromDirectGps) "direct-gps" else location.provider ?: "fused")
             lastUsableFixAt = wallNow
             unusableFixMarked = false
-            if (directGpsActive && !fromDirectGps) fusedRecoveryFixes++
+            if (directGpsActive && !fromDirectGps &&
+                location.elapsedRealtimeNanos > lastFusedRecoveryFixNanos) {
+                lastFusedRecoveryFixNanos = location.elapsedRealtimeNanos
+                fusedRecoveryFixes++
+            }
         } else if (!unusableFixMarked && wallNow - lastUsableFixAt > 8_000) {
             // FusedLocation can keep sending fresh but useless fixes with an
             // accuracy radius of hundreds or thousands of metres. The old
@@ -599,11 +664,12 @@ class TrackingService : Service() {
         }
         lastEngineOutput = output
         recordPositionRecovery(beforeUpdate, output, currentSnap, positionAccepted)
+        handleAlert(output)
         tripEngine?.save()?.let(::persistTripState)
         output?.let {
             updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))
         }
-        persistSnapshot(output, accuracy); handleAlert(output)
+        persistSnapshot(output, accuracy)
         recordDiagnosticSample(location, result, currentSnap, output, fromDirectGps)
         recordReplayGps(location, result, currentSnap, output, fromDirectGps)
         output?.officialM?.let { official ->
@@ -711,6 +777,7 @@ class TrackingService : Service() {
         val json = JSONObject().put("active", state.active).put("route", state.route)
             .put("direction", state.direction).put("manualOfficialM", state.manualOfficialM)
             .put("offsetM", state.offsetM).put("speedMps", state.speedMps)
+            .put("calibrationRevision", lastCalibrationRevision)
             .put("calibrationWaitStartedElapsedMs", state.calibrationWaitStartedElapsedMs)
         state.physicalM?.let { json.put("physicalM", it) }
         journeyId?.let { json.put("journey", it) }
@@ -723,6 +790,7 @@ class TrackingService : Service() {
         val json = JSONObject(raw)
         journeyId = json.optString("journey").takeUnless { it.isBlank() || it == "null" }
         trainNumber = json.optString("train").takeUnless { it.isBlank() || it == "null" }
+        lastCalibrationRevision = json.optLong("calibrationRevision", 0L)
         routeLabel = json.optString("route", routeLabel)
         updateSpeedCeiling()
         val ceilingMps = RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber) / 3.6f
@@ -741,6 +809,7 @@ class TrackingService : Service() {
         journeyId = root.optString("journey").takeUnless { it.isBlank() || it == "null" }
         trainNumber = root.optString("train").takeUnless { it.isBlank() || it == "null" }
         updateSpeedCeiling()
+        voiceEnabled = root.optBoolean("voice", true)
         soundEnabled = root.optBoolean("sound", true); vibrationEnabled = root.optBoolean("vibration", true)
         alertSpeech.clear(); alertSpeed.clear(); alertReason.clear()
         val restrictionDiagnostics = org.json.JSONArray()
@@ -774,8 +843,11 @@ class TrackingService : Service() {
             completedAlertIds.clear(); warnedAlertIds.clear()
             lastRecoveryState = null; lastTransitionProbeKey = ""; lastTransitionProbeAt = 0L
         }
+        val calibrationRevision = root.optLong("calibrationRevision", 0L)
+        val forceCalibration = calibrationRevision > 0L && calibrationRevision != lastCalibrationRevision
         tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
-            nextActive, restrictions)
+            nextActive, restrictions, forceCalibration)
+        if (calibrationRevision > 0L) lastCalibrationRevision = calibrationRevision
         val startsNewSession = nextActive && (previousState?.active != true ||
             previousState?.route != routeLabel || previousState?.direction != nextDirection)
         if (startsNewSession) startTripSession() else if (!nextActive) finishTripSession("configured-inactive")
@@ -784,16 +856,17 @@ class TrackingService : Service() {
             "trusted_speed_ceiling_kmh" to RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber),
             "direction" to nextDirection, "active" to nextActive,
             "manual_official_m" to root.optDouble("manualOfficialM"),
-            "lead_m" to root.optDouble("lead", 3_000.0), "sound" to soundEnabled,
+            "lead_m" to root.optDouble("lead", 3_000.0), "voice" to voiceEnabled, "sound" to soundEnabled,
             "vibration" to vibrationEnabled, "restrictions" to restrictions.size))
         diagnostics.event("restrictions_configured", diagnosticContext() + mapOf(
             "lead_m" to root.optDouble("lead", 3_000.0), "items" to restrictionDiagnostics))
-        if (previousState?.manualOfficialM != null &&
-            abs(previousState.manualOfficialM - root.optDouble("manualOfficialM")) >= 0.5)
+        if (previousState?.manualOfficialM != null && (forceCalibration ||
+            abs(previousState.manualOfficialM - root.optDouble("manualOfficialM")) >= 0.5))
             diagnostics.event("manual_calibration_changed", diagnosticContext() + mapOf(
                 "from_official_m" to previousState.manualOfficialM,
                 "to_official_m" to root.optDouble("manualOfficialM"),
-                "delta_m" to root.optDouble("manualOfficialM") - previousState.manualOfficialM))
+                "delta_m" to root.optDouble("manualOfficialM") - previousState.manualOfficialM,
+                "forced" to forceCalibration, "revision" to calibrationRevision))
         }.onFailure { diagnostics.event("trip_config_error", diagnosticContext() + mapOf(
             "error" to it.javaClass.simpleName, "message" to it.message,
             "payload_length" to (raw?.length ?: 0))) }
@@ -819,7 +892,9 @@ class TrackingService : Service() {
             val ahead = if (distance >= 1_000) String.format(Locale.forLanguageTag("ru"), "Через %.1f километра. ", distance / 1_000)
                 else "Через ${distance.roundToInt()} метров. "
             val phrase = (if (entered) "Ограничение. " else ahead) + (alertSpeech[id] ?: "Ограничение")
-            if (soundEnabled) { beep(kind); speak(phrase) }
+            if (soundEnabled || voiceEnabled) requestAlertAudioFocus()
+            if (soundEnabled) beep(kind)
+            if (voiceEnabled) speak(phrase) else if (soundEnabled) mainHandler.postDelayed({ releaseAlertAudioFocus() }, 1_500)
             if (vibrationEnabled) vibrate(kind)
         }
         if (entered) completedAlertIds += completedKey
@@ -927,7 +1002,7 @@ class TrackingService : Service() {
         tripTicker = null; watchdog = null; stopNetworkBackup(); stopDirectGps("service-stopped")
         mainLocationCallback?.let { fusedClient?.removeLocationUpdates(it) }
         gnssCallback?.let { locationManager?.unregisterGnssStatusCallback(it) }
-        tts?.stop(); tts?.shutdown(); tts = null
+        tts?.stop(); tts?.shutdown(); tts = null; releaseAlertAudioFocus()
         tripEngine?.let { it.stop(); persistTripState(it.save(),true) }
         persistSnapshot(null, 999f,true)
         super.onDestroy()

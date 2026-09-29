@@ -940,9 +940,11 @@ window.addEventListener("unhandledrejection",function(e){
 
   function indexWindow(segPts, targetM, windowM){
     // точки идут по возрастанию id (метров) — находим диапазон индексов в targetM±windowM
-    var lo=0, hi=segPts.length-1;
-    for(var i=0;i<segPts.length;i++){ if(segPts[i][2]>=targetM-windowM){ lo=i; break; } lo=i; }
-    for(var j=segPts.length-1;j>=0;j--){ if(segPts[j][2]<=targetM+windowM){ hi=j; break; } hi=j; }
+    var n=segPts.length,left=targetM-windowM,right=targetM+windowM,a=0,b=n;
+    while(a<b){var m=(a+b)>>1;if(segPts[m][2]<left)a=m+1;else b=m;}
+    var lo=Math.max(0,a-1);a=0;b=n;
+    while(a<b){var u=(a+b)>>1;if(segPts[u][2]<=right)a=u+1;else b=u;}
+    var hi=Math.min(n-1,a);
     if(lo>hi){ var t=lo; lo=hi; hi=t; }
     return {lo:lo, hi:hi};
   }
@@ -1090,15 +1092,14 @@ window.addEventListener("unhandledrejection",function(e){
     var pts=TRACK.segs[si], ids=CHAINAGE[si];
     if(!pts || !ids || pts.length!==ids.length) return trackM;
     if(trackM<=pts[0][2]) return ids[0]+(trackM-pts[0][2]);
-    for(var i=0;i<pts.length-1;i++){
-      var a=pts[i][2], b=pts[i+1][2];
-      if(trackM>b) continue;
-      var physical=b-a, official=ids[i+1]-ids[i];
-      var discontinuity=official<=0 || Math.abs(official-physical)>3000;
-      if(discontinuity) return trackM>=b-1 ? ids[i+1] : ids[i]+(trackM-a);
-      var f=physical>0?(trackM-a)/physical:0;
-      return ids[i]+f*official;
-    }
+    var low=1,high=pts.length-1;
+    while(low<high){var mid=(low+high)>>1;if(pts[mid][2]<trackM)low=mid+1;else high=mid;}
+    var i=Math.max(0,low-1),a=pts[i][2],b=pts[i+1][2];
+    var physical=b-a,official=ids[i+1]-ids[i];
+    var discontinuity=official<=0 || Math.abs(official-physical)>3000;
+    if(discontinuity) return trackM>=b-1 ? ids[i+1] : ids[i]+(trackM-a);
+    var f=physical>0?(trackM-a)/physical:0;
+    if(trackM<=b)return ids[i]+f*official;
     var n=pts.length; return ids[n-1]+(trackM-pts[n-1][2]);
   }
   function routeOfficialOffset(label){
@@ -1142,9 +1143,11 @@ window.addEventListener("unhandledrejection",function(e){
           journey:nativeJourney,
           train:selectedTrain||null,
           manualOfficialM:manual,
+          calibrationRevision:state.calib&&state.calib._revision?+state.calib._revision:0,
           active:!!rt.tracking,
           lead:state.settings.lead||3000,
           sound:state.settings.sound!==false,
+          voice:state.settings.voice!==false,
           vibration:state.settings.vibe!==false,
           restrictions:nativeRestrictions
         }));
@@ -1365,10 +1368,10 @@ window.addEventListener("unhandledrejection",function(e){
   function say(t){ if(!state.settings.voice)return;
     try{ if(window.Android&&window.Android.speak){ window.Android.speak(t); return; } }catch(e){appDiagnostic("voice_error",{stage:"native-speak",error:String(e&&e.message||e)});}
     if(!("speechSynthesis"in window)){appDiagnostic("voice_error",{stage:"unsupported"});return;} try{ speechSynthesis.cancel();
-    var u=new SpeechSynthesisUtterance(t); u.lang="ru-RU"; u.rate=1.0; u.pitch=1.05; var v=pickVoice(); if(v)u.voice=v;u.onerror=function(ev){appDiagnostic("voice_error",{stage:"utterance",error:String(ev&&ev.error||"unknown")});}; speechSynthesis.speak(u);}catch(e){appDiagnostic("voice_error",{stage:"browser-speak",error:String(e&&e.message||e)});} }
+    var u=new SpeechSynthesisUtterance(t); u.lang="ru-RU"; u.rate=1.0; u.pitch=1.05; u.volume=1; var v=pickVoice(); if(v)u.voice=v;u.onerror=function(ev){appDiagnostic("voice_error",{stage:"utterance",error:String(ev&&ev.error||"unknown")});}; speechSynthesis.speak(u);}catch(e){appDiagnostic("voice_error",{stage:"browser-speak",error:String(e&&e.message||e)});} }
   function warmVoice(){ if(!state.settings.voice)return;
     try{ if(window.Android&&window.Android.speak){ window.Android.speak("Контроль включён"); return; } }catch(e){appDiagnostic("voice_error",{stage:"native-warmup",error:String(e&&e.message||e)});}
-    if(!("speechSynthesis"in window)){appDiagnostic("voice_error",{stage:"unsupported-warmup"});return;} try{ speechSynthesis.cancel(); var w=new SpeechSynthesisUtterance("Контроль включён"); w.lang="ru-RU"; w.pitch=1.05; var v=pickVoice(); if(v)w.voice=v;w.onerror=function(ev){appDiagnostic("voice_error",{stage:"warmup-utterance",error:String(ev&&ev.error||"unknown")});}; speechSynthesis.speak(w);}catch(e){appDiagnostic("voice_error",{stage:"browser-warmup",error:String(e&&e.message||e)});} }
+    if(!("speechSynthesis"in window)){appDiagnostic("voice_error",{stage:"unsupported-warmup"});return;} try{ speechSynthesis.cancel(); var w=new SpeechSynthesisUtterance("Контроль включён"); w.lang="ru-RU"; w.pitch=1.05; w.volume=1; var v=pickVoice(); if(v)w.voice=v;w.onerror=function(ev){appDiagnostic("voice_error",{stage:"warmup-utterance",error:String(ev&&ev.error||"unknown")});}; speechSynthesis.speak(w);}catch(e){appDiagnostic("voice_error",{stage:"browser-warmup",error:String(e&&e.message||e)});} }
   function sayPhrase(r){ var p=""; if(r.reason)p+=r.reason.toLowerCase(); if(r.spd!=null){ p+=(p?", ":"")+"ограничение скорости "+r.spd; } return p||"внимание"; }
   function distWords(m){ return m>=1000?("через "+(m/1000).toFixed(1).replace(".",",")+" километра"):("через "+(Math.round(m/100)*100)+" метров"); }
 
@@ -2923,7 +2926,7 @@ window.addEventListener("unhandledrejection",function(e){
       }
       rt.pendingCalibConfirm=false;
     }
-    var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null,_manual:true};
+    var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:null,_manual:true,_revision:Date.now()};
     // trackM НЕ берём с текущего (возможно шумного) замера — установим на первом надёжном сигнале в onPos
     state.calib=cal; rt.autoCalib=false; rt.stoppedPositionM=null; rt.stoppedRoute=null; rt.stoppedDirection=null; save("sap_lastStop",null);
     rt.odo=0; rt.last=null; rt.lastGoodFix=null; rt.pendingCandM=null; rt.pendingCount=0; rt.correctionTargetOdo=null; alertState={}; rt.posM=currentMeters(); persist();

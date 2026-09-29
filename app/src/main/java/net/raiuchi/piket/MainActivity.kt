@@ -5,6 +5,8 @@ import android.app.Activity
 import android.app.ActivityManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.AudioManager
 import android.net.Uri
 import android.provider.Settings
 import android.os.*
@@ -79,7 +81,6 @@ class MainActivity : Activity() {
     }
     @Volatile private var updateCheckRunning = false
     @Volatile private var lastUpdateCheckAt = 0L
-    private var updateRetryCount = 0
     @Volatile private var updateDownloadRunning = false
     @Volatile private var latestUpdateUrl: String? = null
     @Volatile private var latestUpdateVersion: String? = null
@@ -101,7 +102,7 @@ class MainActivity : Activity() {
                 mediaPlaybackRequiresUserGesture=false;cacheMode=WebSettings.LOAD_NO_CACHE
             }
             view.webViewClient=object:WebViewClient(){
-                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot());publishThermalState();checkForUpdate(true)}
+                override fun onPageFinished(v:WebView,url:String){pageReady=true;publishSnapshot(repository.loadSnapshot());publishThermalState();checkForUpdate()}
                 override fun shouldOverrideUrlLoading(v:WebView,r:WebResourceRequest)=openExternal(r.url)
                 override fun shouldOverrideUrlLoading(v:WebView,url:String)=openExternal(Uri.parse(url))
             }
@@ -216,7 +217,13 @@ class MainActivity : Activity() {
     private fun openExternal(uri:Uri?):Boolean{if(uri==null||uri.toString()==APP_URL)return false;if(uri.scheme in listOf("http","https"))runCatching{startActivity(Intent(Intent.ACTION_VIEW,uri))};return true}
     private fun checkForUpdate(force:Boolean=false){
         val now=System.currentTimeMillis()
-        if(updateCheckRunning||(!force&&now-lastUpdateCheckAt<60_000))return
+        val updatePrefs=getSharedPreferences("piket_updates",MODE_PRIVATE)
+        val nextAutomaticCheckAt=updatePrefs.getLong("next_check_at",0L)
+        // Update discovery must not compete with safety-critical tracking for radio,
+        // CPU and battery. Remember a failed check across Activity recreations instead
+        // of retrying GitHub every 15/30/45 seconds in a coverage gap.
+        if(updateCheckRunning||(!force&&(serviceRunning()||now-lastUpdateCheckAt<60_000||
+                now<nextAutomaticCheckAt)))return
         updateCheckRunning=true;lastUpdateCheckAt=now
         diagnostics.event("update_check_started", mapOf("forced" to force))
         Thread{
@@ -255,10 +262,8 @@ class MainActivity : Activity() {
                 "error" to it.javaClass.simpleName, "message" to it.message)) }
             val success=result.isSuccess
             updateCheckRunning=false
-            if(success)updateRetryCount=0 else if(updateRetryCount<3){
-                updateRetryCount++
-                handler.postDelayed({checkForUpdate(true)},15_000L*updateRetryCount)
-            }
+            updatePrefs.edit().putLong("next_check_at",System.currentTimeMillis()+
+                if(success)6*60*60_000L else 30*60_000L).apply()
         }.start()
     }
 
@@ -400,7 +405,16 @@ class MainActivity : Activity() {
         for(i in 0 until maxOf(a.size,b.size)){val av=a.getOrElse(i){0};val bv=b.getOrElse(i){0};if(av!=bv)return av>bv}
         return false
     }
-    private fun initTts(){tts=TextToSpeech(this){status->if(status==TextToSpeech.SUCCESS){val r=tts?.setLanguage(Locale("ru","RU"))?:TextToSpeech.LANG_NOT_SUPPORTED;ttsReady=r!=TextToSpeech.LANG_MISSING_DATA&&r!=TextToSpeech.LANG_NOT_SUPPORTED}}}
+    private fun initTts(){tts=TextToSpeech(this){status->if(status==TextToSpeech.SUCCESS){val r=tts?.setLanguage(Locale("ru","RU"))?:TextToSpeech.LANG_NOT_SUPPORTED;ttsReady=r!=TextToSpeech.LANG_MISSING_DATA&&r!=TextToSpeech.LANG_NOT_SUPPORTED;tts?.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())}}}
+
+    private fun warnIfAlertVolumeIsLow() {
+        val audio = getSystemService(AUDIO_SERVICE) as? AudioManager ?: return
+        val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+        val current = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
+        if (current * 100 / max >= 35) return
+        diagnostics.event("low_alert_volume", mapOf("current" to current, "max" to max))
+        web?.evaluateJavascript("if(window.toast)toast('Увеличь громкость медиа, чтобы слышать предупреждения')", null)
+    }
 
     inner class PiketBridge{
         @JavascriptInterface fun notifyUiReady() { uiReady = true }
@@ -414,6 +428,7 @@ class MainActivity : Activity() {
                 runOnUiThread{
                     logTripUiAction("trip_start_requested", pendingConfig)
                     diagnostics.event("native_ui_session_started", mapOf("native_session_id" to sessionId))
+                    warnIfAlertVolumeIsLow()
                     startNative(pendingConfig,sessionId)
                 }
                 return sessionId
@@ -442,7 +457,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun isTtsReady()=ttsReady
         @JavascriptInterface fun getAppVersion():String=packageManager.getPackageInfo(packageName,0).versionName?:"0.0.0"
         @JavascriptInterface fun downloadUpdate()=runOnUiThread{downloadLatestUpdate()}
-        @JavascriptInterface fun speak(text:String)=runOnUiThread{if(ttsReady)tts?.speak(text,TextToSpeech.QUEUE_FLUSH,null,"piket-ui")}
+        @JavascriptInterface fun speak(text:String)=runOnUiThread{if(ttsReady){val p=Bundle().apply{putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME,1f)};tts?.speak(text,TextToSpeech.QUEUE_FLUSH,p,"piket-ui-${SystemClock.elapsedRealtime()}")}}
         @JavascriptInterface fun vibrate(kind:String)=runOnUiThread{val v=if(Build.VERSION.SDK_INT>=31)(getSystemService(VIBRATOR_MANAGER_SERVICE)as VibratorManager).defaultVibrator else getSystemService(VIBRATOR_SERVICE)as Vibrator;val p=if(kind=="danger")longArrayOf(0,160,80,160,80,260)else longArrayOf(0,120,90,120);if(Build.VERSION.SDK_INT>=26)v.vibrate(VibrationEffect.createWaveform(p,-1))else v.vibrate(p,-1)}
         @JavascriptInterface fun beep(kind:String){}
         @JavascriptInterface fun updatePosition(text:String){}
