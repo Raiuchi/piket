@@ -158,6 +158,13 @@ for (const event of events) {
         { configuredLeadM: lead, actualDistanceM: Number(event.distance_m), restrictionId: event.id ?? null }));
   }
 }
+const directStarts = events.filter(e => e.event === 'direct_gps_started');
+const directFirstFixes = events.filter(e => e.event === 'direct_gps_first_fix');
+const directFirstFixWaits = directFirstFixes.map(e => Number(e.wait_ms)).filter(Number.isFinite);
+const directTriggers = Object.fromEntries([...new Set(directStarts.map(e => e.trigger).filter(Boolean))]
+  .sort().map(trigger => [trigger, directStarts.filter(e => e.trigger === trigger).length]));
+const recoveryWakeLocks = events.filter(e => e.event === 'gps_recovery_wake_lock');
+const latestBatteryOptimization = events.filter(e => e.event === 'battery_optimization_status').at(-1);
 const report = {
   file: path.basename(input), events: events.length,
   firstEventTime: events.length && finite(events[0].time) ? eventTime(events[0]) : null,
@@ -175,8 +182,15 @@ const report = {
   maxPositionCorrectionM: corrections.length ? Math.max(...corrections) : null,
   scheduleCardChanges: scheduleCards.length, scheduleCardRegressions,
   rapidConfigurationReplacements,
-  gpsReserveStarts: events.filter(e => e.event === 'direct_gps_started').length,
+  gpsReserveStarts: directStarts.length,
   gpsReserveStops: events.filter(e => e.event === 'direct_gps_stopped').length,
+  gpsReserveTriggers: directTriggers,
+  gpsReserveFirstFixes: directFirstFixes.length,
+  gpsReserveMaxFirstFixWaitMs: directFirstFixWaits.length ? Math.max(...directFirstFixWaits) : null,
+  gpsReserveWaitingEvents: events.filter(e => e.event === 'direct_gps_waiting').length,
+  gpsRecoveryWakeLockAcquires: recoveryWakeLocks.filter(e => e.state === 'acquired').length,
+  gpsRecoveryWakeLockReleases: recoveryWakeLocks.filter(e => e.state === 'released').length,
+  batteryOptimizationExempt: latestBatteryOptimization?.exempt ?? null,
   locationRequestRestarts,
   restrictionAlerts: events.filter(e => e.event === 'restriction_alert').length,
   manualCalibrationChanges: events.filter(e => e.event === 'manual_calibration_changed').length,

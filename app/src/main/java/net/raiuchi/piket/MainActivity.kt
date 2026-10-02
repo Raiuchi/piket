@@ -112,7 +112,7 @@ class MainActivity : Activity() {
             }
             view.addJavascriptInterface(PiketBridge(),"Android");setContentView(view);view.loadUrl(APP_URL)
         }
-        requestPermissionsIfNeeded()
+        if (!requestPermissionsIfNeeded()) handler.postDelayed({ maybeRequestBatteryOptimizationExemption() }, 1_200)
         registerThermalMonitor()
     }
 
@@ -198,21 +198,43 @@ class MainActivity : Activity() {
     }
 
     private fun serviceRunning():Boolean=(getSystemService(ACTIVITY_SERVICE)as? ActivityManager)?.getRunningServices(Int.MAX_VALUE)?.any{it.service.className==TrackingService::class.java.name}==true
-    private fun requestPermissionsIfNeeded(){
+    private fun requestPermissionsIfNeeded():Boolean{
         val need=mutableListOf<String>();if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)need+=Manifest.permission.ACCESS_FINE_LOCATION
         if(checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)!=PackageManager.PERMISSION_GRANTED)need+=Manifest.permission.ACCESS_COARSE_LOCATION
         if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)need+=Manifest.permission.POST_NOTIFICATIONS
         if(need.isNotEmpty()){
             diagnostics.event("permissions_requested", mapOf("permissions" to need.joinToString(",")))
             requestPermissions(need.toTypedArray(),REQUEST_PERMISSIONS)
+            return true
         }
+        return false
     }
     override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray){
         super.onRequestPermissionsResult(requestCode,permissions,grantResults)
-        if(requestCode==REQUEST_PERMISSIONS)diagnostics.event("permissions_result",mapOf(
-            "results" to permissions.indices.joinToString(","){index->
+        if(requestCode==REQUEST_PERMISSIONS){
+            diagnostics.event("permissions_result",mapOf("results" to permissions.indices.joinToString(","){index->
                 "${permissions[index]}=${if(grantResults.getOrNull(index)==PackageManager.PERMISSION_GRANTED)"granted" else "denied"}"
             }))
+            handler.postDelayed({ maybeRequestBatteryOptimizationExemption() }, 800)
+        }
+    }
+
+    private fun maybeRequestBatteryOptimizationExemption(){
+        if(Build.VERSION.SDK_INT<Build.VERSION_CODES.M)return
+        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return
+        val power=getSystemService(POWER_SERVICE)as?PowerManager?:return
+        val exempt=power.isIgnoringBatteryOptimizations(packageName)
+        diagnostics.event("battery_optimization_status",mapOf("exempt" to exempt))
+        if(exempt)return
+        val prefs=getSharedPreferences("piket_power",MODE_PRIVATE)
+        if(prefs.getBoolean("exemption_prompted",false))return
+        prefs.edit().putBoolean("exemption_prompted",true).apply()
+        runCatching{
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:$packageName")))
+            diagnostics.event("battery_optimization_exemption_requested")
+        }.onFailure{diagnostics.event("battery_optimization_exemption_error",mapOf(
+            "error" to it.javaClass.simpleName,"message" to it.message))}
     }
     private fun openExternal(uri:Uri?):Boolean{if(uri==null||uri.toString()==APP_URL)return false;if(uri.scheme in listOf("http","https"))runCatching{startActivity(Intent(Intent.ACTION_VIEW,uri))};return true}
     private fun checkForUpdate(force:Boolean=false){

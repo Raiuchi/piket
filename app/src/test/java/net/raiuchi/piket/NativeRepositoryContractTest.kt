@@ -34,7 +34,12 @@ class NativeRepositoryContractTest {
         assertTrue(main.contains("@JavascriptInterface fun downloadUpdate()") && main.contains("promptInstall(target)"))
         assertTrue(manifest.contains("android.permission.REQUEST_INSTALL_PACKAGES"))
         assertTrue(service.contains("NativeTripEngine") && service.contains("NativeMotionFilter"))
-        assertFalse("foreground GPS must not hold the CPU awake for the whole trip", manifest.contains("android.permission.WAKE_LOCK"))
+        assertTrue(manifest.contains("android.permission.WAKE_LOCK"))
+        assertTrue("wake lock must be bounded to GPS recovery instead of the whole trip",
+            service.contains("RECOVERY_WAKE_LOCK_TIMEOUT_MS") &&
+                service.contains("releaseRecoveryWakeLock()"))
+        assertTrue(main.contains("ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS") &&
+            main.contains("battery_optimization_status"))
         assertTrue(service.contains("latestSnapshotJson") && service.contains("now-lastSnapshotDiskAt>=10_000"))
         assertTrue(service.contains("now-lastNotificationAt>=10_000"))
         assertTrue(service.contains("direct_gps_active_ms") && service.contains("location_callbacks") &&

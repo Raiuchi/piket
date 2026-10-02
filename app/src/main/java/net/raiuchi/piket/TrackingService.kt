@@ -71,6 +71,11 @@ class TrackingService : Service() {
     private var lastFusedRecoveryFixNanos = 0L
     private var lastProcessedFixHealthy = false
     private var directGpsExtendedLogged = false
+    private var directGpsFirstCallbackSeen = false
+    private var directGpsWaitingStage = 0
+    private var directGpsMinimumStopAt = 0L
+    private var recoveryWakeLock: PowerManager.WakeLock? = null
+    private var interferencePrewarmPending = false
     private var lastProcessedFixNanos = 0L
     @Volatile private var satellitesUsed = 0
     @Volatile private var averageCn0 = 0f
@@ -421,27 +426,56 @@ class TrackingService : Service() {
             override fun run() {
                 val now = System.currentTimeMillis()
                 val silence = now - lastFixReceivedAt
+                val tripActive = tripEngine?.save()?.active == true
+                if (!tripActive) {
+                    interferencePrewarmPending = false
+                    if (networkBackupActive) stopNetworkBackup()
+                    if (directGpsActive) stopDirectGps("trip-inactive")
+                }
                 if (silence > 8_000 && !signalUnavailableMarked) {
                     signalUnavailableMarked = true
                     motionFilter.markSignalUnavailable(); tripEngine?.markSignalUnavailable()
                     markGpsOutage("location_silence", mapOf("silence_ms" to silence))
                     persistSnapshot(null, 999f)
                 } else if (silence <= 3_000) signalUnavailableMarked = false
-                if (silence > 10_000 && !networkBackupActive) startNetworkBackup()
-                else if (silence <= 10_000 && networkBackupActive) stopNetworkBackup()
                 val unusableFor = now - lastUsableFixAt
-                if (!directGpsActive && unusableFor > 10_000 && now - lastDirectGpsStopAt > 30_000)
-                    startDirectGps(now, silence, unusableFor)
-                if (directGpsActive && fusedRecoveryFixes >= 3) stopDirectGps("fused-recovered")
+                val needsNetwork = NativeGpsRecoveryPolicy.shouldStartNetwork(tripActive, silence, unusableFor)
+                if (needsNetwork && !networkBackupActive) startNetworkBackup()
+                else if (!needsNetwork && networkBackupActive) stopNetworkBackup()
+                val prewarm = interferencePrewarmPending
+                if (NativeGpsRecoveryPolicy.shouldStartDirect(tripActive, directGpsActive, unusableFor,
+                        now - lastDirectGpsStopAt, prewarm)) {
+                    interferencePrewarmPending = false
+                    startDirectGps(now, silence, unusableFor,
+                        if (prewarm) "known-interference" else "unusable-fix")
+                } else if (directGpsActive && prewarm) interferencePrewarmPending = false
+                if (directGpsActive && fusedRecoveryFixes >= 3 && now >= directGpsMinimumStopAt)
+                    stopDirectGps("fused-recovered")
                 else if (directGpsActive && !directGpsExtendedLogged && now - directGpsStartedAt > 120_000) {
                     directGpsExtendedLogged = true
                     diagnostics.event("direct_gps_extended", diagnosticContext() + mapOf(
                         "active_ms" to (now - directGpsStartedAt),
                         "reason" to "primary-not-recovered"))
                 }
+                if (directGpsActive && !directGpsFirstCallbackSeen) {
+                    val waitingMs = now - directGpsStartedAt
+                    val nextStage = when {
+                        waitingMs >= 45_000L -> 2
+                        waitingMs >= 15_000L -> 1
+                        else -> 0
+                    }
+                    if (nextStage > directGpsWaitingStage) {
+                        directGpsWaitingStage = nextStage
+                        diagnostics.event("direct_gps_waiting", diagnosticContext() + mapOf(
+                            "waiting_ms" to waitingMs, "stage" to nextStage,
+                            "satellites" to satellitesUsed, "average_cn0" to averageCn0,
+                            "fused_silence_ms" to silence, "unusable_ms" to unusableFor))
+                    }
+                }
                 // Fresh network fixes can mask a stalled precise-GPS stream.
                 // Bound retries to avoid continually restarting acquisition in interference.
-                if ((silence > 15_000 || now - lastUsableFixAt > 30_000) && now - lastFusedRestartAt > 120_000) {
+                if (NativeGpsRecoveryPolicy.shouldRestartFused(tripActive, silence, unusableFor,
+                        now - lastFusedRestartAt)) {
                     diagnostics.event("location_request_restarted", mapOf("silence_ms" to silence,
                         "unusable_ms" to now - lastUsableFixAt))
                     locationRequestRestartCount++
@@ -488,13 +522,21 @@ class TrackingService : Service() {
         networkBackupActive = false
     }
 
-    private fun startDirectGps(now: Long, silence: Long, unusableFor: Long) {
+    private fun startDirectGps(now: Long, silence: Long, unusableFor: Long, trigger: String) {
         val manager = locationManager ?: (getSystemService(LOCATION_SERVICE) as? LocationManager) ?: return
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
             !manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return
         val listener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
                 locationCallbackCount++
+                if (!directGpsFirstCallbackSeen) {
+                    directGpsFirstCallbackSeen = true
+                    diagnostics.event("direct_gps_first_fix", diagnosticContext() + mapOf(
+                        "wait_ms" to (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0),
+                        "accuracy_m" to if (location.hasAccuracy()) location.accuracy else null,
+                        "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
+                        "satellites" to satellitesUsed, "average_cn0" to averageCn0))
+                }
                 processLocation(location, true)
             }
             override fun onProviderDisabled(provider: String) {
@@ -512,10 +554,35 @@ class TrackingService : Service() {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
             directGpsListener = listener; directGpsActive = true; directGpsStartedAt = now
             fusedRecoveryFixes = 0; lastFusedRecoveryFixNanos = 0L
-            directGpsExtendedLogged = false; directGpsStartCount++
+            directGpsExtendedLogged = false; directGpsFirstCallbackSeen = false
+            directGpsWaitingStage = 0; directGpsStartCount++
+            directGpsMinimumStopAt = if (trigger == "known-interference")
+                now + NativeGpsRecoveryPolicy.INTERFERENCE_PREWARM_MIN_MS
+            else now + NativeGpsRecoveryPolicy.DIRECT_MIN_ACTIVE_MS
+            acquireRecoveryWakeLock()
             diagnostics.event("direct_gps_started", diagnosticContext() + mapOf(
-                "silence_ms" to silence, "unusable_ms" to unusableFor))
+                "silence_ms" to silence, "unusable_ms" to unusableFor, "trigger" to trigger,
+                "minimum_active_ms" to (directGpsMinimumStopAt - now).coerceAtLeast(0)))
+        }.onFailure { diagnostics.event("direct_gps_error", diagnosticContext() + mapOf(
+            "error" to it.javaClass.simpleName, "message" to it.message, "trigger" to trigger)) }
+    }
+
+    private fun acquireRecoveryWakeLock() {
+        val lock = recoveryWakeLock ?: (getSystemService(POWER_SERVICE) as? PowerManager)
+            ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:gps-recovery")
+            ?.apply { setReferenceCounted(false) }
+            ?.also { recoveryWakeLock = it }
+        if (lock?.isHeld != true) runCatching {
+            lock?.acquire(NativeGpsRecoveryPolicy.RECOVERY_WAKE_LOCK_TIMEOUT_MS)
+            diagnostics.event("gps_recovery_wake_lock", diagnosticContext() + mapOf(
+                "state" to "acquired", "timeout_ms" to NativeGpsRecoveryPolicy.RECOVERY_WAKE_LOCK_TIMEOUT_MS))
         }
+    }
+
+    private fun releaseRecoveryWakeLock() {
+        val lock = recoveryWakeLock ?: return
+        if (lock.isHeld) runCatching { lock.release() }
+        diagnostics.event("gps_recovery_wake_lock", diagnosticContext() + mapOf("state" to "released"))
     }
 
     private fun stopDirectGps(reason: String) {
@@ -529,7 +596,9 @@ class TrackingService : Service() {
         directGpsListener = null; directGpsActive = false
         lastDirectGpsStopAt = System.currentTimeMillis(); fusedRecoveryFixes = 0
         lastFusedRecoveryFixNanos = 0L
-        directGpsExtendedLogged = false
+        directGpsExtendedLogged = false; directGpsFirstCallbackSeen = false
+        directGpsWaitingStage = 0; directGpsMinimumStopAt = 0L
+        releaseRecoveryWakeLock()
     }
 
     private fun isFreshRealFix(location: Location): Boolean {
@@ -560,30 +629,7 @@ class TrackingService : Service() {
             location.speed.takeIf { location.hasSpeed() },
             location.speedAccuracyMetersPerSecond.takeIf { location.hasSpeedAccuracy() },
             location.isMock, satellitesUsed, averageCn0, gnssTelemetrySeen))
-        lastProcessedFixHealthy = result.accepted && result.quality in setOf("good", "stationary")
         val wallNow = System.currentTimeMillis()
-        if (result.accepted) acceptedGpsSamples++ else rejectedGpsSamples++
-        if (result.accepted && result.quality in setOf("good", "stationary")) {
-            recoverGpsOutage(if (fromDirectGps) "direct-gps" else location.provider ?: "fused")
-            lastUsableFixAt = wallNow
-            unusableFixMarked = false
-            if (directGpsActive && !fromDirectGps &&
-                location.elapsedRealtimeNanos > lastFusedRecoveryFixNanos) {
-                lastFusedRecoveryFixNanos = location.elapsedRealtimeNanos
-                fusedRecoveryFixes++
-            }
-        } else if (!unusableFixMarked && wallNow - lastUsableFixAt > 8_000) {
-            // FusedLocation can keep sending fresh but useless fixes with an
-            // accuracy radius of hundreds or thousands of metres. The old
-            // watchdog treated those callbacks as a healthy signal.
-            unusableFixMarked = true
-            motionFilter.markSignalUnavailable()
-            tripEngine?.markSignalUnavailable()
-            markGpsOutage("unusable_fix", mapOf("accuracy_m" to accuracy,
-                "quality" to result.quality, "reason" to result.reason))
-            diagnostics.event("usable_gps_lost", diagnosticContext() + mapOf("accuracy_m" to accuracy,
-                "quality" to result.quality, "reason" to result.reason))
-        }
         val state = tripEngine?.save()
         var currentSnap = routeEngine?.snap(routeLabel, location.latitude, location.longitude, state?.direction)
         if (state != null && result.accepted && result.quality in setOf("good", "stationary")) {
@@ -631,7 +677,10 @@ class TrackingService : Service() {
         // filtered speed also discarded an accurate on-track position, leaving
         // both speed and kilometre frozen until Stop/Start. NativeTripEngine has
         // its own two-fix recovery confirmation, so a good position remains safe.
-        val positionAccepted = result.accepted && result.quality in setOf("good", "stationary")
+        val basePositionAccepted = result.accepted && result.quality in setOf("good", "stationary")
+        val routePositionPlausible = NativeGpsRecoveryPolicy.isRoutePositionPlausible(
+            routeLabel, currentSnap?.distanceM)
+        val positionAccepted = basePositionAccepted && routePositionPlausible
         val engineSpeed = result.filteredSpeedMps
         val beforeUpdate = tripEngine?.save()
         // A fresh coarse fix near the selected route is good enough to remember where
@@ -664,6 +713,38 @@ class TrackingService : Service() {
         }
         lastEngineOutput = output
         recordPositionRecovery(beforeUpdate, output, currentSnap, positionAccepted)
+        // A fix is usable for recovery only when both layers agree: Android reports
+        // a stable precise measurement, and the route engine has confirmed a
+        // plausible on-track position. This catches accurate-looking but wrong
+        // coordinates, oscillating along-track jumps and a recovery that never
+        // receives its second confirmation.
+        val fullyTrustedFix = positionAccepted && output?.recovering != true
+        lastProcessedFixHealthy = fullyTrustedFix
+        if (fullyTrustedFix) acceptedGpsSamples++ else rejectedGpsSamples++
+        if (fullyTrustedFix) {
+            recoverGpsOutage(if (fromDirectGps) "direct-gps" else location.provider ?: "fused")
+            lastUsableFixAt = wallNow
+            unusableFixMarked = false
+            if (directGpsActive && !fromDirectGps &&
+                location.elapsedRealtimeNanos > lastFusedRecoveryFixNanos) {
+                lastFusedRecoveryFixNanos = location.elapsedRealtimeNanos
+                fusedRecoveryFixes++
+            }
+        } else if (!unusableFixMarked && wallNow - lastUsableFixAt > 8_000) {
+            val unusableReason = when {
+                basePositionAccepted && !routePositionPlausible -> "off-route"
+                positionAccepted && output?.recovering == true -> "engine-unconfirmed"
+                else -> result.reason
+            }
+            unusableFixMarked = true
+            motionFilter.markSignalUnavailable()
+            tripEngine?.markSignalUnavailable()
+            val fields = mapOf("accuracy_m" to accuracy, "quality" to result.quality,
+                "reason" to unusableReason, "distance_to_route_m" to currentSnap?.distanceM,
+                "engine_recovering" to output?.recovering)
+            markGpsOutage("unusable_fix", fields)
+            diagnostics.event("usable_gps_lost", diagnosticContext() + fields)
+        }
         handleAlert(output)
         tripEngine?.save()?.let(::persistTripState)
         output?.let {
@@ -850,7 +931,11 @@ class TrackingService : Service() {
         if (calibrationRevision > 0L) lastCalibrationRevision = calibrationRevision
         val startsNewSession = nextActive && (previousState?.active != true ||
             previousState?.route != routeLabel || previousState?.direction != nextDirection)
-        if (startsNewSession) startTripSession() else if (!nextActive) finishTripSession("configured-inactive")
+        if (startsNewSession) startTripSession() else if (!nextActive) {
+            finishTripSession("configured-inactive")
+            stopNetworkBackup()
+            if (directGpsActive) stopDirectGps("trip-inactive")
+        }
         diagnostics.event("trip_configured", diagnosticContext() + mapOf("route" to routeLabel, "journey" to journeyId,
             "train" to trainNumber, "speed_ceiling_kmh" to RouteSpeedCeilings.maxKmh(routeLabel, trainNumber),
             "trusted_speed_ceiling_kmh" to RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber),
@@ -949,9 +1034,9 @@ class TrackingService : Service() {
     }
 
     private fun updateInterferenceMemory(output: NativeTripEngine.Output, bad: Boolean) {
-        if (!output.active) { frequentInterference = false; return }
+        if (!output.active) { frequentInterference = false; interferencePrewarmPending = false; return }
         val official = output.officialM ?: return
-        if (output.speedMps * 3.6f < 30f) { frequentInterference = false; return }
+        if (output.speedMps * 3.6f < 30f) { frequentInterference = false; interferencePrewarmPending = false; return }
         val now = System.currentTimeMillis()
         val prefs = getSharedPreferences("piket_native_zones", MODE_PRIVATE)
         if (now - lastZoneSampleAt >= 10_000) {
@@ -964,11 +1049,17 @@ class TrackingService : Service() {
         }
         val sign = if (tripEngine?.save()?.direction == "obratno") -1 else 1
         val buckets = NativeInterferenceZones.currentAndAheadBuckets(official, sign)
+        val wasFrequent = frequentInterference
         frequentInterference = buckets.any { bucket ->
             val key = "${routeLabel}_$bucket"
             val total = prefs.getInt("${key}_total", 0)
             NativeInterferenceZones.isFrequent(total, prefs.getInt("${key}_bad", 0))
         }
+        if (frequentInterference && !wasFrequent) {
+            interferencePrewarmPending = true
+            diagnostics.event("gps_interference_prewarm_queued", diagnosticContext() + mapOf(
+                "official_m" to official, "buckets" to buckets))
+        } else if (!frequentInterference) interferencePrewarmPending = false
     }
 
     private fun createChannel() {
