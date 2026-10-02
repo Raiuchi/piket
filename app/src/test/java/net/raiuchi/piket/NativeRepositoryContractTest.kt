@@ -32,6 +32,8 @@ class NativeRepositoryContractTest {
         assertFalse(main.contains("updateCheckStarted"))
         assertTrue(main.contains("browser_download_url") && main.contains("showUpdateBanner"))
         assertTrue(main.contains("@JavascriptInterface fun downloadUpdate()") && main.contains("promptInstall(target)"))
+        assertTrue(main.contains("@JavascriptInterface fun checkForUpdates()") &&
+            main.contains("getUpdateIntervalHours()") && main.contains("UPDATE_INTERVAL_HOURS"))
         assertTrue(manifest.contains("android.permission.REQUEST_INSTALL_PACKAGES"))
         assertTrue(service.contains("NativeTripEngine") && service.contains("NativeMotionFilter"))
         assertTrue(manifest.contains("android.permission.WAKE_LOCK"))
@@ -64,6 +66,8 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("CHUDOVO_DUTY=\"Чудово - Петрозаводск\""))
         assertTrue(html.contains("Вышло обновление") && html.contains("id=\"ubDownload\""))
         assertTrue(html.contains("window.Android.downloadUpdate") && html.contains("onUpdateDownloadProgress"))
+        assertTrue(html.contains("id=\"btnCheckUpdate\"") && html.contains("id=\"btnUpdateFrequency\"") &&
+            html.contains("window.Android.checkForUpdates") && html.contains("window.Android.setUpdateIntervalHours"))
         assertTrue(html.contains("grid-template-columns:auto minmax(0,1fr) auto auto") &&
             html.contains("@media(max-width:480px)") && html.contains("overflow-wrap:anywhere"))
         assertTrue(html.contains("role=\"status\" aria-live=\"polite\""))

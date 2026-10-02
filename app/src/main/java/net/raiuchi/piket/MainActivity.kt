@@ -49,6 +49,8 @@ class MainActivity : Activity() {
         @JvmField val EXTRA_LIFECYCLE_TEST = "net.raiuchi.piket.extra.LIFECYCLE_TEST"
         private const val APP_URL = "file:///android_asset/index.html"
         private const val REQUEST_PERMISSIONS = 100
+        private const val DEFAULT_UPDATE_INTERVAL_HOURS = 6
+        private val UPDATE_INTERVAL_HOURS = setOf(6, 12, 24, 72, 168)
     }
     private var web: WebView? = null
     private var pageReady = false
@@ -237,17 +239,34 @@ class MainActivity : Activity() {
             "error" to it.javaClass.simpleName,"message" to it.message))}
     }
     private fun openExternal(uri:Uri?):Boolean{if(uri==null||uri.toString()==APP_URL)return false;if(uri.scheme in listOf("http","https"))runCatching{startActivity(Intent(Intent.ACTION_VIEW,uri))};return true}
+    private fun updatePreferences()=getSharedPreferences("piket_updates",MODE_PRIVATE)
+    private fun updateIntervalHours():Int=updatePreferences().getInt(
+        "interval_hours",DEFAULT_UPDATE_INTERVAL_HOURS).takeIf{it in UPDATE_INTERVAL_HOURS}
+        ?:DEFAULT_UPDATE_INTERVAL_HOURS
+    private fun setUpdateIntervalHours(hours:Int){
+        val safe=hours.takeIf{it in UPDATE_INTERVAL_HOURS}?:DEFAULT_UPDATE_INTERVAL_HOURS
+        updatePreferences().edit().putInt("interval_hours",safe).putLong("next_check_at",0L).apply()
+        diagnostics.event("update_interval_changed",mapOf("hours" to safe))
+    }
+    private fun publishUpdateCheck(script:String)=handler.post{
+        if(pageReady)web?.evaluateJavascript(script,null)
+    }
     private fun checkForUpdate(force:Boolean=false){
         val now=System.currentTimeMillis()
-        val updatePrefs=getSharedPreferences("piket_updates",MODE_PRIVATE)
+        val updatePrefs=updatePreferences()
         val nextAutomaticCheckAt=updatePrefs.getLong("next_check_at",0L)
         // Update discovery must not compete with safety-critical tracking for radio,
         // CPU and battery. Remember a failed check across Activity recreations instead
         // of retrying GitHub every 15/30/45 seconds in a coverage gap.
-        if(updateCheckRunning||(!force&&(serviceRunning()||now-lastUpdateCheckAt<60_000||
-                now<nextAutomaticCheckAt)))return
+        if(updateCheckRunning){if(force)publishUpdateCheck("if(window.onUpdateCheckBusy)window.onUpdateCheckBusy()") ;return}
+        if(serviceRunning()){
+            if(force)publishUpdateCheck("if(window.onUpdateCheckDeferred)window.onUpdateCheckDeferred()")
+            return
+        }
+        if(!force&&(now-lastUpdateCheckAt<60_000||now<nextAutomaticCheckAt))return
         updateCheckRunning=true;lastUpdateCheckAt=now
         diagnostics.event("update_check_started", mapOf("forced" to force))
+        if(force)publishUpdateCheck("if(window.onUpdateCheckStarted)window.onUpdateCheckStarted()")
         Thread{
             val result=runCatching{
                 val connection=(URL("https://api.github.com/repos/Raiuchi/piket/releases/latest").openConnection() as HttpURLConnection).apply{
@@ -276,16 +295,22 @@ class MainActivity : Activity() {
                     latestUpdateUrl=download
                     diagnostics.event("update_available", mapOf("current" to current, "latest" to latest,
                         "asset" to Uri.parse(download).lastPathSegment))
-                    handler.post{web?.evaluateJavascript("if(window.showUpdateBanner)window.showUpdateBanner('${jsQuote(latest)}','${jsQuote(download)}')",null)}
-                } else diagnostics.event("update_check_complete", mapOf("current" to current,
-                    "latest" to latest, "update_available" to false))
+                    publishUpdateCheck("if(window.showUpdateBanner)window.showUpdateBanner('${jsQuote(latest)}','${jsQuote(download)}');if(window.onUpdateCheckResult)window.onUpdateCheckResult('available','${jsQuote(current)}','${jsQuote(latest)}')")
+                } else {
+                    diagnostics.event("update_check_complete", mapOf("current" to current,
+                        "latest" to latest, "update_available" to false))
+                    publishUpdateCheck("if(window.onUpdateCheckResult)window.onUpdateCheckResult('current','${jsQuote(current)}','${jsQuote(latest)}')")
+                }
             }
-            result.onFailure { diagnostics.event("update_check_error", mapOf(
-                "error" to it.javaClass.simpleName, "message" to it.message)) }
+            result.onFailure {
+                diagnostics.event("update_check_error", mapOf(
+                    "error" to it.javaClass.simpleName, "message" to it.message))
+                publishUpdateCheck("if(window.onUpdateCheckError)window.onUpdateCheckError('${jsQuote(it.message?:"Не удалось проверить обновление")}')")
+            }
             val success=result.isSuccess
             updateCheckRunning=false
             updatePrefs.edit().putLong("next_check_at",System.currentTimeMillis()+
-                if(success)6*60*60_000L else 30*60_000L).apply()
+                if(success)updateIntervalHours()*60*60_000L else 30*60_000L).apply()
         }.start()
     }
 
@@ -478,6 +503,9 @@ class MainActivity : Activity() {
         @JavascriptInterface fun isHeadless()=false
         @JavascriptInterface fun isTtsReady()=ttsReady
         @JavascriptInterface fun getAppVersion():String=packageManager.getPackageInfo(packageName,0).versionName?:"0.0.0"
+        @JavascriptInterface fun getUpdateIntervalHours():Int=updateIntervalHours()
+        @JavascriptInterface fun setUpdateIntervalHours(hours:Int)=runOnUiThread{this@MainActivity.setUpdateIntervalHours(hours)}
+        @JavascriptInterface fun checkForUpdates()=runOnUiThread{checkForUpdate(true)}
         @JavascriptInterface fun downloadUpdate()=runOnUiThread{downloadLatestUpdate()}
         @JavascriptInterface fun speak(text:String)=runOnUiThread{if(ttsReady){val p=Bundle().apply{putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME,1f)};tts?.speak(text,TextToSpeech.QUEUE_FLUSH,p,"piket-ui-${SystemClock.elapsedRealtime()}")}}
         @JavascriptInterface fun vibrate(kind:String)=runOnUiThread{val v=if(Build.VERSION.SDK_INT>=31)(getSystemService(VIBRATOR_MANAGER_SERVICE)as VibratorManager).defaultVibrator else getSystemService(VIBRATOR_SERVICE)as Vibrator;val p=if(kind=="danger")longArrayOf(0,160,80,160,80,260)else longArrayOf(0,120,90,120);if(Build.VERSION.SDK_INT>=26)v.vibrate(VibrationEffect.createWaveform(p,-1))else v.vibrate(p,-1)}
