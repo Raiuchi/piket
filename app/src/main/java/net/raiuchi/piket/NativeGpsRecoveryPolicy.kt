@@ -35,8 +35,10 @@ object NativeGpsRecoveryPolicy {
         sinceDirectStopMs: Long,
         interferencePrewarmPending: Boolean
     ): Boolean = tripActive && !directActive &&
-        sinceDirectStopMs >= DIRECT_RESTART_COOLDOWN_MS &&
-        (unusableForMs >= DIRECT_START_AFTER_UNUSABLE_MS || interferencePrewarmPending)
+        ((unusableForMs >= DIRECT_START_AFTER_UNUSABLE_MS &&
+            sinceDirectStopMs >= DIRECT_RESTART_COOLDOWN_MS) ||
+            (interferencePrewarmPending &&
+                sinceDirectStopMs > DIRECT_RESTART_COOLDOWN_MS))
 
     fun shouldStartNetwork(tripActive: Boolean, silenceMs: Long, unusableForMs: Long): Boolean =
         tripActive && (silenceMs >= NETWORK_START_AFTER_UNUSABLE_MS ||

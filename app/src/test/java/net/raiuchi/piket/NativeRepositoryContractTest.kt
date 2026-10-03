@@ -149,7 +149,8 @@ class NativeRepositoryContractTest {
 
         val html = projectFile("app/src/main/assets/index.html").readText()
         assertTrue(html.contains("\"москвапасокт\":\"москвапассажирская\""))
-        assertTrue(html.contains("if(!rt.tracking||rt.posM==null)return null"))
+        assertTrue(html.contains("function scheduleLiveM(){if(!rt.tracking||rt.posM==null"))
+        assertTrue(html.contains("IS_MIRROR)&&!rt.nativeSnapshot"))
         assertTrue(html.contains("if(schedulePos==null){rt.scheduleProgressIndex=0"))
         assertTrue(html.contains("candidate>rt.scheduleProgressIndex"))
         assertFalse(html.contains("if(index<first||index>last)return"))
