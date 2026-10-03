@@ -131,6 +131,27 @@ class NativeTripEngineTest {
         assertEquals(0.0, output.alertDistanceM!!, 0.01)
     }
 
+    @Test fun recoveryJumpAcrossRestrictionStillEmitsEntryAlert() {
+        val start = route.points.first().physicalM
+        val entry = start + 400.0
+        val end = entry + 100.0
+        val restriction = NativeTripEngine.Restriction("crossed", route.label, "tuda",
+            routes.officialMeters(route.label, entry)!!, routes.officialMeters(route.label, end)!!,
+            100.0, entry, end)
+        engine.configure(route.label, "tuda", route.chainageM.first(), true, listOf(restriction))
+        assertNull(engine.update(NativeTripEngine.Input(1_000, 0f, true, snap(0))).alertId)
+        engine.markSignalUnavailable()
+        val recoveredM = start + 800.0
+        val recoveredSnap = NativeRouteEngine.Snap(route.label, recoveredM,
+            routes.officialMeters(route.label, recoveredM)!!, 4.0, 0)
+        assertNull(engine.update(NativeTripEngine.Input(2_000, 0f, true, recoveredSnap)).alertId)
+        val crossed = engine.update(NativeTripEngine.Input(3_000, 0f, true, recoveredSnap))
+        assertEquals("crossed", crossed.alertId)
+        assertTrue(crossed.alertInZone)
+        assertEquals(0.0, crossed.alertDistanceM!!, 0.01)
+        assertNull(engine.update(NativeTripEngine.Input(4_000, 0f, true, recoveredSnap)).alertId)
+    }
+
     @Test fun repeatedOfficialKilometerUsesSavedPhysicalAxisHint() {
         val label = "Д. Долг - Павлово"
         val firstOccurrence = routes.physicalMeters(label, 2_300.0, 2_300.0, "tuda")!!

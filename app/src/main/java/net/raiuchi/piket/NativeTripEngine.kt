@@ -36,6 +36,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     private var calibrationMovementM: Double? = null
     private var calibrationMovementConfirmations = 0
     private var restrictions = emptyList<Restriction>()
+    private var previousAlertPhysicalM: Double? = null
 
     fun configure(route: String, direction: String, manualOfficialM: Double,
                   active: Boolean, restrictions: List<Restriction>, forceCalibration: Boolean = false) {
@@ -60,6 +61,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
             calibrationWaitStartedElapsedMs = 0L
             beginCalibrationHold(physicalM)
         } else if (routeChanged || calibrationChanged || forceCalibration) {
+            previousAlertPhysicalM = null
             physicalM = null
             officialOffsetM = 0.0
             recoveryCandidateM = null
@@ -187,6 +189,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         calibrationAnchorM = null
         calibrationMovementM = null
         calibrationMovementConfirmations = 0
+        previousAlertPhysicalM = physicalM
     }
 
     fun stop() { active = false; speedMps = 0f }
@@ -203,18 +206,21 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         calibrationAnchorM = null
         calibrationMovementM = null
         calibrationMovementConfirmations = 0
+        previousAlertPhysicalM = snap.physicalM
     }
 
     private fun output(source: String): Output {
         val physical = physicalM
         val official = physical?.let { routes.officialMeters(route, it, direction)?.plus(officialOffsetM) }
-        val alert = if (active && physical != null) nextRestriction(physical) else null
+        val alert = if (active && physical != null) nextRestriction(physical, previousAlertPhysicalM) else null
+        previousAlertPhysicalM = physical
         return Output(active, physical, official, speedMps, recovering, source,
             alert?.restriction?.id, alert?.distanceM, alert?.inZone == true)
     }
 
-    private data class AlertCandidate(val restriction: Restriction, val distanceM: Double, val inZone: Boolean)
-    private fun nextRestriction(nowPhysicalM: Double): AlertCandidate? {
+    private data class AlertCandidate(val restriction: Restriction, val distanceM: Double,
+                                      val inZone: Boolean, val priority: Int, val rankM: Double)
+    private fun nextRestriction(nowPhysicalM: Double, previousPhysicalM: Double?): AlertCandidate? {
         return restrictions.asSequence()
             .filter { (it.route == "Все участки" || it.route == route) && (it.direction == "both" || it.direction == direction) }
             .mapNotNull { restriction ->
@@ -230,9 +236,19 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
                 val inZone = nowPhysicalM in low..high
                 val entry = if (directionSign() > 0) minOf(start, end) else maxOf(start, end)
                 val ahead = directionSign() * (entry - nowPhysicalM)
-                if (inZone) AlertCandidate(restriction, 0.0, true)
-                else if (ahead in 0.0..restriction.leadM) AlertCandidate(restriction, ahead, false) else null
-            }.minByOrNull { it.distanceM }
+                val crossed = previousPhysicalM != null &&
+                    directionSign() * (entry - previousPhysicalM) > 0.0 &&
+                    directionSign() * (entry - nowPhysicalM) <= 0.0
+                when {
+                    inZone -> AlertCandidate(restriction, 0.0, true, 0, 0.0)
+                    // A confirmed GPS reconciliation can jump over a short restriction.
+                    // Emit one red entry alert instead of silently losing it; on the next
+                    // sample previousPhysicalM catches up and this candidate disappears.
+                    crossed -> AlertCandidate(restriction, 0.0, true, 1, abs(nowPhysicalM - entry))
+                    ahead in 0.0..restriction.leadM -> AlertCandidate(restriction, ahead, false, 2, ahead)
+                    else -> null
+                }
+            }.minWithOrNull(compareBy<AlertCandidate> { it.priority }.thenBy { it.rankM })
     }
 
     private fun directionSign() = if (direction == "obratno") -1.0 else 1.0

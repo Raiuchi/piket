@@ -266,6 +266,9 @@
   .srBadge.bokp{background:linear-gradient(180deg,rgba(245,183,36,.24),rgba(126,83,10,.30));color:#ffd36f;border:1px solid rgba(255,204,77,.28);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
   .srNote{font-size:12px;color:var(--dim);line-height:1.5;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-top:6px}
   .srRow.srHit{border-color:rgba(255,77,91,.72);background:linear-gradient(110deg,rgba(154,16,37,.26),rgba(16,22,32,.94));box-shadow:0 0 0 2px rgba(255,77,91,.18),0 10px 28px rgba(95,0,18,.22);transition:background .3s,box-shadow .3s}
+  .srCoord{margin-top:4px;color:#85BCE2;font-size:11px;letter-spacing:.025em}
+  .srNow{display:none;margin:10px 0 14px;padding:10px 12px;border:1px solid rgba(127,194,255,.24);border-radius:12px;background:rgba(29,55,76,.28);color:#B9DFFF;font-size:12px;font-weight:700}
+  .srNow.on{display:block}
   .routeCard{display:flex;align-items:center;gap:10px;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:13px;margin-bottom:10px;text-align:left;width:100%}
   .routeCard .rcTrain{flex:none;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--blue-l);background:rgba(46,123,245,.14);border-radius:6px;padding:4px 8px}
   .routeCard .rcName{flex:1;font-size:14px;line-height:1.3;min-width:0}
@@ -788,6 +791,7 @@
     </div>
     <h2 id="srTitle" style="margin:4px 2px 2px">Справочник скоростей</h2>
     <p class="small" id="srSub" style="text-align:left;margin:0 2px 14px"></p>
+    <div class="srNow" id="srPosition"></div>
     <div id="speedRefBox"></div>
   </section>
 </div>
@@ -3039,20 +3043,41 @@ window.addEventListener("unhandledrejection",function(e){
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg></button>';
     }).join(""); }
 
-  // Приблизительный км из текста строки — только для прокрутки/подсветки, не для точной цифры
-  function approxKmFromName(name){
-    // ВАЖНО: "X км/ч" — это скорость, не позиция на пути. Без этой защиты строки вида
-    // "...до стр.№118 (40 км/ч)" подсвечивались бы как находящиеся на 40-м километре —
-    // это реально путало бы подсветку строки приказа с твоей фактической позицией.
-    var m=name.match(/(\d+)\s*км(?!\s*\/\s*ч)/); return m?parseInt(m[1],10):null; }
+  // Точные отметки из строки приказа. Пикет учитывается до 100 м: прежняя логика
+  // округляла позицию до целого километра и поэтому выбирала соседнюю строку.
+  function speedPositionsFromName(name){
+    var clean=String(name||"").replace(/\d+\s*км\s*\/\s*ч/gi,"")
+      .replace(/(\d{2,})\s*пк\s*(\d+)/gi,"$1км $2пк");
+    var result=[],lastKm=null,re=/(\d+)\s*км(?!\s*\/\s*ч)(?:\s*(?:пк\s*)?(\d+)\s*(?:пк)?)?|(\d+)\s*пк/gi,m;
+    while((m=re.exec(clean))){
+      if(m[1]!=null){ lastKm=+m[1]; result.push(metersOf(lastKm,m[2]!=null?+m[2]:1,0)); }
+      else if(lastKm!=null&&m[3]!=null) result.push(metersOf(lastKm,+m[3],0));
+    }
+    return result.filter(function(value,index,list){return list.indexOf(value)===index;});
+  }
+
+  function speedStationRows(routeId){
+    if(routeId!=="last-dd-ptz"&&routeId!=="last-ptz-dd")return[];
+    return (TIMING_STATIONS["Д. Долг - Павлово"]||[]).concat(TIMING_STATIONS["Горы - Петрозаводск"]||[]);
+  }
+  function speedPlaceKey(value){return String(value||"").toLowerCase().replace(/ё/g,"е").replace(/петрозаводск[-– ]пассажирский/g,"петрозаводск").replace(/блок[-– ]пост/g,"пост").replace(/[^а-яa-z0-9]+/g," ").trim();}
+  function stationPositionForSpeedRow(routeId,name){
+    var row=speedPlaceKey(name),best=null,bestAt=Infinity;
+    speedStationRows(routeId).forEach(function(st){
+      var key=speedPlaceKey(st[0]),at=row.indexOf(key);
+      if(at<0&&key.indexOf(row)>=0)at=0;
+      if(at>=0&&(at<bestAt||(at===bestAt&&best&&key.length>best.key.length))){best={m:+st[1],key:key};bestAt=at;}
+    });
+    return best?best.m:null;
+  }
 
   // Связь перегона (с координатами) с маршрутом в справочнике приказа
   var ROUTE_LINK={
     "СпбГл - Москва":{ tuda:null, obratno:null, pickTrain:true, idsTuda:["sap-spb-msk","last-spb-msk"], idsObratno:["sap-msk-spb","last-msk-spb"] },
     "Броневая - Луга":{ tuda:"last-luga", obratno:"last-luga" },
     "Горы - Петрозаводск":{ tuda:"last-dd-ptz", obratno:"last-ptz-dd", note:"Координаты пути у нас есть только от Гор — начало документа (Дача Долгорукова) физически дальше, туда не подскролит." },
-    "Д. Долг - Павлово":{ tuda:"last-dd-ptz", obratno:"last-dd-ptz" },
-    "Павлово - Горы II путь":{ tuda:"last-dd-ptz", obratno:"last-dd-ptz" },
+    "Д. Долг - Павлово":{ tuda:"last-dd-ptz", obratno:"last-ptz-dd" },
+    "Павлово - Горы II путь":{ tuda:"last-dd-ptz", obratno:"last-ptz-dd" },
     "Горы - Павлово I путь":{ tuda:"last-ptz-dd", obratno:"last-ptz-dd" },
     "СПбФин - Выборг":{ tuda:"last-spbfin-kamenn", obratno:"last-kamenn-spbfin" },
     "Выборг - Каменногорск":{ tuda:"last-spbfin-kamenn", obratno:"last-kamenn-spbfin" },
@@ -3060,40 +3085,45 @@ window.addEventListener("unhandledrejection",function(e){
     "Волховстрой - Чудово":{ tuda:"last-vnov-volh2", obratno:"last-vnov-volh2" }
   };
 
-  function renderSpeedRef(idx,jumpKm){ var r=SPEEDROUTES[idx]; var box=$("#speedRefBox"),view=$("#v-speedref");
+  function renderSpeedRef(idx,jumpM){ var r=SPEEDROUTES[idx]; var box=$("#speedRefBox"),view=$("#v-speedref");
     view.classList.remove("train-sapsan","train-lastochka");var trainClass=speedTrainClass(r.train);if(trainClass)view.classList.add(trainClass);
     $("#srTitle").textContent=r.train+" · "+r.route;
     $("#srSub").textContent="Выписка из приказа ОКТ-10 + ОКТ-54 от 29.06.2026. Перенесено вручную — сверь с бланком.";
     var rowSeq=0;
     function grp(title,rows){
-      // КРИТИЧНО: многие строки (особенно названия станций/перегонов вида "Горы – Волховстрой-1
-      // II гл.п." или просто "Мга") НЕ содержат явного числа км в самом тексте - км там
-      // подразумевается по смыслу как "от этой точки и до следующей". Без распространения
-      // км вперёд такие строки получали km=null и НИКОГДА не подсвечивались сами по себе -
-      // подсветка перепрыгивала прямо к следующей строке с явным числом (обычно это
-      // промежуточное ограничение скорости), создавая впечатление, что станция "пропущена".
-      var lastKm=null;
+      // Названия станций без цифр получают координату из той же таблицы станций, что
+      // использует перегонное время хода. Диапазоны из приказа остаются приоритетнее.
       var withKm=rows.map(function(rr){
-        var km=approxKmFromName(rr.name);
-        if(km==null) km=lastKm; else lastKm=km;
-        return {rr:rr, km:km};
+        var positions=speedPositionsFromName(rr.name),stationM=positions.length?null:stationPositionForSpeedRow(r.id,rr.name);
+        if(!positions.length&&stationM!=null)positions=[stationM];
+        return {rr:rr, positions:positions, stationM:stationM};
       });
+      var anchors=withKm.filter(function(item){return item.positions.length;}).map(function(item){return item.positions[0];});
+      var flow=anchors.length>1&&anchors[anchors.length-1]<anchors[0]?"down":"up";
       var h='<div class="srGroup">'+(title?('<h3>'+escapeHtml(title)+'</h3>'):'')+
-      withKm.map(function(item){ var rr=item.rr, km=item.km, seq=rowSeq++;
-        return '<div class="srRow" data-seq="'+seq+'" data-km="'+(km==null?'':km)+'"><div class="srName">'+escapeHtml(rr.name)+'</div><div class="srSpd">'+
+      withKm.map(function(item){ var rr=item.rr, positions=item.positions, seq=rowSeq++,lo=positions.length?Math.min.apply(null,positions):null,hi=positions.length?Math.max.apply(null,positions):null;
+        var coord=item.stationM!=null?('<div class="srCoord">Станция · '+stationMark(item.stationM)+'</div>'):'';
+        return '<div class="srRow" data-seq="'+seq+'" data-flow="'+flow+'" data-min-m="'+(lo==null?'':lo)+'" data-max-m="'+(hi==null?'':hi)+'"><div class="srName">'+escapeHtml(rr.name)+coord+'</div><div class="srSpd">'+
         (rr.glp!=null?'<span class="srBadge glp'+((+rr.glp===15||+rr.glp===25)?' speedCritical':'')+'">'+rr.glp+'</span>':'')+
         (rr.bokp!=null?'<span class="srBadge bokp'+((+rr.bokp===15||+rr.bokp===25)?' speedCritical':'')+'">'+rr.bokp+'</span>':'')+'</div></div>'; }).join("")+
       '</div>'; return h; }
     box.innerHTML=grp(r.groups[0].title,r.groups[0].rows)+(r.groups[1]?grp(r.groups[1].title,r.groups[1].rows):"")+
       '<div class="srNote">🟢 Гл.п — главный путь · 🟡 Бок.п — боковой путь · 🔴 скорости 15 и 25 км/ч'+(r.note?('<br><br>'+escapeHtml(r.note)):'')+'</div>';
-    if(jumpKm!=null) highlightSpeedRefRow(jumpKm,true); }
+    updateSpeedPositionLabel(jumpM);
+    if(jumpM!=null) highlightSpeedRefRow(jumpM,true); }
 
-  function highlightSpeedRefRow(km,scroll){ var box=$("#speedRefBox"); var nearestEl=null,nearestDiff=Infinity;
+  function updateSpeedPositionLabel(m){var el=$("#srPosition");if(m==null){el.classList.remove("on");el.textContent="";return;}el.classList.add("on");el.textContent="Текущая позиция: "+kmFrom(m)+" км "+pkFrom(m)+" пк "+meterInPk(m)+" м · активная строка ниже";}
+  function highlightSpeedRefRow(positionM,scroll){ var box=$("#speedRefBox"); var nearestEl=null,nearestScore=Infinity,wantedFlow=dirDown()?"down":"up";
     box.querySelectorAll(".srRow").forEach(function(el){
-      var k=el.getAttribute("data-km"); if(k==="")return; k=+k;
-      var diff=Math.abs(k-km); if(diff<nearestDiff){ nearestDiff=diff; nearestEl=el; } });
+      var lo=el.getAttribute("data-min-m"),hi=el.getAttribute("data-max-m");if(lo===""||hi==="")return;lo=+lo;hi=+hi;
+      var inside=positionM>=lo-35&&positionM<=hi+35,diff=inside?0:Math.min(Math.abs(positionM-lo),Math.abs(positionM-hi));
+      var span=Math.max(0,hi-lo),flowPenalty=el.getAttribute("data-flow")===wantedFlow?0:10000000;
+      var score=flowPenalty+(inside?span:1000000+diff);
+      if(score<nearestScore){nearestScore=score;nearestEl=el;}
+    });
     var prev=box.querySelector(".srHit"); if(prev&&prev!==nearestEl)prev.classList.remove("srHit");
-    if(nearestEl&&!nearestEl.classList.contains("srHit")){ nearestEl.classList.add("srHit"); if(scroll)setTimeout(function(){ nearestEl.scrollIntoView({block:"center"}); },80); } }
+    if(nearestEl){nearestEl.classList.add("srHit");nearestEl.setAttribute("aria-current","location");if(prev&&prev!==nearestEl)prev.removeAttribute("aria-current");if(scroll)setTimeout(function(){ nearestEl.scrollIntoView({block:"center"}); },80);}
+    updateSpeedPositionLabel(positionM); }
 
   // Живое обновление подсветки, пока открыт справочник — гаснет само, если экран закрыли
   function startSpeedRefLive(routeId){
@@ -3104,7 +3134,7 @@ window.addEventListener("unhandledrejection",function(e){
       var idsAll=(link.idsTuda||[]).concat(link.idsObratno||[],link.tuda?[link.tuda]:[],link.obratno?[link.obratno]:[]);
       if(idsAll.indexOf(rt.srRouteId)<0)return; // открытая таблица не относится к текущему перегону — не дёргаем
       var m=currentMeters(); if(m==null)return;
-      highlightSpeedRefRow(Math.round(m/1000),false);
+      highlightSpeedRefRow(m,false);
     },1500);
   }
 
@@ -3127,13 +3157,13 @@ window.addEventListener("unhandledrejection",function(e){
     // Раньше это полностью блокировалось тостом "Сначала откалибруйся" - неудобно,
     // если просто хочешь свериться со скоростями перед стартом, ещё не встав у столба.
     var m=currentMeters();
-    var km=(m!=null)?Math.round(m/1000):null, up=!dirDown();
+    var up=!dirDown();
     var ids = link.pickTrain ? (up?link.idsTuda:link.idsObratno) : [up?link.tuda:link.obratno];
     if(!ids||!ids[0]){ toast("Нет таблицы для этого направления"); return; }
     function openWith(routeId){
       var idx=SPEEDROUTES.findIndex(function(x){return x.id===routeId;}); if(idx<0)return;
       document.querySelectorAll(".view").forEach(function(x){x.classList.remove("on")});
-      $("#v-speedref").classList.add("on"); renderSpeedRef(idx,km);
+      $("#v-speedref").classList.add("on"); renderSpeedRef(idx,m);
       if(m!=null) startSpeedRefLive(routeId); // живая подсветка только если знаем позицию
       if(link.note)toast(link.note);
     }

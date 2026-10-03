@@ -30,6 +30,24 @@ for (const name of ['exactAxisProfile','profileOfficial','baseOfficialTrackM','o
   vm.runInContext(html.slice(start, end), box);
 }
 box.metersOf=(km,pk=1,m=0)=>km*1000+(pk-1)*100+(m||0);
+for (const name of ['speedPositionsFromName']) {
+  const start = html.indexOf(`  function ${name}(`);
+  assert.ok(start >= 0, name);
+  const end = html.indexOf('\n  function ', start + 1);
+  vm.runInContext(html.slice(start, end), box);
+}
+assert.deepEqual(Array.from(box.speedPositionsFromName('Онежский, 394км 9пк - 393км 1пк')),[394800,393000],
+  'speed order must resolve exact kilometre and picket ranges');
+assert.deepEqual(Array.from(box.speedPositionsFromName('— 375 км 8пк - 2пк')),[375700,375100],
+  'short second picket must remain on the preceding kilometre');
+assert.deepEqual(Array.from(box.speedPositionsFromName('— 53 км пк 7 - 54 пк 4')),[53600,54300],
+  'OCR-style next-kilometre notation must retain both kilometre and picket');
+assert.deepEqual(Array.from(box.speedPositionsFromName('путь 25 км/ч')),[],
+  'a speed value must never be treated as a track position');
+assert.ok(html.includes('"Д. Долг - Павлово":{ tuda:"last-dd-ptz", obratno:"last-ptz-dd" }'),
+  'the return trip must open the Petrozavodsk-to-Dacha speed order');
+assert.ok(html.includes('highlightSpeedRefRow(m,false)') && html.includes('renderSpeedRef(idx,m)'),
+  'live speed-order highlighting must use exact metres without kilometre rounding');
 box.state.restrictions=[{peregon:'Д. Долг - Павлово',km:216,pk:6,kmE:216,pkE:7},
   {peregon:'Д. Долг - Павлово',km:19,pk:9}];
 box.normalizeRestrictionRoutes();
