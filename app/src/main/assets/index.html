@@ -737,6 +737,12 @@
 
   <section class="view pad" id="v-set">
     <div class="sec-h"><h2>Настройки</h2></div>
+    <div class="card speed-ref-entry">
+      <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><span class="ref-kicker">Приказ по скоростям</span><div class="t">Справочник скоростей · ОКТ-10 и ОКТ-54</div><div class="d">Редакция от 29.06.2026</div></div><div style="color:#68BFF5;font-size:24px">›</div></div>
+    </div>
+    <div class="card" style="padding:14px">
+      <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
+    </div>
     <div class="card">
       <div class="row">
         <div><div class="t">Предупреждать за</div><div class="d">База для сигнала. Для высокой скорости — с запасом на тормозной путь.</div></div>
@@ -754,16 +760,10 @@
         <button class="update-frequency" id="btnUpdateFrequency"><span><strong>Частота автоматической проверки</strong><small id="updateFrequencyLabel">Каждые 6 часов</small></span><b>›</b></button>
       </div>
     </div>
-    <div class="card speed-ref-entry">
-      <div class="row" id="btnSpeedRef" style="cursor:pointer;border-bottom:none"><div><span class="ref-kicker">Путевой норматив</span><div class="t">Справочник скоростей · ОКТ-10 и ОКТ-54</div><div class="d">Редакция от 29.06.2026</div></div><div style="color:#68BFF5;font-size:24px">›</div></div>
-    </div>
     <div class="card" id="diagnosticsCard" style="padding:14px;display:none">
       <div class="row" style="border-bottom:none;padding:4px 2px 12px"><div><div class="t">Диагностика поездки</div><div class="d">Локальный журнал GPS и автокоррекций. Никуда не отправляется сам.</div></div></div>
       <button class="lb" id="btnShareDiagnostics" style="width:100%;margin-bottom:9px">Поделиться диагностикой</button>
       <button class="lb danger" id="btnClearDiagnostics" style="width:100%">Очистить журнал</button>
-    </div>
-    <div class="card" style="padding:14px">
-      <button class="lb danger" id="btnWipe" style="width:100%">Удалить все ограничения</button>
     </div>
     <p class="small" style="margin:18px 4px 8px">Работает офлайн, данные на телефоне.</p>
     <p class="small" id="appVerLine" style="margin:0 4px 8px;opacity:.6"></p>
