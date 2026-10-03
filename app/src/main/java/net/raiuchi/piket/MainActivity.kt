@@ -512,6 +512,19 @@ class MainActivity : Activity() {
         @JavascriptInterface fun beep(kind:String){}
         @JavascriptInterface fun updatePosition(text:String){}
         @JavascriptInterface fun logUiDiagnostic(event:String, json:String) {
+            if (event == "trip_stop_confirmed") {
+                runCatching {
+                    val row = JSONObject(json)
+                    diagnostics.event(event, mapOf(
+                        "native_session_id" to nativeSessionId,
+                        "route" to row.optString("route"),
+                        "direction" to row.optString("direction"),
+                        "official_m" to row.optDouble("official_m").takeIf {
+                            row.has("official_m") && it.isFinite()
+                        }))
+                }
+                return
+            }
             if (event != "schedule_card_changed") return
             runCatching {
                 val row = JSONObject(json)

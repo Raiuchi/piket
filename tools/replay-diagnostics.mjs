@@ -137,6 +137,11 @@ for (const event of events.filter(e => e.event === 'uncaught_exception'))
 for (const event of events.filter(e => e.event === 'location_provider_changed' && e.enabled === false))
   issues.push(issue('warning', 'location-provider-disabled',
     `Системный провайдер ${event.provider || 'GPS'} был отключён`, event));
+for (const event of events.filter(e => e.event === 'usable_gps_lost' && e.reason === 'off-route' &&
+  finite(e.accuracy_m) && Number(e.accuracy_m) <= 30))
+  issues.push(issue('warning', 'precise-fix-outside-route-axis',
+    `Точная GPS-точка отклонена маршрутной осью на ${Math.round(Number(event.distance_to_route_m))} м`, event,
+    { accuracyM: Number(event.accuracy_m), distanceToRouteM: Number(event.distance_to_route_m) }));
 for (const event of events.filter(e => e.event === 'tracking_permission_missing'))
   issues.push(issue('error', 'location-permission-missing', 'Трекинг не стартовал: нет разрешения точной геолокации', event));
 const locationRequestRestarts = events.filter(e => e.event === 'location_request_restarted').length;
@@ -160,6 +165,9 @@ for (const event of events) {
 }
 const directStarts = events.filter(e => e.event === 'direct_gps_started');
 const directFirstFixes = events.filter(e => e.event === 'direct_gps_first_fix');
+const directRequestRestarts = events.filter(e => e.event === 'direct_gps_request_restarted');
+const currentLocationProbes = events.filter(e => e.event === 'current_location_probe_started');
+const currentLocationProbeFixes = events.filter(e => e.event === 'current_location_probe_fix');
 const directFirstFixWaits = directFirstFixes.map(e => Number(e.wait_ms)).filter(Number.isFinite);
 const directTriggers = Object.fromEntries([...new Set(directStarts.map(e => e.trigger).filter(Boolean))]
   .sort().map(trigger => [trigger, directStarts.filter(e => e.trigger === trigger).length]));
@@ -188,6 +196,9 @@ const report = {
   gpsReserveFirstFixes: directFirstFixes.length,
   gpsReserveMaxFirstFixWaitMs: directFirstFixWaits.length ? Math.max(...directFirstFixWaits) : null,
   gpsReserveWaitingEvents: events.filter(e => e.event === 'direct_gps_waiting').length,
+  gpsReserveRequestRestarts: directRequestRestarts.length,
+  currentLocationProbes: currentLocationProbes.length,
+  currentLocationProbeFixes: currentLocationProbeFixes.length,
   gpsRecoveryWakeLockAcquires: recoveryWakeLocks.filter(e => e.state === 'acquired').length,
   gpsRecoveryWakeLockReleases: recoveryWakeLocks.filter(e => e.state === 'released').length,
   batteryOptimizationExempt: latestBatteryOptimization?.exempt ?? null,
@@ -207,6 +218,8 @@ const report = {
     locationCallbacks: power.at(-1).location_callbacks ?? null,
     processedLocationFixes: power.at(-1).processed_location_fixes ?? null,
     locationRequestRestarts: power.at(-1).location_request_restarts ?? null,
+    directGpsRequestRestarts: power.at(-1).direct_gps_request_restarts ?? null,
+    currentLocationProbes: power.at(-1).current_location_probes ?? null,
     snapshotPublishes: power.at(-1).snapshot_publishes ?? null,
     networkReserveStarts: power.at(-1).network_reserve_starts ?? null
   } : null,

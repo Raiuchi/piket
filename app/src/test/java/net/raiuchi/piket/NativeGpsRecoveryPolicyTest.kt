@@ -27,9 +27,32 @@ class NativeGpsRecoveryPolicyTest {
     }
 
     @Test fun accurateButOffRouteCoordinatesAreNotTrusted() {
-        assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", 119.9))
-        assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", 120.1))
+        assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("Горы - Петрозаводск", 177.3))
+        assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", 249.9))
+        assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", 250.1))
         assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", null))
         assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("Все участки", null))
+    }
+
+    @Test fun stalledNativeGpsRequestIsActivelyRestarted() {
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 24_999, 25_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 30_000, 19_999))
+        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 25_000, 20_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(false, 60_000, 60_000))
+    }
+
+    @Test fun currentLocationProbeOnlyRunsDuringARealRecovery() {
+        assertTrue(NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(true, false, 12_000, 20_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(true, true, 60_000, 60_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(true, false, 11_999, 60_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(false, false, 60_000, 60_000))
+    }
+
+    @Test fun directReserveStopsOnlyAfterSustainedPrimaryRecovery() {
+        val now = 200_000L
+        assertFalse(NativeGpsRecoveryPolicy.shouldStopDirect(true, now, 100_000L, 0L))
+        assertFalse(NativeGpsRecoveryPolicy.shouldStopDirect(true, now, 100_000L, 170_001L))
+        assertTrue(NativeGpsRecoveryPolicy.shouldStopDirect(true, now, 100_000L, 170_000L))
+        assertFalse(NativeGpsRecoveryPolicy.shouldStopDirect(true, 99_999L, 100_000L, 1L))
     }
 }

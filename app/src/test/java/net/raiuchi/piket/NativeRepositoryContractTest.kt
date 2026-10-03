@@ -46,6 +46,12 @@ class NativeRepositoryContractTest {
         assertTrue(service.contains("now-lastNotificationAt>=10_000"))
         assertTrue(service.contains("direct_gps_active_ms") && service.contains("location_callbacks") &&
             service.contains("processed_location_fixes") && service.contains("snapshot_publishes"))
+        assertTrue("stale satellite telemetry must not claim that a dead GNSS stream is healthy",
+            service.contains("gnss_status_stale") && service.contains("lastGnssStatusAtElapsed"))
+        assertTrue("an accidental tap must not stop a running trip without confirmation",
+            html.contains("Остановить текущую поездку?") && html.contains("trip_stop_confirmed"))
+        assertTrue("schedule must wait for the fresh native snapshot after Stop/Start",
+            html.contains("IS_MIRROR)&&!rt.nativeSnapshot"))
         assertTrue(main.contains("update_check_error") && main.contains("update_download_error") &&
             main.contains("update_installer_opened"))
         assertTrue(html.contains("Kotlin is the source of truth"))
