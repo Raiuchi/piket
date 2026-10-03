@@ -4,13 +4,16 @@ import assert from 'node:assert/strict';
 
 // Execute the shipped browser functions, not a second implementation of them.
 const html = fs.readFileSync('app/src/main/assets/index.html', 'utf8');
+const listHtml = html.slice(html.indexOf('<section class="view pad" id="v-list">'), html.indexOf('<section class="view pad" id="v-set">'));
 const settingsHtml = html.slice(html.indexOf('<section class="view pad" id="v-set">'), html.indexOf('<section class="view pad" id="v-speedlist">'));
-const settingsOrder = ['id="btnSpeedRef"', 'id="btnWipe"', 'id="leadDn"', 'id="updateSettingsCard"', 'id="diagnosticsCard"']
+const settingsOrder = ['id="btnSpeedRef"', 'id="leadDn"', 'id="updateSettingsCard"', 'id="diagnosticsCard"']
   .map(marker => settingsHtml.indexOf(marker));
 assert.ok(settingsHtml.includes('<span class="ref-kicker">Приказ по скоростям</span>') && !settingsHtml.includes('Путевой норматив'),
   'settings must name the speed reference "Приказ по скоростям"');
 assert.ok(settingsOrder.every((position, index) => position >= 0 && (index === 0 || position > settingsOrder[index - 1])),
-  'settings cards must stay ordered: speed order, wipe, alerts, updates, diagnostics');
+  'settings cards must stay ordered: speed order, alerts, updates, diagnostics');
+assert.ok(!settingsHtml.includes('id="btnWipe"') && listHtml.indexOf('id="btnWipe"') > listHtml.indexOf('id="listBox"'),
+  'wipe restrictions must live in the restrictions list after the list contents');
 const routes = JSON.parse(fs.readFileSync('app/src/main/assets/data/routes.json', 'utf8'));
 const timing = JSON.parse(fs.readFileSync('app/src/main/assets/data/timing.json','utf8'));
 const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
