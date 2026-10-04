@@ -14,6 +14,8 @@ class RouteSpeedCeilingsTest {
         assertEquals(140f, RouteSpeedCeilings.maxKmh("Броневая - Луга", null))
         assertEquals(160f, RouteSpeedCeilings.maxKmh("СПбФин - Выборг", null))
         assertEquals(160f, RouteSpeedCeilings.maxKmh("Выборг - Каменногорск", null))
+        assertEquals(180f, RouteSpeedCeilings.sensorHardKmh("Горы - Петрозаводск", "803"))
+        assertEquals(120f, RouteSpeedCeilings.trustedKmh("Горы - Петрозаводск", "803"))
     }
 
     @Test fun twoFiftyIsEnabledOnlyForSapsanNumbers() {

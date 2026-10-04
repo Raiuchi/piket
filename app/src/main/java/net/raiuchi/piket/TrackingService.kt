@@ -17,6 +17,8 @@ import android.media.ToneGenerator
 import android.os.*
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat
 import com.google.android.gms.location.*
 import com.google.android.gms.tasks.CancellationTokenSource
 import org.json.JSONObject
@@ -83,6 +85,10 @@ class TrackingService : Service() {
     private var currentLocationProbeStartedAt = 0L
     private var currentLocationProbeCount = 0
     private var currentLocationProbeToken: CancellationTokenSource? = null
+    private var nativeLocationProbeInFlight = false
+    private var nativeLocationProbeStartedAt = 0L
+    private var nativeLocationProbeCount = 0
+    private var nativeLocationProbeCancellation: CancellationSignal? = null
     private var recoveryWakeLock: PowerManager.WakeLock? = null
     private var interferencePrewarmPending = false
     private var lastProcessedFixNanos = 0L
@@ -101,7 +107,7 @@ class TrackingService : Service() {
 
     private fun updateSpeedCeiling() {
         motionFilter.setSpeedCeilingsKmh(
-            RouteSpeedCeilings.maxKmh(routeLabel, trainNumber),
+            RouteSpeedCeilings.sensorHardKmh(routeLabel, trainNumber),
             RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber))
     }
 
@@ -166,6 +172,8 @@ class TrackingService : Service() {
     private var positionReconciliationCount = 0
     private var maxPositionCorrectionM = 0.0
     private var routeTransitionCount = 0
+    private var countedTransitionKey = ""
+    private var countedTransitionConfirmations = 0
     private var maxBatteryTemperatureC: Double? = null
     private var lastEngineOutput: NativeTripEngine.Output? = null
     private var lastCalibrationRevision = 0L
@@ -183,7 +191,7 @@ class TrackingService : Service() {
         acceptedGpsSamples = 0; rejectedGpsSamples = 0
         gpsOutageStartedAt = 0; gpsOutageCount = 0; gpsOutageTotalMs = 0; longestGpsOutageMs = 0
         directGpsStartCount = 0; directGpsTotalActiveMs = 0; locationCallbackCount = 0
-        directGpsRequestRestartCount = 0; currentLocationProbeCount = 0
+        directGpsRequestRestartCount = 0; currentLocationProbeCount = 0; nativeLocationProbeCount = 0
         processedLocationCount = 0; locationRequestRestartCount = 0; snapshotPublishCount = 0
         networkReserveStartCount = 0; positionReconciliationCount = 0; maxPositionCorrectionM = 0.0
         if (directGpsActive) { directGpsStartedAt = tripStartedAt; directGpsStartCount = 1 }
@@ -212,11 +220,10 @@ class TrackingService : Service() {
                 (now - directGpsStartedAt).coerceAtLeast(0) else 0L),
             "direct_gps_request_restarts" to directGpsRequestRestartCount,
             "current_location_probes" to currentLocationProbeCount,
+            "native_location_probes" to nativeLocationProbeCount,
             "location_callbacks" to locationCallbackCount,
             "processed_location_fixes" to processedLocationCount,
             "location_request_restarts" to locationRequestRestartCount,
-            "direct_gps_request_restarts" to directGpsRequestRestartCount,
-            "current_location_probes" to currentLocationProbeCount,
             "snapshot_publishes" to snapshotPublishCount,
             "network_reserve_starts" to networkReserveStartCount,
             "position_reconciliations" to positionReconciliationCount,
@@ -502,7 +509,13 @@ class TrackingService : Service() {
                             "fused_silence_ms" to silence, "unusable_ms" to unusableFor))
                     }
                 }
-                if (NativeGpsRecoveryPolicy.shouldRestartDirectRequest(directGpsActive,
+                // Do not tear down a live satellite acquisition merely because a fix has
+                // not been emitted yet. Re-registering the listener every few seconds was
+                // resetting weak-signal cold starts which Yandex was then able to finish.
+                val gnssActivelyAcquiring = gnssTelemetrySeen && satellitesUsed > 0 &&
+                    lastGnssStatusAtElapsed > 0L &&
+                    elapsedNow - lastGnssStatusAtElapsed <= 15_000L
+                if (!gnssActivelyAcquiring && NativeGpsRecoveryPolicy.shouldRestartDirectRequest(directGpsActive,
                         now - directGpsLastCallbackAt, now - directGpsLastRequestAt)) {
                     restartDirectGpsRequest(now, "callback-stalled")
                 }
@@ -510,6 +523,11 @@ class TrackingService : Service() {
                         currentLocationProbeInFlight, unusableFor,
                         now - currentLocationProbeStartedAt)) {
                     probeCurrentLocation(now)
+                }
+                if (NativeGpsRecoveryPolicy.shouldProbeNativeLocation(directGpsActive,
+                        nativeLocationProbeInFlight, unusableFor,
+                        now - nativeLocationProbeStartedAt)) {
+                    probeNativeLocation(now)
                 }
                 if (directGpsActive) acquireRecoveryWakeLock()
                 // Fresh network fixes can mask a stalled precise-GPS stream.
@@ -676,6 +694,64 @@ class TrackingService : Service() {
             }
     }
 
+    /**
+     * Ask Android's GPS provider for one fresh fix independently of Google Play
+     * services. Keeping this path separate is important on devices where the fused
+     * stream remains on a coarse network coordinate while the GNSS chip already sees
+     * satellites. It also reproduces the useful "navigator kick" inside PIKET.
+     */
+    private fun probeNativeLocation(now: Long) {
+        val manager = locationManager ?: return
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED ||
+            !manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return
+        nativeLocationProbeCancellation?.cancel()
+        val cancellation = CancellationSignal()
+        nativeLocationProbeCancellation = cancellation
+        nativeLocationProbeInFlight = true
+        nativeLocationProbeStartedAt = now
+        nativeLocationProbeCount++
+        diagnostics.event("native_location_probe_started", diagnosticContext() + mapOf(
+            "unusable_ms" to (now - lastUsableFixAt).coerceAtLeast(0),
+            "satellites" to satellitesUsed, "average_cn0" to averageCn0))
+        runCatching {
+            LocationManagerCompat.getCurrentLocation(manager, LocationManager.GPS_PROVIDER,
+                cancellation, ContextCompat.getMainExecutor(this)) { location ->
+                if (nativeLocationProbeCancellation === cancellation) {
+                    nativeLocationProbeInFlight = false
+                    nativeLocationProbeCancellation = null
+                    if (location != null && directGpsActive) {
+                        diagnostics.event("native_location_probe_fix", diagnosticContext() + mapOf(
+                            "accuracy_m" to if (location.hasAccuracy()) location.accuracy else null,
+                            "age_ms" to ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) /
+                                1_000_000).coerceAtLeast(0),
+                            "satellites" to satellitesUsed))
+                        locationCallbackCount++
+                        directGpsLastCallbackAt = System.currentTimeMillis()
+                        processLocation(location, true)
+                    } else if (directGpsActive) {
+                        diagnostics.event("native_location_probe_empty", diagnosticContext())
+                    }
+                }
+            }
+            mainHandler.postDelayed({
+                if (nativeLocationProbeCancellation === cancellation) {
+                    cancellation.cancel()
+                    nativeLocationProbeCancellation = null
+                    nativeLocationProbeInFlight = false
+                    diagnostics.event("native_location_probe_timeout", diagnosticContext() + mapOf(
+                        "satellites" to satellitesUsed, "average_cn0" to averageCn0))
+                }
+            }, 25_000L)
+        }.onFailure {
+            if (nativeLocationProbeCancellation === cancellation) {
+                nativeLocationProbeCancellation = null
+                nativeLocationProbeInFlight = false
+            }
+            diagnostics.event("native_location_probe_error", diagnosticContext() + mapOf(
+                "error" to it.javaClass.simpleName, "message" to it.message))
+        }
+    }
+
     private fun acquireRecoveryWakeLock() {
         val lock = recoveryWakeLock ?: (getSystemService(POWER_SERVICE) as? PowerManager)
             ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:gps-recovery")
@@ -697,6 +773,8 @@ class TrackingService : Service() {
     private fun stopDirectGps(reason: String) {
         currentLocationProbeToken?.cancel()
         currentLocationProbeToken = null; currentLocationProbeInFlight = false
+        nativeLocationProbeCancellation?.cancel()
+        nativeLocationProbeCancellation = null; nativeLocationProbeInFlight = false
         directGpsListener?.let { runCatching { locationManager?.removeUpdates(it) } }
         if (directGpsActive) {
             val activeMs = (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0)
@@ -1049,6 +1127,7 @@ class TrackingService : Service() {
             previousState?.direction != nextDirection) {
             completedAlertIds.clear(); warnedAlertIds.clear()
             lastRecoveryState = null; lastTransitionProbeKey = ""; lastTransitionProbeAt = 0L
+            countedTransitionKey = ""; countedTransitionConfirmations = 0
         }
         val calibrationRevision = root.optLong("calibrationRevision", 0L)
         val forceCalibration = calibrationRevision > 0L && calibrationRevision != lastCalibrationRevision
@@ -1064,6 +1143,7 @@ class TrackingService : Service() {
         }
         diagnostics.event("trip_configured", diagnosticContext() + mapOf("route" to routeLabel, "journey" to journeyId,
             "train" to trainNumber, "speed_ceiling_kmh" to RouteSpeedCeilings.maxKmh(routeLabel, trainNumber),
+            "sensor_hard_speed_ceiling_kmh" to RouteSpeedCeilings.sensorHardKmh(routeLabel, trainNumber),
             "trusted_speed_ceiling_kmh" to RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber),
             "direction" to nextDirection, "active" to nextActive,
             "manual_official_m" to root.optDouble("manualOfficialM"),
@@ -1112,13 +1192,71 @@ class TrackingService : Service() {
         lastAlertId = id; lastAlertInZone = output.alertInZone
     }
 
+    /**
+     * A known continuous route junction must not freeze the trip merely because GPS
+     * vanished before the boundary. NativeTripEngine deliberately clamps counting at
+     * the current polyline end, so after three consecutive ticker confirmations we
+     * continue onto the documented adjacent route. Stop/cab-change junctions still
+     * require a real position and are never switched by dead reckoning.
+     */
+    private fun advanceRouteByCounting(
+        output: NativeTripEngine.Output,
+        elapsedMs: Long
+    ): NativeTripEngine.Output {
+        val engine = tripEngine ?: return output
+        val state = engine.save()
+        val next = journeyRouter?.nextLeg(journeyId, routeLabel, state.direction)
+            ?: return output.also {
+                countedTransitionKey = ""; countedTransitionConfirmations = 0
+            }
+        val route = routeEngine?.route(routeLabel) ?: return output
+        val boundary = next.boundaryM ?: route.points.takeIf { it.isNotEmpty() }?.let {
+            if (state.direction == "obratno") it.first().physicalM else it.last().physicalM
+        } ?: return output
+        val physicalM = output.physicalM
+        val candidateKey = "$routeLabel|${state.direction}|${next.route}|${next.direction}"
+        val eligible = output.active && output.recovering && gpsOutageStartedAt > 0L &&
+            !next.requireStop && physicalM != null &&
+            abs(physicalM - boundary) <= 3.0 && output.speedMps >= 2.5f
+        if (!eligible) {
+            countedTransitionKey = ""
+            countedTransitionConfirmations = 0
+            return output
+        }
+        if (countedTransitionKey == candidateKey) countedTransitionConfirmations++ else {
+            countedTransitionKey = candidateKey
+            countedTransitionConfirmations = 1
+        }
+        if (countedTransitionConfirmations < 3) return output
+
+        val boundaryPoint = route.points.minByOrNull { abs(it.physicalM - boundary) } ?: return output
+        val nextSnap = routeEngine?.snap(next.route, boundaryPoint.latitude, boundaryPoint.longitude,
+            next.direction) ?: return output
+        if (nextSnap.distanceM > maxOf(1_000.0, next.maxNextDistanceM)) return output
+
+        routeTransitionCount++
+        diagnostics.event("route_transition", diagnosticContext() + mapOf(
+            "from" to routeLabel, "to" to next.route, "direction" to next.direction,
+            "source" to "dead-reckoning-boundary", "boundary_m" to boundary,
+            "physical_m" to nextSnap.physicalM, "official_m" to nextSnap.officialM,
+            "speed_kmh" to output.speedMps * 3.6f))
+        routeLabel = next.route
+        updateSpeedCeiling()
+        engine.switchRoute(next.route, next.direction, nextSnap)
+        engine.markSignalUnavailable()
+        countedTransitionKey = ""
+        countedTransitionConfirmations = 0
+        return engine.update(NativeTripEngine.Input(elapsedMs, output.speedMps, false, null))
+    }
+
     private fun startTripTicker() {
         tripTicker = object : Runnable {
             override fun run() {
                 recordPowerSample()
                 tripEngine?.let { engine ->
                     val tickElapsed = SystemClock.elapsedRealtime()
-                    val output = engine.update(NativeTripEngine.Input(tickElapsed, null, false, null))
+                    val counted = engine.update(NativeTripEngine.Input(tickElapsed, null, false, null))
+                    val output = advanceRouteByCounting(counted, tickElapsed)
                     lastEngineOutput = output
                     recordReplayTick(tickElapsed, output)
                     updateInterferenceMemory(output, output.recovering && System.currentTimeMillis() - lastFixReceivedAt > 5_000)
@@ -1150,6 +1288,9 @@ class TrackingService : Service() {
             "direct_gps_reserve" to directGpsActive,
             "direct_gps_active_ms" to (directGpsTotalActiveMs + if (directGpsActive)
                 (System.currentTimeMillis() - directGpsStartedAt).coerceAtLeast(0) else 0L),
+            "direct_gps_request_restarts" to directGpsRequestRestartCount,
+            "current_location_probes" to currentLocationProbeCount,
+            "native_location_probes" to nativeLocationProbeCount,
             "location_callbacks" to locationCallbackCount,
             "processed_location_fixes" to processedLocationCount,
             "location_request_restarts" to locationRequestRestartCount,

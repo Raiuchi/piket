@@ -17,4 +17,17 @@ object RouteSpeedCeilings {
     }
     fun trustedKmh(route: String?, trainNumber: String?): Float =
         if (route == "СпбГл - Москва" && trainNumber.isNullOrBlank()) 160f else maxKmh(route, trainNumber)
+
+    /**
+     * Sensor sanity ceiling is wider than the operational speed limit. The latter
+     * remains the displayed order limit. Speeds in this extra band are accepted by
+     * NativeMotionFilter only after matching coordinate movement, which preserves
+     * counting without reopening the old single-sample 250 km/h spike bug.
+     */
+    fun sensorHardKmh(route: String?, trainNumber: String?): Float = when (maxKmh(route, trainNumber)) {
+        120f -> 180f
+        140f -> 190f
+        160f -> 210f
+        else -> 300f
+    }
 }

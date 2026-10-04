@@ -12,10 +12,14 @@ object NativeGpsRecoveryPolicy {
     const val INTERFERENCE_PREWARM_MIN_MS = 120_000L
     const val PRIMARY_STABLE_BEFORE_DIRECT_STOP_MS = 30_000L
     const val PRIMARY_STABLE_FIX_MAX_GAP_MS = 5_000L
-    const val DIRECT_REQUEST_RESTART_AFTER_MS = 25_000L
-    const val DIRECT_REQUEST_RESTART_COOLDOWN_MS = 20_000L
+    // Re-registering GPS every 20 seconds repeatedly reset Samsung's weak-signal
+    // acquisition. Leave the continuous request alive long enough for a cold fix.
+    const val DIRECT_REQUEST_RESTART_AFTER_MS = 120_000L
+    const val DIRECT_REQUEST_RESTART_COOLDOWN_MS = 120_000L
     const val CURRENT_LOCATION_PROBE_AFTER_MS = 12_000L
     const val CURRENT_LOCATION_PROBE_COOLDOWN_MS = 20_000L
+    const val NATIVE_LOCATION_PROBE_AFTER_MS = 30_000L
+    const val NATIVE_LOCATION_PROBE_COOLDOWN_MS = 45_000L
     const val RECOVERY_WAKE_LOCK_TIMEOUT_MS = 180_000L
     // The hand-traced railway axis can be 128-177 m away from the actual main
     // track on the Gory-Petrozavodsk corridor. Motion/accuracy filtering happens
@@ -69,6 +73,15 @@ object NativeGpsRecoveryPolicy {
     ): Boolean = directActive && !probeInFlight &&
         sinceLastUsableFixMs >= CURRENT_LOCATION_PROBE_AFTER_MS &&
         sinceLastProbeMs >= CURRENT_LOCATION_PROBE_COOLDOWN_MS
+
+    fun shouldProbeNativeLocation(
+        directActive: Boolean,
+        probeInFlight: Boolean,
+        sinceLastUsableFixMs: Long,
+        sinceLastProbeMs: Long
+    ): Boolean = directActive && !probeInFlight &&
+        sinceLastUsableFixMs >= NATIVE_LOCATION_PROBE_AFTER_MS &&
+        sinceLastProbeMs >= NATIVE_LOCATION_PROBE_COOLDOWN_MS
 
     fun shouldStopDirect(
         directActive: Boolean,

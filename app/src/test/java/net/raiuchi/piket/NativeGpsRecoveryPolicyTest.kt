@@ -35,10 +35,10 @@ class NativeGpsRecoveryPolicyTest {
     }
 
     @Test fun stalledNativeGpsRequestIsActivelyRestarted() {
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 24_999, 25_000))
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 30_000, 19_999))
-        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 25_000, 20_000))
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(false, 60_000, 60_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 119_999, 120_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 180_000, 119_999))
+        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 120_000, 120_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(false, 180_000, 180_000))
     }
 
     @Test fun currentLocationProbeOnlyRunsDuringARealRecovery() {
@@ -46,6 +46,13 @@ class NativeGpsRecoveryPolicyTest {
         assertFalse(NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(true, true, 60_000, 60_000))
         assertFalse(NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(true, false, 11_999, 60_000))
         assertFalse(NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(false, false, 60_000, 60_000))
+    }
+
+    @Test fun nativeGpsProbeWaitsLongerAndDoesNotOverlap() {
+        assertTrue(NativeGpsRecoveryPolicy.shouldProbeNativeLocation(true, false, 30_000, 45_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldProbeNativeLocation(true, true, 60_000, 60_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldProbeNativeLocation(true, false, 29_999, 60_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldProbeNativeLocation(false, false, 60_000, 60_000))
     }
 
     @Test fun directReserveStopsOnlyAfterSustainedPrimaryRecovery() {

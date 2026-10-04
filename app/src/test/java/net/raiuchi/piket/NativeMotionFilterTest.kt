@@ -22,6 +22,25 @@ class NativeMotionFilterTest {
         assertNotNull(accepted.filteredSpeedMps)
         assertEquals(55.5f, accepted.filteredSpeedMps!!, 0.5f)
     }
+
+    @Test fun routeOrder120StillCountsCoordinateConfirmed150Doppler() {
+        val filter = NativeMotionFilter()
+        filter.setSpeedCeilingsKmh(180f, 120f)
+        filter.process(fix(0, speed = 33f))
+        filter.process(fix(1_000, lat = 59.900297, speed = 33f))
+        assertNull(filter.process(fix(2_000, lat = 59.900672, speed = 41.7f)).filteredSpeedMps)
+        val accepted = filter.process(fix(3_000, lat = 59.901047, speed = 41.7f))
+        assertNotNull(accepted.filteredSpeedMps)
+        assertEquals(41.7f, accepted.filteredSpeedMps!!, 0.5f)
+    }
+
+    @Test fun routeOrder120StillRejects250Spike() {
+        val filter = NativeMotionFilter()
+        filter.setSpeedCeilingsKmh(180f, 120f)
+        val result = filter.process(fix(0, speed = 69.4f))
+        assertNull(result.filteredSpeedMps)
+        assertEquals("speed-ceiling", result.reason)
+    }
     @Test fun rejectsSpeedAboveConfiguredRouteCeiling() {
         val filter = NativeMotionFilter()
         filter.setSpeedCeilingKmh(120f)

@@ -48,6 +48,13 @@ class NativeRepositoryContractTest {
             service.contains("processed_location_fixes") && service.contains("snapshot_publishes"))
         assertTrue("stale satellite telemetry must not claim that a dead GNSS stream is healthy",
             service.contains("gnss_status_stale") && service.contains("lastGnssStatusAtElapsed"))
+        assertTrue("GPS recovery must keep an Android-provider one-shot path independent of fused location",
+            service.contains("native_location_probe_started") &&
+                service.contains("LocationManagerCompat.getCurrentLocation"))
+        assertTrue("continuous documented route junctions must not freeze during a GPS outage",
+            service.contains("dead-reckoning-boundary") && service.contains("advanceRouteByCounting"))
+        assertTrue("operational route limit must stay separate from the sensor sanity ceiling",
+            service.contains("RouteSpeedCeilings.sensorHardKmh"))
         assertTrue("an accidental tap must not stop a running trip without confirmation",
             html.contains("Остановить текущую поездку?") && html.contains("trip_stop_confirmed"))
         assertTrue("schedule must wait for the fresh native snapshot after Stop/Start",
