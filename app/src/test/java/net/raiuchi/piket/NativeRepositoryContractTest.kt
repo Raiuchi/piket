@@ -95,6 +95,18 @@ class NativeRepositoryContractTest {
         assertTrue(main.contains("nativeStartGate.accepts(s.route, s.direction)"))
         assertTrue(main.contains("nativeSessionCounter.incrementAndGet()") && main.contains("\$nativeSessionId);"))
         assertTrue(html.contains("manualOfficialM:manual") && html.contains("m:+r.m||0") && html.contains("journey:nativeJourney"))
+        assertTrue("live order and restriction cards must use the Kotlin mirror position",
+            html.contains("function liveOfficialMeters()") &&
+                html.contains("IS_MIRROR&&rt.posM!=null") &&
+                html.contains("IS_MIRROR&&rt.physicalM!=null"))
+        assertTrue("trip screen must keep order, timetable and restriction in one live console",
+            html.contains("id=\"tripConsole\"") && html.contains("id=\"tripOrderCard\"") &&
+                html.contains("id=\"tripScheduleCard\"") && html.contains("id=\"tripRestrictionCard\""))
+        assertTrue("speed order row must progress in document order instead of sticking at departure",
+            html.contains("function activeSpeedOrder") && html.contains("speedOrderIndex"))
+        assertTrue("wipe action must be hidden while the restriction list is empty",
+            html.contains("id=\"wipeCard\"") &&
+                html.contains("style.display=arr.length?\"block\":\"none\""))
         assertTrue(html.contains("return 128900+rt.posM"))
         assertTrue(html.contains("r.kmE!=null?metersOf(r.kmE,r.pkE):start+100"))
         assertFalse(html.contains("+r.spd>0&&r.kmE!=null"))
