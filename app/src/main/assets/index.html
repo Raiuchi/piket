@@ -138,6 +138,16 @@
     background:radial-gradient(circle,rgba(255,77,79,.32),transparent 70%);animation:gaugeAlarm .8s infinite}
   .gaugeWrap.gd-warn::after{content:"";position:absolute;inset:-16px;border-radius:50%;z-index:-1;
     background:radial-gradient(circle,rgba(245,165,36,.22),transparent 70%)}
+  .g-limit-marker{--lm-color:#F5A524;--lm-glow:rgba(245,165,36,.18);--lm-scale:.94;position:absolute;z-index:9;display:none;align-items:center;justify-content:center;
+    min-width:36px;height:26px;padding:0 7px;border-radius:9px;transform:translate(-50%,-50%) scale(var(--lm-scale));
+    border:1px solid var(--lm-color);background:linear-gradient(180deg,rgba(27,31,37,.98),rgba(5,7,10,.98));
+    color:var(--lm-color);font-family:var(--mono);font-size:12px;font-weight:900;line-height:1;letter-spacing:-.02em;
+    box-shadow:0 0 0 3px var(--lm-glow),0 5px 14px rgba(0,0,0,.65),inset 0 1px rgba(255,255,255,.12);
+    transition:left .32s ease,top .32s ease,color .2s,border-color .2s,box-shadow .2s,transform .2s;pointer-events:none}
+  .g-limit-marker.on{display:flex}.g-limit-marker::after{content:"";position:absolute;left:50%;bottom:-5px;width:7px;height:7px;
+    transform:translateX(-50%) rotate(45deg);background:#080b0f;border-right:1px solid var(--lm-color);border-bottom:1px solid var(--lm-color)}
+  .g-limit-marker.lm-danger{--lm-color:#FF4D5A;--lm-glow:rgba(255,77,90,.22)}.g-limit-marker.lm-warn{--lm-color:#FFD15A;--lm-glow:rgba(255,209,90,.18)}.g-limit-marker.lm-ready{--lm-color:#53E49A;--lm-glow:rgba(83,228,154,.18)}
+  .g-limit-marker.lm-danger{animation:limitMarkerPulse .85s ease-in-out infinite}@keyframes limitMarkerPulse{50%{filter:brightness(1.22)}}
   @keyframes gaugeAlarm{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
 
   .odo{display:flex;justify-content:center;margin:6px auto 2px;align-items:flex-end}
@@ -683,6 +693,7 @@
       </svg>
       <div class="g-sheen"></div>
       <div class="g-needle" id="gaugeNeedle" aria-hidden="true"></div>
+      <div class="g-limit-marker" id="gaugeLimitMarker" aria-hidden="true"><span id="gaugeLimitValue">—</span></div>
       <div class="g-center">
         <div class="sv num" id="spdVal">0</div><div class="su">КМ/Ч</div>
         <div class="g-limit" id="gLimit" style="display:none"><span class="lv num" id="limVal">—</span><span class="lu">доп.</span></div>
@@ -2666,7 +2677,7 @@ window.addEventListener("unhandledrejection",function(e){
       var a=up?(lo-pos):(pos-hi); r._ahead=a; r._zone=false; if(a>0&&a<bestA){ bestA=a; best=r; } });
     return inzone||best; }
 
-  function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#gaugeNeedle").style.transform="rotate("+(-135+v/MAXSPD*270).toFixed(2)+"deg)"; $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; }
+  function setGauge(){ var v=rt.tracking?Math.min(rt.speed,MAXSPD):0; $("#gaugeFg").setAttribute("stroke-dasharray",(v/MAXSPD*75).toFixed(2)+" 100"); $("#gaugeNeedle").style.transform="rotate("+(-135+v/MAXSPD*270).toFixed(2)+"deg)"; $("#spdVal").textContent=rt.tracking?Math.round(Math.min(rt.speed,300)):0; if(rt.gaugeLimitState)renderGaugeLimitMarker(rt.gaugeLimitState.r,rt.gaugeLimitState.inzone,rt.gaugeLimitState.ahead,rt.gaugeLimitState.lead); }
 
   // Выбранная дистанция включает трёхцветный контроль подготовки к ограничению:
   // красный — скорость выше лимита более чем на 10 км/ч, жёлтый — осталось погасить
@@ -2686,6 +2697,17 @@ window.addEventListener("unhandledrejection",function(e){
     var cls=gaugeDangerClass(r,inzone,ahead,lead);
     $("#gaugeWrap").classList.remove("gd-ok","gd-ready","gd-warn","gd-danger");
     $("#gaugeWrap").classList.add(cls);
+    rt.gaugeLimitState=r?{r:r,inzone:inzone,ahead:ahead,lead:lead}:null;
+    renderGaugeLimitMarker(r,inzone,ahead,lead);
+  }
+  function renderGaugeLimitMarker(r,inzone,ahead,lead){
+    var el=$("#gaugeLimitMarker"),active=!!(rt.tracking&&r&&r.spd!=null&&(inzone||(ahead!=null&&lead!=null&&ahead>=0&&ahead<=lead)));
+    if(!active){el.className="g-limit-marker";el.removeAttribute("title");return;}
+    var limit=Math.max(0,Math.min(MAXSPD,+r.spd||0)),angle=-135+(limit/MAXSPD)*270,rad=angle*Math.PI/180,radius=40;
+    el.style.left=(50+radius*Math.sin(rad)).toFixed(2)+"%";el.style.top=(50-radius*Math.cos(rad)).toFixed(2)+"%";
+    var stateClass=gaugeDangerClass(r,inzone,ahead,lead).replace("gd-","lm-"),progress=inzone?1:Math.max(0,Math.min(1,1-ahead/Math.max(1,lead)));
+    el.style.setProperty("--lm-scale",(.94+progress*.08).toFixed(3));el.className="g-limit-marker on "+stateClass;
+    $("#gaugeLimitValue").textContent=Math.round(+r.spd);el.title=(inzone?"Ограничение действует":"Ограничение через "+fmtM(ahead))+": "+Math.round(+r.spd)+" км/ч";
   }
 
   function chipsOf(r){ var c="";

@@ -107,6 +107,10 @@ class NativeRepositoryContractTest {
         assertTrue("wipe action must be hidden while the restriction list is empty",
             html.contains("id=\"wipeCard\"") &&
                 html.contains("style.display=arr.length?\"block\":\"none\""))
+        assertTrue("speedometer must mark the selected restriction speed only inside the configured warning distance",
+            html.contains("id=\"gaugeLimitMarker\"") && html.contains("function renderGaugeLimitMarker") &&
+                html.contains("ahead>=0&&ahead<=lead") && html.contains("lm-danger") &&
+                html.contains("lm-warn") && html.contains("lm-ready"))
         assertTrue(html.contains("return 128900+rt.posM"))
         assertTrue(html.contains("r.kmE!=null?metersOf(r.kmE,r.pkE):start+100"))
         assertFalse(html.contains("+r.spd>0&&r.kmE!=null"))
