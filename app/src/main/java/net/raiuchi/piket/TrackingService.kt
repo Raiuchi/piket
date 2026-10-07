@@ -1166,12 +1166,13 @@ class TrackingService : Service() {
     }
 
     private fun handleAlert(output: NativeTripEngine.Output?) {
-        val alerts = output?.alerts.orEmpty().ifEmpty {
-            val fallback = output ?: return@ifEmpty emptyList()
-            fallback.alertId?.let { listOf(NativeTripEngine.Alert(it, fallback.alertDistanceM ?: 0.0, fallback.alertInZone)) }.orEmpty()
+        val snapshot = output
+        if (snapshot == null) { lastAlertId = null; lastAlertInZone = false; return }
+        val alerts = snapshot.alerts.ifEmpty {
+            snapshot.alertId?.let { listOf(NativeTripEngine.Alert(it, snapshot.alertDistanceM ?: 0.0, snapshot.alertInZone)) }.orEmpty()
         }
         if (alerts.isEmpty()) { lastAlertId = null; lastAlertInZone = false; return }
-        alerts.forEach { alert -> handleSingleAlert(alert, output) }
+        alerts.forEach { alert -> handleSingleAlert(alert, snapshot) }
         val primary = alerts.first()
         lastAlertId = primary.id; lastAlertInZone = primary.inZone
     }
