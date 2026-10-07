@@ -416,7 +416,9 @@
   .g-bezel-groove{stroke:#020304;stroke-width:7;opacity:.9}
   .g-bg{stroke:#151C24;stroke-width:10;filter:drop-shadow(0 1px 0 rgba(255,255,255,.07))}
   .g-tickL{stroke:#F4F8FB;stroke-width:3.1}.g-tickM{stroke:#A9B7C4;stroke-width:1.55;opacity:.94}.g-tickS{stroke:#667582;stroke-width:1.05;opacity:.88}
-  .g-label{fill:#E6EDF3;font-size:9px}.g-labelAccent{fill:#9DABB8;font-size:6.4px}.g-labelLow{fill:#C7D2DC;font-size:5.7px;font-weight:700}
+  .g-labelPrimary,.g-labelSecondary{font-family:var(--display);font-variant-numeric:tabular-nums;letter-spacing:-.025em}
+  .g-labelPrimary{fill:#F2F5F7;font-size:7.7px;font-weight:760;opacity:.98;paint-order:stroke;stroke:rgba(255,255,255,.07);stroke-width:.28px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.78))}
+  .g-labelSecondary{fill:#9EABB6;font-size:5.8px;font-weight:650;opacity:.90;filter:drop-shadow(0 1px 1px rgba(0,0,0,.72))}
   .g-fg{stroke-width:11;filter:drop-shadow(0 0 7px rgba(53,167,255,.82)) drop-shadow(0 0 2px rgba(184,231,255,.75))}
   /* Внутреннее стекло находится строго внутри шкалы и больше не пересекает подписи. */
   .g-sheen{inset:19%;z-index:3;border:1px solid rgba(210,226,239,.10);background:
@@ -491,7 +493,7 @@
   .board .seg,.board .peregon{background:linear-gradient(180deg,#191A1F,#0E0F12);border-color:rgba(255,255,255,.12)}
   .board .seg button.on{background:linear-gradient(180deg,rgba(240,45,58,.34),rgba(121,12,24,.23));color:#FFF;border-bottom:2px solid #FF4451}
   .gaugeWrap::before{background:radial-gradient(circle,rgba(240,45,58,.24),transparent 72%)}.g-fg{filter:drop-shadow(0 0 9px rgba(255,49,62,.78))}
-  .g-labelAccent{fill:#FF737C}.g-center .sv{text-shadow:0 0 28px rgba(240,45,58,.24)}
+  .g-center .sv{text-shadow:0 0 28px rgba(240,45,58,.24)}
   .g-needle{background:linear-gradient(90deg,#FF7881,#F02D3A 55%,#7C0712);box-shadow:0 0 14px rgba(240,45,58,.75)}
   .odo{position:relative}.odo::before{content:"";position:absolute;top:-10px;left:18%;right:18%;height:2px;background:linear-gradient(90deg,transparent,#F02D3A 20% 80%,transparent);box-shadow:0 0 12px rgba(240,45,58,.6)}
   .odo .v.km{color:#FFF;text-shadow:0 0 18px rgba(240,45,58,.32)}
@@ -506,22 +508,28 @@
   .nav button.on{border-color:rgba(255,83,94,.58);background-color:#941522!important;background-image:none!important;box-shadow:none!important;filter:none!important}
   .nav button svg,.nav button.on svg{color:#F4F4F6!important;filter:none!important;shape-rendering:geometricPrecision}
   .nav button.on svg{color:#FF7B84!important}
-  .speed-ref-entry{border-color:rgba(255,74,86,.28)!important;background:linear-gradient(145deg,rgba(34,24,27,.98),rgba(10,10,12,.98))!important}
-  .speed-ref-entry .row{background:radial-gradient(circle at 5% 0,rgba(240,45,58,.15),transparent 48%)}.speed-ref-entry .ref-kicker,.srGroup h3{color:#FF727B}
-  .routeCard{background:linear-gradient(145deg,rgba(28,28,33,.98),rgba(10,10,12,.98));border-color:rgba(255,255,255,.13)}
-  .routeCard .rcTrain{border-color:rgba(255,79,91,.30);background:linear-gradient(180deg,rgba(240,45,58,.28),rgba(92,8,18,.22));color:#FFB0B5}
-  .routeCard svg{color:#FF6973}
-  /* Приказ скоростей: главный путь зелёный, боковой — жёлтый. Тип поезда имеет свой спокойный акцент. */
-  .srBadge.glp{border-color:rgba(73,214,132,.38);background:linear-gradient(180deg,rgba(42,190,105,.30),rgba(12,91,52,.28));color:#9AF2C0}
-  .srBadge.bokp{border-color:rgba(245,183,36,.35);background:linear-gradient(180deg,rgba(245,183,36,.28),rgba(116,70,10,.25));color:#FFD48A}
-  .srBadge.speedCritical{border-color:rgba(255,67,78,.64);background:linear-gradient(180deg,rgba(230,34,48,.54),rgba(112,5,18,.46));color:#FFFFFF;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 0 12px rgba(240,45,58,.20)}
-  .routeCard.train-sapsan{border-color:rgba(240,45,58,.30);background:linear-gradient(145deg,#0B0B0D,#020203);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 24px rgba(0,0,0,.34)}
-  .routeCard.train-sapsan .rcTrain{border-color:rgba(240,45,58,.42);background:#FFFFFF;color:#D91D2B}
-  .routeCard.train-sapsan .rcName{color:#F4F4F6}.routeCard.train-sapsan svg{color:#F02D3A}
-  .routeCard.train-lastochka{border-color:rgba(240,45,58,.30);background:linear-gradient(145deg,#0B0B0D,#020203);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 10px 24px rgba(0,0,0,.34)}
-  .routeCard.train-lastochka .rcTrain{border-color:rgba(240,45,58,.38);background:#050506;color:#F02D3A}
-  .routeCard.train-lastochka .rcName{color:#F4F4F6}.routeCard.train-lastochka svg{color:#F02D3A}
-  #v-speedref.train-sapsan #srTitle,#v-speedref.train-lastochka #srTitle{color:#F02D3A}
+  .speed-ref-entry{border-color:rgba(255,255,255,.12)!important;background:linear-gradient(145deg,#151518,#09090B)!important}
+  .speed-ref-entry .row{background:linear-gradient(120deg,rgba(255,255,255,.025),transparent 48%)}.speed-ref-entry .ref-kicker{color:#AEB5BE}.srGroup h3{color:#B9C0C8}
+  .routeCard{position:relative;overflow:hidden;background:linear-gradient(145deg,#141518,#08090B);border-color:rgba(255,255,255,.105);box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 20px rgba(0,0,0,.24)}
+  .routeCard .rcName{font-family:var(--display);font-size:13.5px;font-weight:620;letter-spacing:-.01em;color:#E5E7EA}.routeCard .rcTrain{font-family:var(--display);font-size:9px;font-weight:780;letter-spacing:.095em}.routeCard svg{color:#747B84}
+  .srGroup{border-color:rgba(255,255,255,.075);background:linear-gradient(155deg,#111317,#08090B);box-shadow:inset 0 1px rgba(255,255,255,.025)}
+  .srGroup h3{font-family:var(--display);font-size:11px;font-weight:720;letter-spacing:.10em}
+  .srRow{padding:12px;border-color:rgba(255,255,255,.075);background:#111318;box-shadow:none}
+  .srRow .srName{font-family:var(--display);font-size:13.5px;font-weight:560;line-height:1.42;color:#D8DCE1;letter-spacing:-.008em}.srBadge{font-family:var(--display);font-size:13px;font-weight:760;box-shadow:none}
+  /* Приказ скоростей: спокойные служебные цвета без свечения и ярких заливок. */
+  .srBadge.glp{border-color:rgba(83,176,121,.26);background:rgba(37,112,68,.20);color:#86CAA2}
+  .srBadge.bokp{border-color:rgba(190,150,74,.27);background:rgba(127,89,25,.20);color:#D1AE6B}
+  .srBadge.speedCritical{border-color:rgba(190,66,76,.43);background:rgba(127,28,39,.28);color:#E8A0A6;box-shadow:none}
+  .srRow.srHit{border-color:rgba(200,77,88,.48);background:linear-gradient(90deg,rgba(108,27,38,.24),#111318 48%);box-shadow:inset 3px 0 #A92B37}
+  .routeCard.train-sapsan{border-color:rgba(163,176,190,.18);background:linear-gradient(145deg,#15171A,#08090B)}
+  .routeCard.train-sapsan::before{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:#A8B1BB;opacity:.62}
+  .routeCard.train-sapsan .rcTrain{border-color:rgba(194,201,208,.50);background:#D9DDE1;color:#9C2430}
+  .routeCard.train-sapsan .rcName{color:#E7EAED}.routeCard.train-sapsan svg{color:#9DA6AF}
+  .routeCard.train-lastochka{border-color:rgba(145,61,70,.23);background:linear-gradient(145deg,#151214,#08090B)}
+  .routeCard.train-lastochka::before{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:#852631;opacity:.72}
+  .routeCard.train-lastochka .rcTrain{border-color:rgba(150,55,66,.34);background:#120B0D;color:#B9505B}
+  .routeCard.train-lastochka .rcName{color:#E2DDDF}.routeCard.train-lastochka svg{color:#8D4B53}
+  #v-speedref.train-sapsan #srTitle{color:#D9DDE1}#v-speedref.train-lastochka #srTitle{color:#C47A82}
   .sheet{background:linear-gradient(180deg,#19191E,#09090B);border-color:rgba(255,255,255,.16)}
   .sheet:not(.on){visibility:hidden!important;box-shadow:none!important}
   .timing-card{margin:12px 0;padding:16px;border:1px solid #3b2a31;border-radius:18px;background:linear-gradient(145deg,#15191f,#101318)}
@@ -531,7 +539,7 @@
   .tc-title{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:1px 3px 4px}.tc-title>b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}.tc-title>span{color:#788492;font-size:10px}
   .tc-track{appearance:none;-webkit-appearance:none;max-width:58%;padding:6px 9px;border:1px solid #3a414c;border-radius:999px;background:#14181e;color:#b8c4d1;font:700 9px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-track.on{border-color:rgba(255,75,89,.62);color:#fff;background:rgba(103,20,30,.35)}
   .tc-card{appearance:none;-webkit-appearance:none;min-width:0;min-height:92px;padding:12px;border:1px solid #30343d;border-radius:15px;background:linear-gradient(145deg,#171a20,#0b0d11);color:#f6f7f9;text-align:left;font:inherit;display:flex;flex-direction:column;justify-content:space-between;gap:7px;box-shadow:inset 0 1px rgba(255,255,255,.05)}
-  .tc-card:active{border-color:#ff5965;background:#211216}.tc-card.wide{grid-column:1/-1;min-height:76px}.tc-kicker{color:#8794a4;font-size:9px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.tc-main{display:flex;align-items:center;gap:9px;min-width:0}.tc-speed{flex:0 0 auto;color:#7df0ad;font-size:31px;font-weight:900;line-height:1}.tc-speed small{font-size:10px;color:#9aa6b4;margin-left:2px}.tc-copy{min-width:0}.tc-copy b{display:block;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy span{display:block;margin-top:3px;color:#8995a4;font-size:10px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy .tc-next{color:#d9e2ec}.tc-card.schedule .tc-main>b{color:#fff;font-size:18px}.tc-card.restriction .tc-speed{color:#ffcc68}.tc-card.restriction.danger .tc-speed{color:#ff5c68}.tc-arrow{margin-left:auto;color:#ff6671;font-size:20px}.tc-empty .tc-speed{color:#687482}
+  .tc-card:active{border-color:#ff5965;background:#211216}.tc-card.wide{grid-column:1/-1;min-height:76px}.tc-kicker{color:#8794a4;font-size:9px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.tc-main{display:flex;align-items:center;gap:9px;min-width:0}.tc-speed{flex:0 0 auto;color:#7df0ad;font-size:31px;font-weight:900;line-height:1}.tc-speed small{font-size:10px;color:#9aa6b4;margin-left:2px}.tc-copy{min-width:0}.tc-copy b{display:block;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy span{display:block;margin-top:3px;color:#8995a4;font-size:10px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy .tc-next{color:#d9e2ec}.tc-card.schedule .tc-main>b{color:#fff;font-size:18px}.tc-card.restriction{border-color:rgba(255,190,82,.30);background:linear-gradient(145deg,#1b1710,#0b0d11)}.tc-card.restriction .tc-speed{color:#ffcc68}.tc-card.restriction.danger{border-color:rgba(255,82,96,.55);box-shadow:inset 3px 0 #ff4352}.tc-card.restriction.danger .tc-speed{color:#ff5c68}.tc-arrow{margin-left:auto;color:#ff6671;font-size:20px}.tc-empty .tc-speed{color:#687482}
   .tc-order-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}.tc-order-cell{min-width:0;padding:10px 11px;border:1px solid #303945;border-radius:13px;background:linear-gradient(145deg,#101820,#090c10)}.tc-order-cell.next{border-color:#49343a;background:linear-gradient(145deg,#1a1216,#0c0b0d)}.tc-order-label{display:block;margin-bottom:6px;color:#7f8d9d;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.tc-order-line{display:flex;align-items:baseline;gap:7px}.tc-order-line .tc-speed{font-size:28px}.tc-order-cell.next .tc-speed{color:#ffcc68}.tc-order-name{display:block;margin-top:5px;color:#f4f6f8;font-size:12px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-order-mark{display:block;margin-top:3px;color:#8e9baa;font-size:9px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media(max-width:380px){.trip-console{grid-template-columns:1fr}.tc-card,.tc-card.wide,.tc-title{grid-column:1}.tc-card{min-height:78px}}
   .premium-field{width:100%;min-height:50px;padding:10px 13px;border:1px solid #3a424d;border-radius:13px;background:linear-gradient(145deg,#1a2028,#0d1117);color:#f5f5f7;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font:inherit}.premium-field .pf-copy{min-width:0}.premium-field small{display:block;color:#ff7b84;font-size:9px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:3px}.premium-field b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.premium-field .pf-arrow{color:#ff5965;font-size:18px}.premium-field:active{border-color:#ff5965;background:#23151a}
@@ -672,32 +680,32 @@
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(118.8 100 100)"/>
         <line class="g-tickM" x1="100" y1="19.5" x2="100" y2="27" transform="rotate(124.2 100 100)"/>
         <line class="g-tickS" x1="100" y1="21" x2="100" y2="26" transform="rotate(129.6 100 100)"/>
-        <text class="g-label" x="37.1" y="162.9" text-anchor="middle" dominant-baseline="central">0</text>
-        <text class="g-labelLow" x="26.4" y="150.1" text-anchor="middle" dominant-baseline="central">10</text>
-        <text class="g-labelLow" x="18.3" y="135.4" text-anchor="middle" dominant-baseline="central">20</text>
-        <text class="g-labelLow" x="13.1" y="119.4" text-anchor="middle" dominant-baseline="central">30</text>
-        <text class="g-labelLow" x="11.0" y="102.8" text-anchor="middle" dominant-baseline="central">40</text>
-        <text class="g-labelLow" x="12.1" y="86.1" text-anchor="middle" dominant-baseline="central">50</text>
-        <text class="g-labelAccent" x="16.3" y="69.9" text-anchor="middle" dominant-baseline="central">60</text>
-        <text class="g-labelLow" x="23.4" y="54.7" text-anchor="middle" dominant-baseline="central">70</text>
-        <text class="g-labelAccent" x="33.2" y="41.1" text-anchor="middle" dominant-baseline="central">80</text>
-        <text class="g-labelLow" x="45.4" y="29.7" text-anchor="middle" dominant-baseline="central">90</text>
-        <text class="g-label" x="59.6" y="20.7" text-anchor="middle" dominant-baseline="central">100</text>
-        <text class="g-labelLow" x="75.2" y="14.5" text-anchor="middle" dominant-baseline="central">110</text>
-        <text class="g-labelAccent" x="91.6" y="11.4" text-anchor="middle" dominant-baseline="central">120</text>
-        <text class="g-labelLow" x="108.4" y="11.4" text-anchor="middle" dominant-baseline="central">130</text>
-        <text class="g-labelAccent" x="124.8" y="14.5" text-anchor="middle" dominant-baseline="central">140</text>
-        <text class="g-labelLow" x="140.4" y="20.7" text-anchor="middle" dominant-baseline="central">150</text>
-        <text class="g-labelAccent" x="154.5" y="29.7" text-anchor="middle" dominant-baseline="central">160</text>
-        <text class="g-labelLow" x="166.8" y="41.1" text-anchor="middle" dominant-baseline="central">170</text>
-        <text class="g-labelAccent" x="176.6" y="54.7" text-anchor="middle" dominant-baseline="central">180</text>
-        <text class="g-labelLow" x="183.7" y="69.9" text-anchor="middle" dominant-baseline="central">190</text>
-        <text class="g-label" x="187.9" y="86.1" text-anchor="middle" dominant-baseline="central">200</text>
-        <text class="g-labelLow" x="189.0" y="102.8" text-anchor="middle" dominant-baseline="central">210</text>
-        <text class="g-labelAccent" x="186.9" y="119.4" text-anchor="middle" dominant-baseline="central">220</text>
-        <text class="g-labelAccent" x="181.7" y="135.4" text-anchor="middle" dominant-baseline="central">230</text>
-        <text class="g-labelAccent" x="173.6" y="150.1" text-anchor="middle" dominant-baseline="central">240</text>
-        <text class="g-label" x="162.9" y="162.9" text-anchor="middle" dominant-baseline="central">250</text>
+        <text class="g-labelPrimary" x="37.1" y="162.9" text-anchor="middle" dominant-baseline="central">0</text>
+        <text class="g-labelSecondary" x="26.4" y="150.1" text-anchor="middle" dominant-baseline="central">10</text>
+        <text class="g-labelSecondary" x="18.3" y="135.4" text-anchor="middle" dominant-baseline="central">20</text>
+        <text class="g-labelSecondary" x="13.1" y="119.4" text-anchor="middle" dominant-baseline="central">30</text>
+        <text class="g-labelSecondary" x="11.0" y="102.8" text-anchor="middle" dominant-baseline="central">40</text>
+        <text class="g-labelSecondary" x="12.1" y="86.1" text-anchor="middle" dominant-baseline="central">50</text>
+        <text class="g-labelPrimary" x="16.3" y="69.9" text-anchor="middle" dominant-baseline="central">60</text>
+        <text class="g-labelSecondary" x="23.4" y="54.7" text-anchor="middle" dominant-baseline="central">70</text>
+        <text class="g-labelSecondary" x="33.2" y="41.1" text-anchor="middle" dominant-baseline="central">80</text>
+        <text class="g-labelSecondary" x="45.4" y="29.7" text-anchor="middle" dominant-baseline="central">90</text>
+        <text class="g-labelPrimary" x="59.6" y="20.7" text-anchor="middle" dominant-baseline="central">100</text>
+        <text class="g-labelSecondary" x="75.2" y="14.5" text-anchor="middle" dominant-baseline="central">110</text>
+        <text class="g-labelPrimary" x="91.6" y="11.4" text-anchor="middle" dominant-baseline="central">120</text>
+        <text class="g-labelSecondary" x="108.4" y="11.4" text-anchor="middle" dominant-baseline="central">130</text>
+        <text class="g-labelPrimary" x="124.8" y="14.5" text-anchor="middle" dominant-baseline="central">140</text>
+        <text class="g-labelSecondary" x="140.4" y="20.7" text-anchor="middle" dominant-baseline="central">150</text>
+        <text class="g-labelPrimary" x="154.5" y="29.7" text-anchor="middle" dominant-baseline="central">160</text>
+        <text class="g-labelSecondary" x="166.8" y="41.1" text-anchor="middle" dominant-baseline="central">170</text>
+        <text class="g-labelPrimary" x="176.6" y="54.7" text-anchor="middle" dominant-baseline="central">180</text>
+        <text class="g-labelSecondary" x="183.7" y="69.9" text-anchor="middle" dominant-baseline="central">190</text>
+        <text class="g-labelPrimary" x="187.9" y="86.1" text-anchor="middle" dominant-baseline="central">200</text>
+        <text class="g-labelSecondary" x="189.0" y="102.8" text-anchor="middle" dominant-baseline="central">210</text>
+        <text class="g-labelPrimary" x="186.9" y="119.4" text-anchor="middle" dominant-baseline="central">220</text>
+        <text class="g-labelPrimary" x="181.7" y="135.4" text-anchor="middle" dominant-baseline="central">230</text>
+        <text class="g-labelSecondary" x="173.6" y="150.1" text-anchor="middle" dominant-baseline="central">240</text>
+        <text class="g-labelPrimary" x="162.9" y="162.9" text-anchor="middle" dominant-baseline="central">250</text>
 
         <circle class="g-fg" id="gaugeFg" cx="100" cy="100" r="64" pathLength="100" stroke-dasharray="0 100" transform="rotate(135 100 100)"/>
       </svg>
@@ -1240,8 +1248,11 @@ window.addEventListener("unhandledrejection",function(e){
   var ZONE_BUCKET_M = 1000;
   function zoneKey(peregon, trackM){ return peregon+"_"+Math.floor(trackM/ZONE_BUCKET_M); }
   function recordZoneQuality(){
-    if(!rt.tracking || rt.posM==null || !state.ctx.peregon || rt.speed<30) return;
+    if(!rt.tracking || rt.posM==null || !state.ctx.peregon || rt.speed<30){rt.zoneBadSince=0;return;}
     var now=Date.now();
+    var bad=rt.fixQuality==="weak"||rt.fixQuality==="waiting"||rt.fixQuality==="recovering"||rt.fixQuality==="deadreckoning"||rt.fixQuality==null;
+    if(bad){if(!rt.zoneBadSince)rt.zoneBadSince=now;}else rt.zoneBadSince=0;
+    var confirmedBad=bad&&now-rt.zoneBadSince>=8000;
     if(rt.lastZoneRecordAt && (now-rt.lastZoneRecordAt)<10000) return; // не чаще раза в 10с
     rt.lastZoneRecordAt=now;
     var zoneM=currentTrackMeters(); if(zoneM==null)zoneM=rt.posM;
@@ -1249,31 +1260,26 @@ window.addEventListener("unhandledrejection",function(e){
     var stats=load("sap_zoneStats",{});
     var session=String(rt.trackingSince||""),s=stats[key]||{passes:0,badPasses:0,session:"",sessionBad:false};
     if(s.session!==session){s.session=session;s.sessionBad=false;s.passes=(+s.passes||0)+1;}
-    var bad=rt.fixQuality==="weak"||rt.fixQuality==="waiting"||rt.fixQuality==null;
-    if(bad&&!s.sessionBad){s.sessionBad=true;s.badPasses=(+s.badPasses||0)+1;}
+    if(confirmedBad&&!s.sessionBad){s.sessionBad=true;s.badPasses=(+s.badPasses||0)+1;}
     stats[key]=s;
     save("sap_zoneStats",stats);
   }
   function checkZoneWarning(){
-    if(!rt.tracking || rt.posM==null || !state.ctx.peregon) return;
-    var lead=1500; // предупреждаем за 1.5км до зоны
+    var hint=document.getElementById("zoneHint");
+    if(!rt.tracking || rt.posM==null || !state.ctx.peregon){rt.zoneHintActive=false;if(hint)hint.classList.remove("on");return;}
     var zoneM=currentTrackMeters(); if(zoneM==null)zoneM=rt.posM;
-    var aheadM = dirDown() ? zoneM-lead : zoneM+lead;
-    var key=zoneKey(state.ctx.peregon, aheadM);
+    var key=zoneKey(state.ctx.peregon, zoneM);
     var stats=load("sap_zoneStats",{});
     var s=stats[key];
-    if(!s || (+s.passes||0)<2 || (+s.badPasses||0)<2) return;
-    var ratio=s.badPasses/s.passes;
-    if(ratio<0.5) return;
-    if(rt.zoneWarnedKey===key || (rt.zoneHintCooldownUntil||0)>Date.now()) return;
-    rt.zoneWarnedKey=key;
-    rt.zoneHintUntil=Date.now()+120000;
-    rt.zoneHintCooldownUntil=Date.now()+600000;
-    $("#gpsTxt").textContent="частая зона помех";
+    var passes=s?(+s.passes||0):0,badPasses=s?(+s.badPasses||0):0,known=passes>=3&&badPasses>=2&&badPasses/passes>=2/3;
+    var active=known&&!!rt.zoneBadSince&&Date.now()-rt.zoneBadSince>=8000;
+    if(active!==rt.zoneHintActive){rt.zoneHintActive=active;webLog("gps_interference_hint_changed",{visible:active,key:key,passes:passes,bad_passes:badPasses,bad_for_ms:rt.zoneBadSince?Date.now()-rt.zoneBadSince:0});}
+    if(hint)hint.classList.toggle("on",active);
+    if(active)$("#gpsTxt").textContent="частая зона помех";
   }
 
   var rt={tracking:false,watchId:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,stoppedPositionM:null,stoppedRoute:null,stoppedDirection:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserFixAt:0,lastGpsRestartAt:0,webHiddenAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting"};
-  rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0; rt.speedCand=null; rt.speedCandCount=0; rt.stationaryAnchor=null; rt.stationarySince=0; rt.lastSnapSegIdx=-1; rt.zoneHintUntil=0; rt.zoneHintCooldownUntil=0;
+  rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0; rt.speedCand=null; rt.speedCandCount=0; rt.stationaryAnchor=null; rt.stationarySince=0; rt.lastSnapSegIdx=-1; rt.zoneBadSince=0; rt.zoneHintActive=false;
   rt.lastAccuracy=999; rt.directionMismatchCount=0; rt.directionWarning=false; rt.alertRepeatAt=0;
   var savedStop=load("sap_lastStop",null);
   if(savedStop&&isFinite(+savedStop.position)&&savedStop.route===state.ctx.peregon&&savedStop.direction===state.ctx.towards){rt.stoppedPositionM=+savedStop.position;rt.stoppedRoute=savedStop.route;rt.stoppedDirection=savedStop.direction;rt.posM=rt.stoppedPositionM;}
@@ -1550,7 +1556,7 @@ window.addEventListener("unhandledrejection",function(e){
       if(!buttons&&x.dep)buttons='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="dep"><small>проход</small>'+formatScheduleTime(x.dep)+'</button>';
       if(next){var fromTime=x.dep||x.arr,toTime=next.arr||next.dep,a=scheduleSeconds(fromTime),b=scheduleSeconds(toTime);if(a!=null&&b!=null){if(b<=a)b+=86400;var sec=b-a;if(x.m!=null&&next.m!=null){var calc=scheduleRequirement(x.m,next.m,sec),req=calc.kmh,note=calc.zones?' · учтено зон: '+calc.zones:'',speedTitle=calc.zones?'средняя по графику вне ограничений ':'средняя по графику ',nonFinite=!isFinite(req),tooFast=!nonFinite&&req>currentBrowserSpeedCeiling(),impossible=nonFinite||tooFast,speedValue=nonFinite?'график недостижим<br><small>ограничения занимают доступное время; следовать с максимально реализуемой скоростью согласно приказам</small>':(tooFast?'график недостижим · требуется '+Math.round(req)+' км/ч<br><small>следовать с максимально реализуемой скоростью согласно приказам</small>':speedTitle+Math.round(req)+' км/ч');run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+fmtM(Math.abs(next.m-x.m))+' · '+(sec/60).toFixed(sec%60?1:0)+' мин'+note+'</span><strong>'+speedValue+'</strong></div>';}else run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+(sec/60).toFixed(sec%60?1:0)+' мин</span><strong>нет км</strong></div>';}}
       var livePace=(i===live&&next&&next.m!=null)?'<div class="schedule-live-pace" id="scheduleLivePace" data-dir="'+train.direction+'" data-to="'+next.m+'" data-arrival="'+escapeHtml(next.arr||next.dep||'')+'"><div><span>фактическая скорость</span><b data-live-speed>—</b></div><div class="pace-target"><span>ориентир по графику</span><b data-live-target>—</b><small data-live-note>средняя по графику на оставшемся пути</small></div><div><span>до станции</span><b data-live-distance>—</b></div><div><span>времени осталось</span><b data-live-time>—</b></div></div>':'';
-      return '<div class="schedule-leg'+(i===live?' live':'')+'"><div class="schedule-stop"><b>'+escapeHtml(x.name)+(x.m!=null?' <small>· '+escapeHtml(x.mark||stationMark(x.displayM))+'</small>':' <small>· км уточняется</small>')+'</b><div class="schedule-times">'+buttons+'</div></div>'+run+livePace+'</div>';
+      return '<div class="schedule-leg'+(i===live?' live':'')+'" data-schedule-leg="'+i+'"><div class="schedule-stop"><b>'+escapeHtml(x.name)+(x.m!=null?' <small>· '+escapeHtml(x.mark||stationMark(x.displayM))+'</small>':' <small>· км уточняется</small>')+'</b><div class="schedule-times">'+buttons+'</div></div>'+run+livePace+'</div>';
     }).join("")+'<button class="schedule-reset" id="scheduleReset">Сбросить мои правки времени этого поезда</button>';
     updateScheduleLivePace(true);
     box.onclick=function(e){var b=e.target.closest("[data-schedule-index]");if(b){var idx=+b.getAttribute("data-schedule-index"),kind=b.getAttribute("data-kind")||"dep",stop=train.stops[idx];openScheduleTimePicker(train,idx,kind,stop[kind]);return;}if(e.target.id==="scheduleReset"){Object.keys(scheduleOverrides).forEach(function(k){if(k.indexOf(train.number+":")===0)delete scheduleOverrides[k];});save("sap_schedule_overrides",scheduleOverrides);renderTrainSchedule();toast("Время восстановлено из расписания");}};
@@ -1928,7 +1934,7 @@ window.addEventListener("unhandledrejection",function(e){
     var signalGood=acc<=30 && !satelliteWeak;
     rt.gpsState=signalGood?(rt.lastGoodFix==null?"checking":"precise"):(acc<=70?"degraded":"deadreckoning");
     $("#gps").className="gps "+(signalGood?"live":(acc<=70?"weak":"dead"));
-    $("#gpsTxt").textContent=(rt.zoneHintUntil>Date.now())?"частая зона помех":(signalGood?"GPS точный":(acc<=70?"GPS слабый":"счёт по пути"));
+    $("#gpsTxt").textContent=rt.zoneHintActive?"частая зона помех":(signalGood?"GPS точный":(acc<=70?"GPS слабый":"счёт по пути"));
     var now=p.timestamp||Date.now(),pt={lat:c.latitude,lon:c.longitude,t:now};
     var dt=rt.last?Math.max(0,(now-rt.last.t)/1000):null;
 
@@ -3218,56 +3224,70 @@ window.addEventListener("unhandledrejection",function(e){
     "Волховстрой - Чудово":{ tuda:"last-vnov-volh2", obratno:"last-vnov-volh2" }
   };
 
-  function speedRouteIdForTrip(){
+  function baseSpeedRouteIdForTrip(){
     var link=ROUTE_LINK[state.ctx.peregon];if(!link)return null;
     var reverse=journeyTowards()==="obratno";
     if(!link.pickTrain)return reverse?link.obratno:link.tuda;
     var ids=reverse?link.idsObratno:link.idsTuda,number=parseInt(selectedScheduleTrain(),10),sapsan=isFinite(number)&&number>=751&&number<=786;
     return ids&&ids.length?(sapsan?ids[0]:(ids[1]||ids[0])):null;
   }
-  function orderPathMode(){return journeyTowards()==="obratno"?(state.settings.orderPathObratno||"auto"):(state.settings.orderPathTuda||"auto");}
+  var WRONG_MAIN_ROUTE={
+    "sap-spb-msk":"sap-msk-spb","sap-msk-spb":"sap-spb-msk",
+    "last-spb-msk":"last-msk-spb","last-msk-spb":"last-spb-msk",
+    "last-spbfin-kamenn":"last-kamenn-spbfin","last-kamenn-spbfin":"last-spbfin-kamenn",
+    "last-dd-ptz":"last-ptz-dd","last-ptz-dd":"last-dd-ptz"
+  };
+  function wrongMainRouteId(routeId){return routeId==="last-luga"?routeId:(WRONG_MAIN_ROUTE[routeId]||null);}
+  function speedRouteIdForTrip(){var routeId=baseSpeedRouteIdForTrip();return orderPathMode()==="wrong"?(wrongMainRouteId(routeId)||routeId):routeId;}
+  function orderPathMode(){
+    var mode=journeyTowards()==="obratno"?(state.settings.orderPathObratno||"auto"):(state.settings.orderPathTuda||"auto");
+    // Не переносим специальный режим на маршрут, для которого встречной таблицы нет.
+    return mode==="wrong"&&!wrongMainRouteId(baseSpeedRouteIdForTrip())?"auto":mode;
+  }
   function orderPathOptions(){
+    var baseRouteId=baseSpeedRouteIdForTrip(),wrongAvailable=!!wrongMainRouteId(baseRouteId);
     if(state.ctx.peregon!=="СпбГл - Москва")return[
       {value:"auto",label:"Авто · главный",meta:"главный путь по выбранному направлению"},
       {value:"primary",label:"Главный путь",meta:"скорость главного пути из приказа"},
+      ...(wrongAvailable?[{value:"wrong",label:"Неправильный главный",meta:"главный путь встречного направления без смены километража"}]:[]),
       {value:"side",label:"Боковой путь",meta:"скорость бокового пути, где она указана"}
     ];
     return journeyTowards()==="obratno"?[
       {value:"auto",label:"Авто · IV → II",meta:"Москва — Крюково IV, после Крюково II"},
       {value:"primary",label:"IV путь до Крюково",meta:"штатный путь из Москвы"},
       {value:"alternate",label:"II путь до Крюково",meta:"неправильный путь; далее штатный II"},
+      {value:"wrong",label:"Неправильный главный",meta:"главный путь направления Санкт-Петербург → Москва"},
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
     ]:[
       {value:"auto",label:"Авто · I → III",meta:"из Петербурга I, после Крюково III"},
       {value:"primary",label:"III путь от Крюково",meta:"штатный путь в Москву"},
       {value:"alternate",label:"I путь через Крюково",meta:"вариант по I пути с возвратом на III"},
+      {value:"wrong",label:"Неправильный главный",meta:"главный путь направления Москва → Санкт-Петербург"},
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
     ];
   }
   function orderPathLabel(){var mode=orderPathMode(),item=orderPathOptions().find(function(x){return x.value===mode;});return item?item.label:"Автоматически";}
   function orderRowsForSelectedPath(routeId,raw){
-    var mode=orderPathMode();
+    var mode=orderPathMode(),selected=raw;
     if(routeId==="last-luga"){
-      var wanted=journeyTowards()==="obratno"?/Путь II/i:/Путь I/i;
-      raw=raw.filter(function(item){return wanted.test(item.groupTitle||"");});
+      var normalSecond=journeyTowards()==="obratno",wanted=mode==="wrong"?(normalSecond?/Путь I/i:/Путь II/i):(normalSecond?/Путь II/i:/Путь I/i);
+      selected=raw.filter(function(item){return wanted.test(item.groupTitle||"");});
     }
     if(routeId==="sap-spb-msk"){
-      if(mode==="alternate")return raw.slice(0,90).concat(raw.slice(107,112),raw.slice(93,107));
-      return raw.slice(0,107);
+      selected=mode==="alternate"?raw.slice(0,90).concat(raw.slice(107,112),raw.slice(93,107)):raw.slice(0,107);
     }
     if(routeId==="sap-msk-spb"){
-      if(mode==="alternate")return [raw[1]].concat(raw.slice(139,151),raw.slice(18,119)).filter(Boolean);
-      return raw.slice(0,119);
+      selected=mode==="alternate"?[raw[1]].concat(raw.slice(139,151),raw.slice(18,119)).filter(Boolean):raw.slice(0,119);
     }
     if(routeId==="last-spb-msk"){
-      if(mode==="alternate")return raw.slice(0,72).concat(raw.slice(91,116));
-      return raw.slice(0,91);
+      selected=mode==="alternate"?raw.slice(0,72).concat(raw.slice(91,116)):raw.slice(0,91);
     }
     if(routeId==="last-msk-spb"){
-      if(mode==="alternate")return [raw[2]].concat(raw.slice(103,115),raw.slice(18,87)).filter(Boolean);
-      return raw.slice(0,87);
+      selected=mode==="alternate"?[raw[2]].concat(raw.slice(103,115),raw.slice(18,87)).filter(Boolean):raw.slice(0,87);
     }
-    return raw;
+    // Документ встречного пути идёт в противоположной последовательности. Разворачиваем
+    // только показ строк: направление поездки и текущий официальный километраж не меняются.
+    return mode==="wrong"?selected.slice().reverse():selected;
   }
   function orderSpeedValue(order){
     if(!order||!order.rr)return null;
@@ -3393,6 +3413,8 @@ window.addEventListener("unhandledrejection",function(e){
       if(m!=null) startSpeedRefLive(routeId); // живая подсветка только если знаем позицию
       if(link.note)toast(link.note);
     }
+    var activeRouteId=speedRouteIdForTrip();
+    if(activeRouteId&&orderPathMode()==="wrong"){openWith(activeRouteId);return;}
     if(ids.length>1){
       var labels=ids.map(function(id){ var rt=SPEEDROUTES.find(function(x){return x.id===id;}); return rt?rt.train:id; });
       $("#perList").innerHTML=labels.map(function(l,i){ return '<button class="perItem" data-pt="'+ids[i]+'">'+l+'</button>'; }).join("");
@@ -3407,7 +3429,9 @@ window.addEventListener("unhandledrejection",function(e){
   $("#tripOrderCard").addEventListener("click",jumpToOrderFromTrip);
   $("#tripTrackPick").addEventListener("click",function(){var key=journeyTowards()==="obratno"?"orderPathObratno":"orderPathTuda";openChoicePicker("Путь по приказу",orderPathOptions(),state.settings[key]||"auto",function(value){state.settings[key]=value;rt.speedRowsCacheKey=null;rt.speedOrderKey=null;rt.speedOrderIndex=null;persist();renderTripConsole();highlightSpeedRefRow(liveOfficialMeters(),false);toast("Путь по приказу: "+orderPathLabel());});});
   $("#tripScheduleCard").addEventListener("click",function(){
-    var card=$("#timingCard");if(card)card.scrollIntoView({behavior:"smooth",block:"start"});
+    renderTrainSchedule();
+    var live=document.querySelector("#scheduleBox .schedule-leg.live"),card=live||$("#timingCard");if(card)card.scrollIntoView({behavior:"smooth",block:"center"});
+    if(live&&live.animate)live.animate([{boxShadow:"inset 3px 0 #d71934,0 0 0 rgba(215,25,52,0)"},{boxShadow:"inset 3px 0 #d71934,0 0 0 5px rgba(215,25,52,.25)"},{boxShadow:"inset 3px 0 #d71934,0 0 0 rgba(215,25,52,0)"}],{duration:900,easing:"ease-out"});
     if(!selectedScheduleTrain())toast("Выбери номер поезда — сводка начнёт обновляться автоматически");
   });
   $("#tripRestrictionCard").addEventListener("click",function(){

@@ -143,6 +143,8 @@ class TrackingService : Service() {
     private val warnedAlertIds = mutableSetOf<String>()
     private var lastZoneSampleAt = 0L
     private var frequentInterference = false
+    private var knownInterferenceNearby = false
+    private var interferenceBadSinceAt = 0L
     private var lastSnapshotPersistAt = 0L
     private var lastSnapshotDiskAt = 0L
     private var lastTripPersistAt = 0L
@@ -1310,11 +1312,16 @@ class TrackingService : Service() {
     }
 
     private fun updateInterferenceMemory(output: NativeTripEngine.Output, bad: Boolean) {
-        if (!output.active) { frequentInterference = false; interferencePrewarmPending = false; return }
+        if (!output.active) { frequentInterference = false; knownInterferenceNearby = false; interferenceBadSinceAt = 0L; interferencePrewarmPending = false; return }
         val official = output.officialM ?: return
         val session = tripSessionId ?: return
-        if (output.speedMps * 3.6f < 30f) { frequentInterference = false; interferencePrewarmPending = false; return }
+        if (output.speedMps * 3.6f < 30f) { frequentInterference = false; knownInterferenceNearby = false; interferenceBadSinceAt = 0L; interferencePrewarmPending = false; return }
         val now = System.currentTimeMillis()
+        if (bad) {
+            if (interferenceBadSinceAt == 0L) interferenceBadSinceAt = now
+        } else interferenceBadSinceAt = 0L
+        val badForMs = if (interferenceBadSinceAt == 0L) 0L else now - interferenceBadSinceAt
+        val confirmedBad = bad && badForMs >= 8_000L
         val prefs = getSharedPreferences("piket_native_zones", MODE_PRIVATE)
         if (now - lastZoneSampleAt >= 10_000) {
             lastZoneSampleAt = now
@@ -1328,24 +1335,33 @@ class TrackingService : Service() {
                 .putString("${key}_session", session)
                 .putBoolean("${key}_session_bad", false)
                 .putInt("${key}_passes", prefs.getInt("${key}_passes", 0) + 1)
-            if (bad && !passWasBad) editor
+            if (confirmedBad && !passWasBad) editor
                 .putBoolean("${key}_session_bad", true)
                 .putInt("${key}_bad_passes", prefs.getInt("${key}_bad_passes", 0) + 1)
             editor.apply()
         }
         val sign = if (tripEngine?.save()?.direction == "obratno") -1 else 1
         val buckets = NativeInterferenceZones.currentAndAheadBuckets(official, sign)
-        val wasFrequent = frequentInterference
-        frequentInterference = buckets.any { bucket ->
+        val wasKnownNearby = knownInterferenceNearby
+        knownInterferenceNearby = buckets.any { bucket ->
             val key = "${routeLabel}_$bucket"
             val passes = prefs.getInt("${key}_passes", 0)
             NativeInterferenceZones.isFrequent(passes, prefs.getInt("${key}_bad_passes", 0))
         }
-        if (frequentInterference && !wasFrequent) {
+        val currentBucket = kotlin.math.floor(official / 1_000.0).toInt()
+        val currentKey = "${routeLabel}_$currentBucket"
+        val currentKnown = NativeInterferenceZones.isFrequent(
+            prefs.getInt("${currentKey}_passes", 0), prefs.getInt("${currentKey}_bad_passes", 0))
+        val wasVisible = frequentInterference
+        frequentInterference = NativeInterferenceZones.shouldShowHint(currentKnown, badForMs)
+        if (frequentInterference != wasVisible) diagnostics.event("gps_interference_hint_changed",
+            diagnosticContext() + mapOf("visible" to frequentInterference, "official_m" to official,
+                "bad_for_ms" to badForMs, "current_bucket_known" to currentKnown))
+        if (knownInterferenceNearby && !wasKnownNearby) {
             interferencePrewarmPending = true
             diagnostics.event("gps_interference_prewarm_queued", diagnosticContext() + mapOf(
                 "official_m" to official, "buckets" to buckets))
-        } else if (!frequentInterference) interferencePrewarmPending = false
+        } else if (!knownInterferenceNearby) interferencePrewarmPending = false
     }
 
     private fun createChannel() {

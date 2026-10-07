@@ -10,6 +10,9 @@ object NativeInterferenceZones {
             .distinct()
 
     fun isFrequent(passes: Int, badPasses: Int): Boolean =
-        passes >= 2 && badPasses >= 2 &&
-            badPasses.coerceIn(0, passes).toDouble() / passes >= 0.5
+        passes >= 3 && badPasses >= 2 &&
+            badPasses.coerceIn(0, passes).toDouble() / passes >= 2.0 / 3.0
+
+    fun shouldShowHint(currentBucketKnown: Boolean, badForMs: Long): Boolean =
+        currentBucketKnown && badForMs >= 8_000L
 }

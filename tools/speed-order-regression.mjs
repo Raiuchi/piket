@@ -45,7 +45,8 @@ function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap
     selectedScheduleTrain:()=>routeId.startsWith('sap-')?(direction==='tuda'?'751':'772'):(direction==='tuda'?'723':'724')
   };
   vm.createContext(context);vm.runInContext(html.slice(speedLogicStart,speedLogicEnd),context);
-  return position=>{const order=context.activeSpeedOrder(routeId,position);return{order,speed:context.orderSpeedValue(order),next:context.nextSpeedOrder(routeId,order)};};
+  const effectiveRouteId=context.speedRouteIdForTrip();
+  return position=>{const order=context.activeSpeedOrder(effectiveRouteId,position);return{order,speed:context.orderSpeedValue(order),next:context.nextSpeedOrder(effectiveRouteId,order),routeId:effectiveRouteId};};
 }
 let orderAt=speedLogic('tuda','auto');
 check('Петербург — Москва начинает с 25 км/ч на перронном пути',orderAt(200).speed===25);
@@ -68,4 +69,13 @@ check('Ласточка по неправильному I пути исполь�
 orderAt=speedLogic('obratno','alternate','last-msk-spb');
 [649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
 check('Ласточка по неправильному II пути после Крюково продолжает штатный II путь',orderAt(560500).speed===160);
+orderAt=speedLogic('tuda','wrong');
+check('неправильный главный в Москву берёт встречный приказ и сохраняет рост километража',orderAt(249500).routeId==='sap-msk-spb'&&orderAt(249500).speed===200);
+orderAt=speedLogic('obratno','wrong');
+check('неправильный главный в Петербург берёт встречный приказ и сохраняет убывание километража',orderAt(249500).routeId==='sap-spb-msk'&&orderAt(249500).speed===200);
+check('неправильный главный отделён от бокового пути',html.includes('value:"wrong",label:"Неправильный главный"')&&html.includes('value:"side",label:"Боковой'));
+const primaryGaugeLabels=[...html.matchAll(/class="g-labelPrimary"[^>]*>(\d+)<\/text>/g)].map(match=>+match[1]);
+check('основные цифры спидометра имеют заданную премиальную иерархию',JSON.stringify(primaryGaugeLabels)===JSON.stringify([0,60,100,120,140,160,180,200,220,230,250]));
+check('остальные цифры остаются нейтральными и компактными',html.includes('class="g-labelSecondary"')&&html.includes('.g-labelSecondary{fill:#9EABB6'));
+check('переход из сводки прокручивает к текущему перегону времени хода',html.includes('#scheduleBox .schedule-leg.live')&&html.includes('data-schedule-leg='));
 console.log(`${passed} speed-order scenarios passed`);

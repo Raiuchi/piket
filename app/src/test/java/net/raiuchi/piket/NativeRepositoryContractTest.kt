@@ -111,6 +111,11 @@ class NativeRepositoryContractTest {
                 html.contains("label:\"Боковой путь\""))
         assertTrue("Luga must use its direction-specific order group",
             html.contains("routeId===\"last-luga\"") && html.contains("/Путь II/i:/Путь I/i"))
+        assertTrue("wrong main track must stay separate from a station side track",
+            html.contains("label:\"Неправильный главный\"") && html.contains("WRONG_MAIN_ROUTE") &&
+                html.contains("mode===\"wrong\"?selected.slice().reverse():selected"))
+        assertTrue("timetable card must scroll to the live leg",
+            html.contains("#scheduleBox .schedule-leg.live") && html.contains("data-schedule-leg="))
         assertTrue("overlapping native restriction speech must be queued instead of cancelled",
             service.contains("TextToSpeech.QUEUE_ADD") && engine.contains("val alerts: List<Alert>"))
         assertTrue("speed order row must progress in document order instead of sticking at departure",
