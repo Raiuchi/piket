@@ -21,7 +21,6 @@ class NativeRepositoryContractTest {
     @Test fun premiumHtmlIsViewAndCriticalEngineRemainsKotlin() {
         val main = projectFile("app/src/main/java/net/raiuchi/piket/MainActivity.kt").readText()
         val service = projectFile("app/src/main/java/net/raiuchi/piket/TrackingService.kt").readText()
-        val engine = projectFile("app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt").readText()
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
         val html = projectFile("app/src/main/assets/index.html").readText()
         assertTrue(main.contains("WebView") && main.contains("publishSnapshot"))
@@ -72,6 +71,7 @@ class NativeRepositoryContractTest {
         val html = projectFile("app/src/main/assets/index.html").readText()
         val main = projectFile("app/src/main/java/net/raiuchi/piket/MainActivity.kt").readText()
         val service = projectFile("app/src/main/java/net/raiuchi/piket/TrackingService.kt").readText()
+        val engine = projectFile("app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt").readText()
         assertTrue(projectFile("app/src/main/assets/icons/piket-signal.gif").length() > 100_000)
         assertTrue(projectFile("app/src/main/assets/assets/piket-core.js").length() > 50_000)
         assertTrue(projectFile("app/src/main/assets/assets/piket-schedules.js").length() > 100_000)
