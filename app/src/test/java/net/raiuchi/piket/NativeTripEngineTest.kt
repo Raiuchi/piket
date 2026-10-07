@@ -108,6 +108,24 @@ class NativeTripEngineTest {
         assertTrue(output.alertDistanceM!! in 0.0..1_500.0)
     }
 
+    @Test fun reportsEveryOverlappingRestrictionInsideLeadDistance() {
+        val start = route.points.first().physicalM
+        val firstM = start + 700.0
+        val secondM = start + 900.0
+        val restrictions = listOf(
+            NativeTripEngine.Restriction("first", route.label, "tuda",
+                routes.officialMeters(route.label, firstM)!!, routes.officialMeters(route.label, firstM + 50.0)!!,
+                1_500.0, firstM, firstM + 50.0),
+            NativeTripEngine.Restriction("second", route.label, "tuda",
+                routes.officialMeters(route.label, secondM)!!, routes.officialMeters(route.label, secondM + 50.0)!!,
+                1_500.0, secondM, secondM + 50.0)
+        )
+        engine.configure(route.label, "tuda", route.chainageM.first(), true, restrictions)
+        val output = engine.update(NativeTripEngine.Input(1_000, 0f, true, snap(0)))
+        assertEquals(listOf("first", "second"), output.alerts.map { it.id })
+        assertTrue(output.alerts.all { !it.inZone && it.distanceM in 0.0..1_500.0 })
+    }
+
     @Test fun remoteRestrictionDoesNotAnnounceAtPavlovoEndpoint() {
         val label = "Д. Долг - Павлово"
         val end = routes.route(label)!!.points.last()
