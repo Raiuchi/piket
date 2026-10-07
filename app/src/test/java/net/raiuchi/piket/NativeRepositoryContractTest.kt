@@ -21,6 +21,7 @@ class NativeRepositoryContractTest {
     @Test fun premiumHtmlIsViewAndCriticalEngineRemainsKotlin() {
         val main = projectFile("app/src/main/java/net/raiuchi/piket/MainActivity.kt").readText()
         val service = projectFile("app/src/main/java/net/raiuchi/piket/TrackingService.kt").readText()
+        val engine = projectFile("app/src/main/java/net/raiuchi/piket/NativeTripEngine.kt").readText()
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
         val html = projectFile("app/src/main/assets/index.html").readText()
         assertTrue(main.contains("WebView") && main.contains("publishSnapshot"))
@@ -102,6 +103,11 @@ class NativeRepositoryContractTest {
         assertTrue("trip screen must keep order, timetable and restriction in one live console",
             html.contains("id=\"tripConsole\"") && html.contains("id=\"tripOrderCard\"") &&
                 html.contains("id=\"tripScheduleCard\"") && html.contains("id=\"tripRestrictionCard\""))
+        assertTrue("trip screen must show current and next order speeds as separate readable values",
+            html.contains("id=\"tripOrderNextSpeed\"") && html.contains("id=\"tripOrderNextName\"") &&
+                html.contains("id=\"tripOrderNextMark\""))
+        assertTrue("overlapping native restriction speech must be queued instead of cancelled",
+            service.contains("TextToSpeech.QUEUE_ADD") && engine.contains("val alerts: List<Alert>"))
         assertTrue("speed order row must progress in document order instead of sticking at departure",
             html.contains("function activeSpeedOrder") && html.contains("speedOrderIndex"))
         assertTrue("wipe action must be hidden while the restriction list is empty",

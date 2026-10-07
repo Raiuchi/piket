@@ -367,7 +367,9 @@ class TrackingService : Service() {
         val utteranceId = "piket_alert_${SystemClock.elapsedRealtime()}"
         activeUtteranceId = utteranceId
         val params = Bundle().apply { putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1f) }
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+        // Alerts can overlap geographically. Keep every phrase in the TTS queue so a
+        // second restriction never cancels the first one at the configured lead point.
+        tts?.speak(text, TextToSpeech.QUEUE_ADD, params, utteranceId)
     }
 
     private fun vibrate(kind: String) {
@@ -1164,22 +1166,29 @@ class TrackingService : Service() {
     }
 
     private fun handleAlert(output: NativeTripEngine.Output?) {
-        val id = output?.alertId
-        if (id == null) { lastAlertId = null; lastAlertInZone = false; return }
-        val completedKey = "$routeLabel|${tripEngine?.save()?.direction}|$id"
-        if (completedKey in completedAlertIds) {
-            lastAlertId = id; lastAlertInZone = output.alertInZone
-            return
+        val alerts = output?.alerts.orEmpty().ifEmpty {
+            val fallback = output ?: return@ifEmpty emptyList()
+            fallback.alertId?.let { listOf(NativeTripEngine.Alert(it, fallback.alertDistanceM ?: 0.0, fallback.alertInZone)) }.orEmpty()
         }
-        val entered = output.alertInZone && (id != lastAlertId || !lastAlertInZone)
-        if (entered || (!output.alertInZone && warnedAlertIds.add(completedKey))) {
+        if (alerts.isEmpty()) { lastAlertId = null; lastAlertInZone = false; return }
+        alerts.forEach { alert -> handleSingleAlert(alert, output) }
+        val primary = alerts.first()
+        lastAlertId = primary.id; lastAlertInZone = primary.inZone
+    }
+
+    private fun handleSingleAlert(alert: NativeTripEngine.Alert, output: NativeTripEngine.Output) {
+        val id = alert.id
+        val completedKey = "$routeLabel|${tripEngine?.save()?.direction}|$id"
+        if (completedKey in completedAlertIds) return
+        val entered = alert.inZone
+        if (entered || (!alert.inZone && warnedAlertIds.add(completedKey))) {
             diagnostics.event("restriction_alert", diagnosticContext() + mapOf(
                 "id" to id, "route" to routeLabel, "speed_kmh" to alertSpeed[id],
-                "reason" to alertReason[id], "distance_m" to output.alertDistanceM,
+                "reason" to alertReason[id], "distance_m" to alert.distanceM,
                 "in_zone" to entered, "official_m" to output.officialM,
                 "physical_m" to output.physicalM))
             val kind = if (entered) "danger" else "warning"
-            val distance = output.alertDistanceM ?: 0.0
+            val distance = alert.distanceM
             val ahead = if (distance >= 1_000) String.format(Locale.forLanguageTag("ru"), "Через %.1f километра. ", distance / 1_000)
                 else "Через ${distance.roundToInt()} метров. "
             val phrase = (if (entered) "Ограничение. " else ahead) + (alertSpeech[id] ?: "Ограничение")
@@ -1189,7 +1198,6 @@ class TrackingService : Service() {
             if (vibrationEnabled) vibrate(kind)
         }
         if (entered) completedAlertIds += completedKey
-        lastAlertId = id; lastAlertInZone = output.alertInZone
     }
 
     /**

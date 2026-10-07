@@ -532,6 +532,7 @@
   .tc-track{appearance:none;-webkit-appearance:none;max-width:58%;padding:6px 9px;border:1px solid #3a414c;border-radius:999px;background:#14181e;color:#b8c4d1;font:700 9px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-track.on{border-color:rgba(255,75,89,.62);color:#fff;background:rgba(103,20,30,.35)}
   .tc-card{appearance:none;-webkit-appearance:none;min-width:0;min-height:92px;padding:12px;border:1px solid #30343d;border-radius:15px;background:linear-gradient(145deg,#171a20,#0b0d11);color:#f6f7f9;text-align:left;font:inherit;display:flex;flex-direction:column;justify-content:space-between;gap:7px;box-shadow:inset 0 1px rgba(255,255,255,.05)}
   .tc-card:active{border-color:#ff5965;background:#211216}.tc-card.wide{grid-column:1/-1;min-height:76px}.tc-kicker{color:#8794a4;font-size:9px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.tc-main{display:flex;align-items:center;gap:9px;min-width:0}.tc-speed{flex:0 0 auto;color:#7df0ad;font-size:31px;font-weight:900;line-height:1}.tc-speed small{font-size:10px;color:#9aa6b4;margin-left:2px}.tc-copy{min-width:0}.tc-copy b{display:block;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy span{display:block;margin-top:3px;color:#8995a4;font-size:10px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy .tc-next{color:#d9e2ec}.tc-card.schedule .tc-main>b{color:#fff;font-size:18px}.tc-card.restriction .tc-speed{color:#ffcc68}.tc-card.restriction.danger .tc-speed{color:#ff5c68}.tc-arrow{margin-left:auto;color:#ff6671;font-size:20px}.tc-empty .tc-speed{color:#687482}
+  .tc-order-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}.tc-order-cell{min-width:0;padding:10px 11px;border:1px solid #303945;border-radius:13px;background:linear-gradient(145deg,#101820,#090c10)}.tc-order-cell.next{border-color:#49343a;background:linear-gradient(145deg,#1a1216,#0c0b0d)}.tc-order-label{display:block;margin-bottom:6px;color:#7f8d9d;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.tc-order-line{display:flex;align-items:baseline;gap:7px}.tc-order-line .tc-speed{font-size:28px}.tc-order-cell.next .tc-speed{color:#ffcc68}.tc-order-name{display:block;margin-top:5px;color:#f4f6f8;font-size:12px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-order-mark{display:block;margin-top:3px;color:#8e9baa;font-size:9px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   @media(max-width:380px){.trip-console{grid-template-columns:1fr}.tc-card,.tc-card.wide,.tc-title{grid-column:1}.tc-card{min-height:78px}}
   .premium-field{width:100%;min-height:50px;padding:10px 13px;border:1px solid #3a424d;border-radius:13px;background:linear-gradient(145deg,#1a2028,#0d1117);color:#f5f5f7;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font:inherit}.premium-field .pf-copy{min-width:0}.premium-field small{display:block;color:#ff7b84;font-size:9px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:3px}.premium-field b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.premium-field .pf-arrow{color:#ff5965;font-size:18px}.premium-field:active{border-color:#ff5965;background:#23151a}
   .premium-picker{position:fixed;inset:0;z-index:500;display:none;align-items:flex-end;justify-content:center}.premium-picker.on{display:flex}.pp-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78)}.pp-card{position:relative;width:min(100%,560px);max-height:86vh;padding:10px 16px calc(14px + env(safe-area-inset-bottom));border:1px solid rgba(255,91,102,.30);border-radius:24px 24px 0 0;background:linear-gradient(165deg,#202027,#09090b 70%);box-shadow:0 -18px 60px rgba(0,0,0,.75);overflow:hidden}.pp-grab{width:46px;height:4px;border-radius:4px;background:#55555e;margin:0 auto 15px}.pp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.pp-head h3{margin:0;font-size:20px}.pp-close{width:38px;height:38px;border-radius:12px;border:1px solid #3a3a42;background:#16161a;color:#ddd;font-size:22px}.pp-body{max-height:62vh;overflow:auto;padding:2px}.pp-list{display:grid;gap:8px}.pp-option{width:100%;min-height:54px;padding:11px 14px;border:1px solid #30323a;border-radius:14px;background:#111218;color:#f2f2f4;text-align:left;font:inherit;display:flex;justify-content:space-between;align-items:center;gap:10px}.pp-option.on{border-color:#ff5360;background:linear-gradient(135deg,#55111a,#191218);box-shadow:inset 3px 0 #ff3848}.pp-option small{color:#a4abba}.pp-option.on small{color:#ff9ba2}.pp-dials{display:grid;grid-template-columns:1fr 28px 1fr;align-items:center;gap:8px;padding:8px 0 16px}.pp-col{text-align:center;border:1px solid #353741;border-radius:18px;background:#101116;padding:10px}.pp-col button{width:100%;height:42px;border:0;border-radius:11px;background:#24262e;color:#ff7780;font-size:24px}.pp-value{font-size:48px;font-weight:800;line-height:1.2;padding:12px 0}.pp-sep{font-size:42px;text-align:center}.pp-date{grid-template-columns:1fr 1fr 1.25fr}.pp-date .pp-value{font-size:30px}.pp-actions{display:flex;gap:10px;margin-top:13px}.pp-actions button{flex:1}.date-pair{display:grid;grid-template-columns:1fr 1fr;gap:9px}
@@ -721,15 +722,18 @@
     <div class="zone-hint" id="zoneHint"><span class="zh-dot"></span><span>Частая зона помех GPS</span></div>
     <div class="trip-console" id="tripConsole">
       <div class="tc-title"><b>Рабочая сводка</b><button type="button" class="tc-track" id="tripTrackPick">Путь: авто</button></div>
-      <button type="button" class="tc-card tc-empty" id="tripOrderCard">
+      <button type="button" class="tc-card wide tc-empty" id="tripOrderCard">
         <span class="tc-kicker">Приказ по скоростям</span>
-        <span class="tc-main"><strong class="tc-speed" id="tripOrderSpeed">—</strong><span class="tc-copy"><b id="tripOrderName">Позиция не определена</b><span id="tripOrderMark">Нажми, чтобы открыть приказ</span><span class="tc-next" id="tripOrderNext">Следующая скорость появится после определения позиции</span></span><i class="tc-arrow">›</i></span>
+        <span class="tc-order-grid">
+          <span class="tc-order-cell"><span class="tc-order-label">Сейчас</span><span class="tc-order-line"><strong class="tc-speed" id="tripOrderSpeed">—</strong></span><b class="tc-order-name" id="tripOrderName">Позиция не определена</b><span class="tc-order-mark" id="tripOrderMark">Нажми, чтобы открыть приказ</span></span>
+          <span class="tc-order-cell next"><span class="tc-order-label">Дальше</span><span class="tc-order-line"><strong class="tc-speed" id="tripOrderNextSpeed">—</strong></span><b class="tc-order-name" id="tripOrderNextName">Следующая скорость</b><span class="tc-order-mark" id="tripOrderNextMark">После определения позиции</span></span>
+        </span>
       </button>
       <button type="button" class="tc-card schedule" id="tripScheduleCard">
         <span class="tc-kicker">Перегонное время</span>
         <span class="tc-main"><b id="tripScheduleTime">—</b><span class="tc-copy"><b id="tripScheduleName">Выбери поезд</b><span id="tripScheduleMeta">Покажу текущий перегон</span></span><i class="tc-arrow">›</i></span>
       </button>
-      <button type="button" class="tc-card restriction wide tc-empty" id="tripRestrictionCard">
+      <button type="button" class="tc-card restriction tc-empty" id="tripRestrictionCard">
         <span class="tc-kicker">Ближайшее ограничение</span>
         <span class="tc-main"><strong class="tc-speed" id="tripRestrictionSpeed">—</strong><span class="tc-copy"><b id="tripRestrictionName">Ограничений впереди нет</b><span id="tripRestrictionMeta">По текущему участку чисто</span></span><i class="tc-arrow">›</i></span>
       </button>
@@ -2757,11 +2761,14 @@ window.addEventListener("unhandledrejection",function(e){
       var orderSpeed=orderSpeedValue(order),nextSpeed=orderSpeedValue(nextOrder),diagnosticKey=[routeId,journeyTowards(),orderPathMode(),order.index,orderSpeed].join("|");
       orderCard.classList.remove("tc-empty");$("#tripOrderSpeed").innerHTML=(orderSpeed!=null?orderSpeed:"—")+'<small>км/ч</small>';
       $("#tripOrderName").textContent=order.rr.name;$("#tripOrderMark").textContent=(position==null?"":stationMark(position))+(orderPathMode()==="side"?" · боковой путь":" · "+orderPathLabel());
-      $("#tripOrderNext").textContent=nextOrder?("Следом "+nextSpeed+" км/ч · "+nextOrder.rr.name):"Дальше изменений скорости нет";
+      $("#tripOrderNextSpeed").innerHTML=nextOrder?(nextSpeed+'<small>км/ч</small>'):"—";
+      $("#tripOrderNextName").textContent=nextOrder?nextOrder.rr.name:"Изменений скорости нет";
+      var nextAhead=nextOrder&&nextOrder.entry!=null&&position!=null?Math.max(0,journeyTowards()==="obratno"?position-nextOrder.entry:nextOrder.entry-position):null;
+      $("#tripOrderNextMark").textContent=nextOrder?(nextAhead!=null?"через "+fmtM(nextAhead):"Следующая строка приказа"):"До конца выбранного направления";
       if(rt.lastSpeedOrderDiagnosticKey!==diagnosticKey){rt.lastSpeedOrderDiagnosticKey=diagnosticKey;appDiagnostic("speed_order_changed",{route:state.ctx.peregon,direction:journeyTowards(),train:selectedScheduleTrain(),order_route:routeId,path_mode:orderPathMode(),row_index:order.index,speed_kmh:orderSpeed,next_row_index:nextOrder?nextOrder.index:null,next_speed_kmh:nextSpeed,official_m:position});}
     }else{
       orderCard.classList.add("tc-empty");$("#tripOrderSpeed").textContent="—";$("#tripOrderName").textContent=position==null?"Позиция не определена":"Для позиции нет строки";$("#tripOrderMark").textContent="Нажми, чтобы открыть приказ";
-      $("#tripOrderNext").textContent="Следующая скорость появится после определения позиции";
+      $("#tripOrderNextSpeed").textContent="—";$("#tripOrderNextName").textContent="Следующая скорость";$("#tripOrderNextMark").textContent="После определения позиции";
     }
     var schedule=currentScheduleSnapshot();
     if(schedule&&schedule.from){
@@ -2875,7 +2882,20 @@ window.addEventListener("unhandledrejection",function(e){
       if(inzone&&!st.z){ st.z=true; st.a=true; fireAlert("danger",r,0); }
       else if(!inzone&&ahead>0&&ahead<=lead&&!st.a){ st.a=true; fireAlert("warn",r,ahead); }
     }); }
-  function fireAlert(kind,r,ahead){ var al=$("#alert"); al.className="alert on "+kind; var loc=r.km+" км "+r.pk+" пк";
+  function fireAlert(kind,r,ahead){
+    if(!rt.nativeSnapshot){
+      rt.alertQueue=rt.alertQueue||[];var queueKey=(r.id||(r.km+"_"+r.pk))+"_"+kind;
+      if(rt.alertQueueKey===queueKey||rt.alertQueue.some(function(x){return x.key===queueKey;}))return;
+      rt.alertQueue.push({key:queueKey,kind:kind,r:r,ahead:ahead});drainAlertQueue();return;
+    }
+    showAlert(kind,r,ahead);
+  }
+  function drainAlertQueue(){
+    if(rt.alertQueueBusy)return;var item=(rt.alertQueue||[]).shift();if(!item)return;
+    rt.alertQueueBusy=true;rt.alertQueueKey=item.key;showAlert(item.kind,item.r,item.ahead);
+    clearTimeout(rt.alertQueueTimer);rt.alertQueueTimer=setTimeout(function(){rt.alertQueueBusy=false;rt.alertQueueKey=null;drainAlertQueue();},5200);
+  }
+  function showAlert(kind,r,ahead){ var al=$("#alert"); al.className="alert on "+kind; var loc=r.km+" км "+r.pk+" пк";
     if(kind==="warn"){var audit=PIKET_RELIABILITY.triggerAudit(state.settings.lead,ahead),log=load("sap_triggerAudit",[]);log.push({at:Date.now(),id:r.id||null,peregon:state.ctx.peregon,expected:state.settings.lead,actual:Math.round(ahead),delta:audit.deltaM,ok:audit.ok});if(log.length>100)log=log.slice(-100);save("sap_triggerAudit",log);}
     var detHtml=kind==="danger"?(loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':'')):('<small>через</small> '+fmtM(ahead)+' · '+loc+(r.reason?'<br><small>'+escapeHtml(r.reason)+'</small>':''));
     $("#alHead").textContent=kind==="danger"?"ОГРАНИЧЕНИЕ — ЗОНА":"ВНИМАНИЕ — ОГРАНИЧЕНИЕ"; $("#alBig").textContent=r.spd||"—";
@@ -3260,7 +3280,7 @@ window.addEventListener("unhandledrejection",function(e){
       // Some station captions and the following "from km" row overlap by 100–200 m.
       // Preserve the document order instead of jumping back to the station caption.
       if(progress!=null){progress=Math.max(progress,lastProgress+.01);lastProgress=progress;}
-      rows.push({rr:rr,index:item.index,pathIndex:rows.length,positions:positions,stationM:stationM,lo:lo,hi:hi,progress:progress});
+      rows.push({rr:rr,index:item.index,pathIndex:rows.length,positions:positions,stationM:stationM,lo:lo,hi:hi,entry:entry,progress:progress});
     });
     rt.speedRowsCacheKey=cacheKey;rt.speedRowsCache=rows;return rows;
   }

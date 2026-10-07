@@ -11,9 +11,11 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     data class Input(val elapsedMs: Long, val speedMps: Float?, val acceptedFix: Boolean,
                      val snap: NativeRouteEngine.Snap?, val stationary: Boolean = false,
                      val provisionalCalibrationFix: Boolean = false)
+    data class Alert(val id: String, val distanceM: Double, val inZone: Boolean)
     data class Output(val active: Boolean, val physicalM: Double?, val officialM: Double?,
                       val speedMps: Float, val recovering: Boolean, val source: String,
-                      val alertId: String?, val alertDistanceM: Double?, val alertInZone: Boolean)
+                      val alertId: String?, val alertDistanceM: Double?, val alertInZone: Boolean,
+                      val alerts: List<Alert> = emptyList())
     data class SavedState(val active: Boolean, val route: String, val direction: String,
                           val manualOfficialM: Double, val physicalM: Double?, val offsetM: Double,
                           val speedMps: Float, val lastElapsedMs: Long,
@@ -212,15 +214,17 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     private fun output(source: String): Output {
         val physical = physicalM
         val official = physical?.let { routes.officialMeters(route, it, direction)?.plus(officialOffsetM) }
-        val alert = if (active && physical != null) nextRestriction(physical, previousAlertPhysicalM) else null
+        val alerts = if (active && physical != null) restrictionAlerts(physical, previousAlertPhysicalM) else emptyList()
+        val alert = alerts.firstOrNull()
         previousAlertPhysicalM = physical
         return Output(active, physical, official, speedMps, recovering, source,
-            alert?.restriction?.id, alert?.distanceM, alert?.inZone == true)
+            alert?.restriction?.id, alert?.distanceM, alert?.inZone == true,
+            alerts.map { Alert(it.restriction.id, it.distanceM, it.inZone) })
     }
 
     private data class AlertCandidate(val restriction: Restriction, val distanceM: Double,
                                       val inZone: Boolean, val priority: Int, val rankM: Double)
-    private fun nextRestriction(nowPhysicalM: Double, previousPhysicalM: Double?): AlertCandidate? {
+    private fun restrictionAlerts(nowPhysicalM: Double, previousPhysicalM: Double?): List<AlertCandidate> {
         return restrictions.asSequence()
             .filter { (it.route == "Все участки" || it.route == route) && (it.direction == "both" || it.direction == direction) }
             .mapNotNull { restriction ->
@@ -248,7 +252,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
                     ahead in 0.0..restriction.leadM -> AlertCandidate(restriction, ahead, false, 2, ahead)
                     else -> null
                 }
-            }.minWithOrNull(compareBy<AlertCandidate> { it.priority }.thenBy { it.rankM })
+            }.sortedWith(compareBy<AlertCandidate> { it.priority }.thenBy { it.rankM }).toList()
     }
 
     private fun directionSign() = if (direction == "obratno") -1.0 else 1.0

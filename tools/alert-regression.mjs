@@ -23,6 +23,18 @@ for(const direction of ['tuda','obratno']) {
   box.rt.posM=direction==='tuda'?5000:5100;box.evalAlerts();
   assert.equal(calls.length,2,'no overspeed, acknowledgement or jitter repeat');
 }
+{
+  const calls=[];
+  const restrictions=[
+    {id:'near',km:5,pk:1,spd:60},
+    {id:'overlap',km:5,pk:6,spd:40}
+  ];
+  const box={rt:{tracking:true,posM:3000,speed:80},state:{calib:{},ctx:{peregon:'route',towards:'tuda'},settings:{lead:2500},restrictions},
+    alertState:{},currentTrackMeters:()=>null,isActive:()=>true,inCtx:()=>true,dirDown:()=>false,
+    metersOf:(km,pk=1)=>km*1000+(pk-1)*100,fireAlert:(...args)=>calls.push(args),$:()=>({className:''})};
+  vm.createContext(box);vm.runInContext(html.slice(start,end),box);box.evalAlerts();
+  assert.deepEqual(calls.map(call=>call[1].id),['near','overlap'],'overlapping restrictions must each produce a warning');
+}
 assert.ok(!html.includes('Ограничение не подтверждено'));
 assert.ok(!html.includes('fireOverspeedAlert'));
 assert.ok(!html.includes('id="alAck"'));
