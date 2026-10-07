@@ -6,8 +6,9 @@ import org.junit.Test
 
 class NativeInterferenceZonesTest {
     @Test fun needsRepeatedEvidenceBeforeShowingHint() {
-        assertFalse(NativeInterferenceZones.isFrequent(2, 2))
-        assertTrue(NativeInterferenceZones.isFrequent(3, 2))
+        assertFalse(NativeInterferenceZones.isFrequent(1, 1))
+        assertTrue(NativeInterferenceZones.isFrequent(2, 2))
+        assertFalse(NativeInterferenceZones.isFrequent(3, 1))
         assertFalse(NativeInterferenceZones.isFrequent(10, 3))
     }
 

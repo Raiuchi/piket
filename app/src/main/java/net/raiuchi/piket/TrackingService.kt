@@ -1303,6 +1303,7 @@ class TrackingService : Service() {
     private fun updateInterferenceMemory(output: NativeTripEngine.Output, bad: Boolean) {
         if (!output.active) { frequentInterference = false; interferencePrewarmPending = false; return }
         val official = output.officialM ?: return
+        val session = tripSessionId ?: return
         if (output.speedMps * 3.6f < 30f) { frequentInterference = false; interferencePrewarmPending = false; return }
         val now = System.currentTimeMillis()
         val prefs = getSharedPreferences("piket_native_zones", MODE_PRIVATE)
@@ -1310,17 +1311,26 @@ class TrackingService : Service() {
             lastZoneSampleAt = now
             val bucket = kotlin.math.floor(official / 1_000.0).toInt()
             val key = "${routeLabel}_$bucket"
-            val total = prefs.getInt("${key}_total", 0) + 1
-            val failures = prefs.getInt("${key}_bad", 0) + if (bad) 1 else 0
-            prefs.edit().putInt("${key}_total", total).putInt("${key}_bad", failures).apply()
+            val previousSession = prefs.getString("${key}_session", null)
+            val newPass = previousSession != session
+            val passWasBad = if (newPass) false else prefs.getBoolean("${key}_session_bad", false)
+            val editor = prefs.edit()
+            if (newPass) editor
+                .putString("${key}_session", session)
+                .putBoolean("${key}_session_bad", false)
+                .putInt("${key}_passes", prefs.getInt("${key}_passes", 0) + 1)
+            if (bad && !passWasBad) editor
+                .putBoolean("${key}_session_bad", true)
+                .putInt("${key}_bad_passes", prefs.getInt("${key}_bad_passes", 0) + 1)
+            editor.apply()
         }
         val sign = if (tripEngine?.save()?.direction == "obratno") -1 else 1
         val buckets = NativeInterferenceZones.currentAndAheadBuckets(official, sign)
         val wasFrequent = frequentInterference
         frequentInterference = buckets.any { bucket ->
             val key = "${routeLabel}_$bucket"
-            val total = prefs.getInt("${key}_total", 0)
-            NativeInterferenceZones.isFrequent(total, prefs.getInt("${key}_bad", 0))
+            val passes = prefs.getInt("${key}_passes", 0)
+            NativeInterferenceZones.isFrequent(passes, prefs.getInt("${key}_bad_passes", 0))
         }
         if (frequentInterference && !wasFrequent) {
             interferencePrewarmPending = true
