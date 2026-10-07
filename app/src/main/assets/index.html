@@ -3241,6 +3241,9 @@ window.addEventListener("unhandledrejection",function(e){
   function speedRouteIdForTrip(){var routeId=baseSpeedRouteIdForTrip();return orderPathMode()==="wrong"?(wrongMainRouteId(routeId)||routeId):routeId;}
   function orderPathMode(){
     var mode=journeyTowards()==="obratno"?(state.settings.orderPathObratno||"auto"):(state.settings.orderPathTuda||"auto");
+    // В прежних версиях отдельный пункт «III путь от Крюково» дублировал
+    // автоматический I → III. Сохранённую настройку мягко возвращаем в «Авто».
+    if(state.ctx.peregon==="СпбГл - Москва"&&journeyTowards()!=="obratno"&&mode==="primary")mode="auto";
     // Не переносим специальный режим на маршрут, для которого встречной таблицы нет.
     return mode==="wrong"&&!wrongMainRouteId(baseSpeedRouteIdForTrip())?"auto":mode;
   }
@@ -3260,8 +3263,7 @@ window.addEventListener("unhandledrejection",function(e){
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
     ]:[
       {value:"auto",label:"Авто · I → III",meta:"из Петербурга I, после Крюково III"},
-      {value:"primary",label:"III путь от Крюково",meta:"штатный путь в Москву"},
-      {value:"alternate",label:"I путь через Крюково",meta:"вариант по I пути с возвратом на III"},
+      ...(baseRouteId==="last-spb-msk"?[{value:"alternate",label:"I путь · Крюково → Москва",meta:"скорости по I пути от Крюково до Москвы"}]:[]),
       {value:"wrong",label:"Неправильный главный",meta:"главный путь направления Москва → Санкт-Петербург"},
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
     ];

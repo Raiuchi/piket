@@ -57,15 +57,14 @@ check('Москва — Петербург начинает с 25 км/ч на �
 check('из Москвы до Крюково автоматически выбран IV путь',orderAt(635400).speed===140);
 check('после Крюково в Петербург автоматически выбран II путь',orderAt(610300).speed===140);
 check('прибытие в Петербург переключается на 25 км/ч перронного пути',orderAt(200).speed===25);
-orderAt=speedLogic('tuda','alternate');
-[610500,611800,614300,631200].forEach(orderAt);
-check('вариант I пути через Крюково возвращается к III и не застревает',orderAt(631200).speed===160);
 orderAt=speedLogic('obratno','alternate');
 [649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
 check('вариант II пути из Москвы после Крюково продолжает штатный II путь',orderAt(560500).speed===120);
 orderAt=speedLogic('tuda','alternate','last-spb-msk');
 [610500,614600,622300,632600,646000,649500].forEach(orderAt);
-check('Ласточка по неправильному I пути использует отдельные строки приказа до Москвы',orderAt(649500).speed===50);
+orderAt=speedLogic('tuda','alternate','last-spb-msk');
+check('I путь от Крюково использует отдельные строки приказа до самой Москвы',orderAt(619700).speed===120&&orderAt(631200).speed===120&&orderAt(649500).speed===50);
+check('дублирующий III путь убран, а полный I путь доступен для Ласточки',!html.includes('label:"III путь от Крюково"')&&html.includes('label:"I путь · Крюково → Москва"'));
 orderAt=speedLogic('obratno','alternate','last-msk-spb');
 [649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
 check('Ласточка по неправильному II пути после Крюково продолжает штатный II путь',orderAt(560500).speed===160);
