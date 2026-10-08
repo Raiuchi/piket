@@ -31,7 +31,7 @@ for(const speed of [70,90,110,130,150,170,190,210])
 
 const speedLogicStart=html.indexOf('  function speedPositionsFromName(');
 const speedLogicEnd=html.indexOf('\n  function renderSpeedRef(',speedLogicStart);
-function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap-msk-spb') {
+function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap-msk-spb',peregon='СпбГл - Москва') {
   const context={
     SPEEDROUTES:orders.routes,
     TIMING_STATIONS:{'СпбГл - Москва':[
@@ -39,7 +39,7 @@ function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap
       ['Химки',631200],['Ховрино',633900],['Москва-Товарная',646600],
       ['Москва-Пассажирская',649500]
     ]},
-    state:{ctx:{peregon:'СпбГл - Москва'},settings:{orderPathTuda:mode,orderPathObratno:mode}},
+    state:{ctx:{peregon},settings:{orderPathTuda:mode,orderPathObratno:mode}},
     rt:{},journeyTowards:()=>direction,
     metersOf:(km,pk=1,m=0)=>km*1000+(pk-1)*100+m,
     selectedScheduleTrain:()=>routeId.startsWith('sap-')?(direction==='tuda'?'751':'772'):(direction==='tuda'?'723':'724')
@@ -73,6 +73,16 @@ check('неправильный главный в Москву берёт вст
 orderAt=speedLogic('obratno','wrong');
 check('неправильный главный в Петербург берёт встречный приказ и сохраняет убывание километража',orderAt(249500).routeId==='sap-spb-msk'&&orderAt(249500).speed===200);
 check('неправильный главный отделён от бокового пути',html.includes('value:"wrong",label:"Неправильный главный"')&&html.includes('value:"side",label:"Боковой'));
+orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','СПбФин - Выборг');
+orderAt(123400);
+const finFourthEntry=orderAt(17650),finFourthRun=orderAt(17000),finFourthExit=orderAt(16250),finSecond=orderAt(15950);
+check('карта полётов ведёт обратный Финляндский ход через 4 путь и обратно на II главный',
+  finFourthEntry.speed===80&&finFourthRun.speed===100&&finFourthExit.speed===50&&finSecond.speed===120&&
+  finFourthRun.order.pathLabel==='4 путь'&&finSecond.order.pathLabel==='II главный');
+orderAt=speedLogic('tuda','auto','last-spbfin-kamenn','Выборг - Каменногорск');
+check('после Выборга приказ использует только строки Каменногорского участка',orderAt(5000).order.index>=32);
+orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','Выборг - Каменногорск');
+check('до Выборга обратный приказ использует только строки Каменногорского участка',orderAt(40000).order.index<=18);
 const primaryGaugeLabels=[...html.matchAll(/class="g-labelPrimary"[^>]*>(\d+)<\/text>/g)].map(match=>+match[1]);
 check('основные цифры спидометра имеют заданную премиальную иерархию',JSON.stringify(primaryGaugeLabels)===JSON.stringify([0,60,100,120,140,160,180,200,220,230,250]));
 check('остальные цифры остаются нейтральными и компактными',html.includes('class="g-labelSecondary"')&&html.includes('.g-labelSecondary{fill:#9EABB6'));

@@ -510,6 +510,13 @@
   .nav button.on svg{color:#FF7B84!important}
   .speed-ref-entry{border-color:rgba(255,255,255,.12)!important;background:linear-gradient(145deg,#151518,#09090B)!important}
   .speed-ref-entry .row{background:linear-gradient(120deg,rgba(255,255,255,.025),transparent 48%)}.speed-ref-entry .ref-kicker{color:#AEB5BE}.srGroup h3{color:#B9C0C8}
+  /* Спокойная «живая» обводка выделяет служебный приказ, не превращая карточку в баннер. */
+  .speed-ref-entry{position:relative;border:1px solid transparent!important;background:linear-gradient(145deg,#151518,#09090B) padding-box,linear-gradient(110deg,#B62839,#D88647,#7C68D8,#3B9AC7,#B62839) border-box!important;background-size:100% 100%,300% 100%!important;box-shadow:0 12px 28px rgba(0,0,0,.30),0 0 18px rgba(105,95,195,.10);animation:speedRefAura 9s linear infinite}
+  .speed-ref-entry .row{position:relative;z-index:1}.speed-ref-entry .row::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 18%,rgba(255,255,255,.055) 46%,transparent 66%);transform:translateX(-110%);animation:speedRefShine 7s ease-in-out infinite}
+  .speed-ref-entry .ref-kicker{color:#D6B6C0}.speed-ref-entry .row>div:last-child{color:#D9818B!important}
+  @keyframes speedRefAura{to{background-position:0 0,300% 0}}
+  @keyframes speedRefShine{0%,58%{transform:translateX(-110%)}78%,100%{transform:translateX(110%)}}
+  @media(prefers-reduced-motion:reduce){.speed-ref-entry,.speed-ref-entry .row::after{animation:none!important}}
   .routeCard{position:relative;overflow:hidden;background:linear-gradient(145deg,#141518,#08090B);border-color:rgba(255,255,255,.105);box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 20px rgba(0,0,0,.24)}
   .routeCard .rcName{font-family:var(--display);font-size:13.5px;font-weight:620;letter-spacing:-.01em;color:#E5E7EA}.routeCard .rcTrain{font-family:var(--display);font-size:9px;font-weight:780;letter-spacing:.095em}.routeCard svg{color:#747B84}
   .srGroup{border-color:rgba(255,255,255,.075);background:linear-gradient(155deg,#111317,#08090B);box-shadow:inset 0 1px rgba(255,255,255,.025)}
@@ -1474,6 +1481,8 @@ window.addEventListener("unhandledrejection",function(e){
   scheduleAliases["бпост42км"]="блокпост42км";
   scheduleAliases["бпост60км"]="блокпост60км";
   function scheduleStation(stop,rows){var n=scheduleNorm(stop),a=scheduleAliases[n]||n,best=null;for(var i=0;i<rows.length;i++){var rn=scheduleNorm(rows[i][0]);if(rn===a||rn===n)return rows[i];if(a.length>5&&(rn.indexOf(a)>=0||a.indexOf(rn)>=0))best=best||rows[i];}return best;}
+  function scheduleStationKey(value){var normalized=scheduleNorm(value);return scheduleAliases[normalized]||normalized;}
+  function dedupeScheduleStops(mapped){return mapped.reduce(function(result,item){var previous=result[result.length-1];if(previous&&scheduleStationKey(previous.stop.station)===scheduleStationKey(item.stop.station)){if(!previous.arr&&item.arr){previous.arr=item.arr;previous.arrIndex=item.index;}if(!previous.dep&&item.dep){previous.dep=item.dep;previous.depIndex=item.index;}return result;}item.arrIndex=item.index;item.depIndex=item.index;result.push(item);return result;},[]);}
   function scheduleStationName(value){return String(value||"").toLowerCase().replace(/(^|[\s–—-])([а-яё])/g,function(_,a,b){return a+b.toUpperCase();});}
   function scheduleSeconds(v){if(!v)return null;var p=v.split(":"),s=(+p[0])*3600+(+p[1])*60+(+p[2]||0);return isFinite(s)?s:null;}
   function scheduleTime(train,index,kind,original){var specific=train.number+":"+index+":"+kind,legacy=train.number+":"+index;return scheduleOverrides[specific]||scheduleOverrides[legacy]||original;}
@@ -1543,7 +1552,7 @@ window.addEventListener("unhandledrejection",function(e){
     if(!train){box.innerHTML=trains.length?'<div class="schedule-empty">Выбери номер поезда — покажу все найденные проходные станции и требуемую скорость между ними.</div>':'<div class="schedule-empty">Для этого участка и направления поездов в загруженном расписании нет.</div>';$("#scheduleTrainText").textContent="Выбрать поезд";return;}
     $("#scheduleTrainText").textContent="Поезд № "+train.number+" · "+train.title;
     var rows=scheduleRowsForContext(),mapped=[];
-    train.stops.forEach(function(stop,index){var station=scheduleStation(stop.station,rows);mapped.push({stop:stop,index:index,name:station?station[0]:scheduleStationName(stop.station),m:station?station[1]:null,displayM:station?(station[2]==null?station[1]:station[2]):null,mark:station?station[3]:null,arr:scheduleTime(train,index,"arr",stop.arr),dep:scheduleTime(train,index,"dep",stop.dep)});});
+    train.stops.forEach(function(stop,index){var station=scheduleStation(stop.station,rows);mapped.push({stop:stop,index:index,name:station?station[0]:scheduleStationName(stop.station),m:station?station[1]:null,displayM:station?(station[2]==null?station[1]:station[2]):null,mark:station?station[3]:null,arr:scheduleTime(train,index,"arr",stop.arr),dep:scheduleTime(train,index,"dep",stop.dep)});});mapped=dedupeScheduleStops(mapped);
     var live=scheduleLiveIndex(mapped,train),liveFrom=mapped[live],liveTo=mapped[live+1],livePos=scheduleLiveM();
     if(rt.tracking&&livePos!=null&&liveFrom){var diagnosticCardKey=[state.ctx.peregon,journeyTowards(),train.number,live].join("|");if(rt.lastScheduleDiagnosticKey!==diagnosticCardKey){rt.lastScheduleDiagnosticKey=diagnosticCardKey;appDiagnostic("schedule_card_changed",{route:state.ctx.peregon,direction:journeyTowards(),train:train.number,index:live,from:liveFrom.name,to:liveTo?liveTo.name:"",physical_m:livePos});}}
     var renderKey=JSON.stringify([state.ctx,train.number,live,scheduleOverrides,state.restrictions],function(key,value){return key.charAt(0)==="_"?undefined:value;});
@@ -1551,9 +1560,9 @@ window.addEventListener("unhandledrejection",function(e){
     rt.scheduleRenderKey=renderKey;
     box.innerHTML=mapped.map(function(x,i){
       var next=mapped[i+1],run="",buttons="";
-      if(x.arr)buttons+='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="arr"><small>'+(x.dep&&x.dep!==x.arr?'приб':'проход')+'</small>'+formatScheduleTime(x.arr)+'</button>';
-      if(x.dep&&x.dep!==x.arr)buttons+='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="dep"><small>отпр</small>'+formatScheduleTime(x.dep)+'</button>';
-      if(!buttons&&x.dep)buttons='<button class="schedule-time" data-schedule-index="'+x.index+'" data-kind="dep"><small>проход</small>'+formatScheduleTime(x.dep)+'</button>';
+      if(x.arr)buttons+='<button class="schedule-time" data-schedule-index="'+x.arrIndex+'" data-kind="arr"><small>'+(x.dep&&x.dep!==x.arr?'приб':'проход')+'</small>'+formatScheduleTime(x.arr)+'</button>';
+      if(x.dep&&x.dep!==x.arr)buttons+='<button class="schedule-time" data-schedule-index="'+x.depIndex+'" data-kind="dep"><small>отпр</small>'+formatScheduleTime(x.dep)+'</button>';
+      if(!buttons&&x.dep)buttons='<button class="schedule-time" data-schedule-index="'+x.depIndex+'" data-kind="dep"><small>проход</small>'+formatScheduleTime(x.dep)+'</button>';
       if(next){var fromTime=x.dep||x.arr,toTime=next.arr||next.dep,a=scheduleSeconds(fromTime),b=scheduleSeconds(toTime);if(a!=null&&b!=null){if(b<=a)b+=86400;var sec=b-a;if(x.m!=null&&next.m!=null){var calc=scheduleRequirement(x.m,next.m,sec),req=calc.kmh,note=calc.zones?' · учтено зон: '+calc.zones:'',speedTitle=calc.zones?'средняя по графику вне ограничений ':'средняя по графику ',nonFinite=!isFinite(req),tooFast=!nonFinite&&req>currentBrowserSpeedCeiling(),impossible=nonFinite||tooFast,speedValue=nonFinite?'график недостижим<br><small>ограничения занимают доступное время; следовать с максимально реализуемой скоростью согласно приказам</small>':(tooFast?'график недостижим · требуется '+Math.round(req)+' км/ч<br><small>следовать с максимально реализуемой скоростью согласно приказам</small>':speedTitle+Math.round(req)+' км/ч');run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+fmtM(Math.abs(next.m-x.m))+' · '+(sec/60).toFixed(sec%60?1:0)+' мин'+note+'</span><strong>'+speedValue+'</strong></div>';}else run='<div class="schedule-run"><span>до '+escapeHtml(next.name)+' · '+(sec/60).toFixed(sec%60?1:0)+' мин</span><strong>нет км</strong></div>';}}
       var livePace=(i===live&&next&&next.m!=null)?'<div class="schedule-live-pace" id="scheduleLivePace" data-dir="'+train.direction+'" data-to="'+next.m+'" data-arrival="'+escapeHtml(next.arr||next.dep||'')+'"><div><span>фактическая скорость</span><b data-live-speed>—</b></div><div class="pace-target"><span>ориентир по графику</span><b data-live-target>—</b><small data-live-note>средняя по графику на оставшемся пути</small></div><div><span>до станции</span><b data-live-distance>—</b></div><div><span>времени осталось</span><b data-live-time>—</b></div></div>':'';
       return '<div class="schedule-leg'+(i===live?' live':'')+'" data-schedule-leg="'+i+'"><div class="schedule-stop"><b>'+escapeHtml(x.name)+(x.m!=null?' <small>· '+escapeHtml(x.mark||stationMark(x.displayM))+'</small>':' <small>· км уточняется</small>')+'</b><div class="schedule-times">'+buttons+'</div></div>'+run+livePace+'</div>';
@@ -2762,16 +2771,16 @@ window.addEventListener("unhandledrejection",function(e){
     if(rt.tripConsoleRenderKey===renderKey&&now-(rt.tripConsoleRenderedAt||0)<800)return;
     rt.tripConsoleRenderKey=renderKey;rt.tripConsoleRenderedAt=now;
     var routeId=speedRouteIdForTrip(),order=activeSpeedOrder(routeId,position),nextOrder=nextSpeedOrder(routeId,order),orderCard=$("#tripOrderCard"),trackPick=$("#tripTrackPick");
-    trackPick.style.display=routeId?"block":"none";trackPick.textContent="Путь: "+orderPathLabel();trackPick.classList.toggle("on",orderPathMode()!=="auto");
+    trackPick.style.display=routeId?"block":"none";trackPick.textContent="Путь: "+orderPathLabel(order);trackPick.classList.toggle("on",orderPathMode()!=="auto");
     if(order){
       var orderSpeed=orderSpeedValue(order),nextSpeed=orderSpeedValue(nextOrder),diagnosticKey=[routeId,journeyTowards(),orderPathMode(),order.index,orderSpeed].join("|");
       orderCard.classList.remove("tc-empty");$("#tripOrderSpeed").innerHTML=(orderSpeed!=null?orderSpeed:"—")+'<small>км/ч</small>';
-      $("#tripOrderName").textContent=order.rr.name;$("#tripOrderMark").textContent=(position==null?"":stationMark(position))+(orderPathMode()==="side"?" · боковой путь":" · "+orderPathLabel());
+      $("#tripOrderName").textContent=order.rr.name;$("#tripOrderMark").textContent=(position==null?"":stationMark(position))+(orderPathMode()==="side"?" · боковой путь":" · "+orderPathLabel(order));
       $("#tripOrderNextSpeed").innerHTML=nextOrder?(nextSpeed+'<small>км/ч</small>'):"—";
       $("#tripOrderNextName").textContent=nextOrder?nextOrder.rr.name:"Изменений скорости нет";
       var nextAhead=nextOrder&&nextOrder.entry!=null&&position!=null?Math.max(0,journeyTowards()==="obratno"?position-nextOrder.entry:nextOrder.entry-position):null;
       $("#tripOrderNextMark").textContent=nextOrder?(nextAhead!=null?"через "+fmtM(nextAhead):"Следующая строка приказа"):"До конца выбранного направления";
-      if(rt.lastSpeedOrderDiagnosticKey!==diagnosticKey){rt.lastSpeedOrderDiagnosticKey=diagnosticKey;appDiagnostic("speed_order_changed",{route:state.ctx.peregon,direction:journeyTowards(),train:selectedScheduleTrain(),order_route:routeId,path_mode:orderPathMode(),row_index:order.index,speed_kmh:orderSpeed,next_row_index:nextOrder?nextOrder.index:null,next_speed_kmh:nextSpeed,official_m:position});}
+      if(rt.lastSpeedOrderDiagnosticKey!==diagnosticKey){rt.lastSpeedOrderDiagnosticKey=diagnosticKey;appDiagnostic("speed_order_changed",{route:state.ctx.peregon,direction:journeyTowards(),train:selectedScheduleTrain(),order_route:routeId,path_mode:orderPathMode(),path_label:order.pathLabel||null,row_index:order.index,speed_kmh:orderSpeed,next_row_index:nextOrder?nextOrder.index:null,next_speed_kmh:nextSpeed,official_m:position});}
     }else{
       orderCard.classList.add("tc-empty");$("#tripOrderSpeed").textContent="—";$("#tripOrderName").textContent=position==null?"Позиция не определена":"Для позиции нет строки";$("#tripOrderMark").textContent="Нажми, чтобы открыть приказ";
       $("#tripOrderNextSpeed").textContent="—";$("#tripOrderNextName").textContent="Следующая скорость";$("#tripOrderNextMark").textContent="После определения позиции";
@@ -3237,6 +3246,19 @@ window.addEventListener("unhandledrejection",function(e){
     "last-spbfin-kamenn":"last-kamenn-spbfin","last-kamenn-spbfin":"last-spbfin-kamenn",
     "last-dd-ptz":"last-ptz-dd","last-ptz-dd":"last-dd-ptz"
   };
+  // Карты полётов задают штатный путь, а ОКТ-10/ОКТ-54 — скорость на нём.
+  // Индексы относятся к строкам соответствующей выписки из приказа. В частности,
+  // на обратном Финляндском ходе штатный маршрут кратко проходит по 4 пути перед
+  // возвращением на II главный: для этих строк нужна колонка бокового пути.
+  var STANDARD_ROUTE_PATHS={
+    "sap-spb-msk":[{from:0,to:89,label:"I главный"},{from:90,to:106,label:"III главный"}],
+    "last-spb-msk":[{from:0,to:71,label:"I главный"},{from:72,to:90,label:"III главный"}],
+    "sap-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:118,label:"II главный"}],
+    "last-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:86,label:"II главный"}],
+    "last-spbfin-kamenn":[{from:0,to:31,label:"I главный"},{from:32,to:57,label:"II главный"}],
+    "last-kamenn-spbfin":[{from:0,to:18,label:"I главный"},{from:19,to:41,label:"II главный"},{from:42,to:44,label:"4 путь",speed:"bokp"},{from:45,to:58,label:"II главный"}]
+  };
+  function standardRoutePath(routeId,rowIndex){var sections=STANDARD_ROUTE_PATHS[routeId]||[];return sections.find(function(section){return rowIndex>=section.from&&rowIndex<=section.to;})||null;}
   function wrongMainRouteId(routeId){return routeId==="last-luga"?routeId:(WRONG_MAIN_ROUTE[routeId]||null);}
   function speedRouteIdForTrip(){var routeId=baseSpeedRouteIdForTrip();return orderPathMode()==="wrong"?(wrongMainRouteId(routeId)||routeId):routeId;}
   function orderPathMode(){
@@ -3268,7 +3290,7 @@ window.addEventListener("unhandledrejection",function(e){
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
     ];
   }
-  function orderPathLabel(){var mode=orderPathMode(),item=orderPathOptions().find(function(x){return x.value===mode;});return item?item.label:"Автоматически";}
+  function orderPathLabel(order){var mode=orderPathMode();if(mode==="auto"&&order&&order.pathLabel)return"Авто · "+order.pathLabel;var item=orderPathOptions().find(function(x){return x.value===mode;});return item?item.label:"Автоматически";}
   function orderRowsForSelectedPath(routeId,raw){
     var mode=orderPathMode(),selected=raw;
     if(routeId==="last-luga"){
@@ -3287,13 +3309,24 @@ window.addEventListener("unhandledrejection",function(e){
     if(routeId==="last-msk-spb"){
       selected=mode==="alternate"?[raw[2]].concat(raw.slice(103,115),raw.slice(18,87)).filter(Boolean):raw.slice(0,87);
     }
+    // На сквозном Финляндском маршруте километраж после Выборга начинается заново.
+    // Оставляем только строки текущего физического участка, иначе одинаковые 1–41 км
+    // могли подсветить строку между Петербургом и Выборгом вместо Каменногорского хода.
+    if(routeId==="last-spbfin-kamenn"){
+      if(state.ctx.peregon==="СПбФин - Выборг")selected=selected.filter(function(item){return item.index<=31;});
+      else if(state.ctx.peregon==="Выборг - Каменногорск")selected=selected.filter(function(item){return item.index>=32;});
+    }
+    if(routeId==="last-kamenn-spbfin"){
+      if(state.ctx.peregon==="Выборг - Каменногорск")selected=selected.filter(function(item){return item.index<=18;});
+      else if(state.ctx.peregon==="СПбФин - Выборг")selected=selected.filter(function(item){return item.index>=19;});
+    }
     // Документ встречного пути идёт в противоположной последовательности. Разворачиваем
     // только показ строк: направление поездки и текущий официальный километраж не меняются.
     return mode==="wrong"?selected.slice().reverse():selected;
   }
   function orderSpeedValue(order){
     if(!order||!order.rr)return null;
-    var rr=order.rr,side=orderPathMode()==="side";
+    var rr=order.rr,side=orderPathMode()==="side"||(orderPathMode()==="auto"&&order.standardSpeed==="bokp");
     return side&&rr.bokp!=null?+rr.bokp:(rr.glp!=null?+rr.glp:(rr.bokp!=null&&/перрон|отпр|прием|прибыт/i.test(rr.name||"")?+rr.bokp:null));
   }
   function speedOrderRows(routeId){
@@ -3310,7 +3343,8 @@ window.addEventListener("unhandledrejection",function(e){
       // Some station captions and the following "from km" row overlap by 100–200 m.
       // Preserve the document order instead of jumping back to the station caption.
       if(progress!=null){progress=Math.max(progress,lastProgress+.01);lastProgress=progress;}
-      rows.push({rr:rr,index:item.index,pathIndex:rows.length,positions:positions,stationM:stationM,lo:lo,hi:hi,entry:entry,progress:progress});
+      var standardPath=standardRoutePath(routeId,item.index);
+      rows.push({rr:rr,index:item.index,pathIndex:rows.length,positions:positions,stationM:stationM,lo:lo,hi:hi,entry:entry,progress:progress,pathLabel:standardPath&&standardPath.label,standardSpeed:standardPath&&standardPath.speed});
     });
     rt.speedRowsCacheKey=cacheKey;rt.speedRowsCache=rows;return rows;
   }

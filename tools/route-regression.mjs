@@ -10,6 +10,8 @@ const settingsOrder = ['id="btnSpeedRef"', 'id="leadDn"', 'id="updateSettingsCar
   .map(marker => settingsHtml.indexOf(marker));
 assert.ok(settingsHtml.includes('<span class="ref-kicker">Приказ по скоростям</span>') && !settingsHtml.includes('Путевой норматив'),
   'settings must name the speed reference "Приказ по скоростям"');
+assert.ok(html.includes('@keyframes speedRefAura') && html.includes('@media(prefers-reduced-motion:reduce)') && html.includes('.speed-ref-entry{position:relative'),
+  'speed order entry must keep the restrained animated border and reduced-motion fallback');
 assert.ok(settingsOrder.every((position, index) => position >= 0 && (index === 0 || position > settingsOrder[index - 1])),
   'settings cards must stay ordered: speed order, alerts, updates, diagnostics');
 assert.ok(!settingsHtml.includes('id="btnWipe"') && listHtml.indexOf('id="btnWipe"') > listHtml.indexOf('id="listBox"'),
@@ -134,6 +136,15 @@ assert.ok(html.includes('state.settings.screenMode="auto";delete state.settings.
   'accepting the heat warning must persist Auto dimming in settings');
 
 const schedules=JSON.parse(fs.readFileSync('app/src/main/assets/data/schedules.json','utf8')).trains;
+const scheduleStationKey=value=>{
+  const normalized=String(value||'').toLowerCase().replace(/ё/g,'е').replace(/[–—-]/g,'').replace(/[^a-zа-я0-9]/g,'').replace(/станция|московское|московский/g,'');
+  return ({бологоемоск:'бологоемосковское',чудовомоск:'чудовомосковское'})[normalized]||normalized;
+};
+for (const train of schedules) for (let index=1;index<train.stops.length;index++)
+  assert.notEqual(scheduleStationKey(train.stops[index-1].station),scheduleStationKey(train.stops[index].station),
+    `train ${train.number} must not contain adjacent duplicate station cards`);
+assert.ok(html.includes('function dedupeScheduleStops(mapped)')&&html.includes('mapped=dedupeScheduleStops(mapped)'),
+  'schedule rendering must also suppress future duplicate aliases defensively');
 const vyborgForward=schedules.filter(train=>train.route==='СПбФин - Выборг'&&train.direction==='tuda').map(train=>train.number);
 const vyborgReverse=schedules.filter(train=>train.route==='СПбФин - Выборг'&&train.direction==='obratno').map(train=>train.number);
 assert.deepEqual(vyborgForward,['821','823','825'],'Finland Station forward must keep only odd trains');
