@@ -72,7 +72,11 @@ orderAt=speedLogic('tuda','alternate','last-spb-msk');
 [610500,614600,622300,632600,646000,649500].forEach(orderAt);
 orderAt=speedLogic('tuda','alternate','last-spb-msk');
 check('I путь от Крюково использует отдельные строки приказа до самой Москвы',orderAt(619700).speed===120&&orderAt(631200).speed===120&&orderAt(649500).speed===50);
-check('дублирующий III путь убран, а полный I путь доступен для Ласточки',!html.includes('label:"III путь от Крюково"')&&html.includes('label:"I путь · Крюково → Москва"'));
+orderAt=speedLogic('tuda','alternate','sap-spb-msk');
+const sapsanFirstKriukovo=orderAt(614600),sapsanFirstSkhodnya=orderAt(619700),sapsanFirstKhimki=orderAt(631200),sapsanFirstMoscow=orderAt(649500);
+check(`Сапсан получает полный I путь Крюково — Москва именно из действующего приказа (${sapsanFirstKriukovo.speed}/${sapsanFirstSkhodnya.speed}/${sapsanFirstKhimki.speed}/${sapsanFirstMoscow.speed})`,
+  sapsanFirstKriukovo.speed===140&&sapsanFirstSkhodnya.speed===120&&sapsanFirstKhimki.speed===120&&sapsanFirstMoscow.speed===50&&sapsanFirstKhimki.order.pathLabel==='I главный, Крюково — Москва');
+check('дублирующий III путь убран, а полный I путь доступен для Сапсана и Ласточки',!html.includes('label:"III путь от Крюково"')&&html.includes('baseRouteId==="sap-spb-msk"||baseRouteId==="last-spb-msk"'));
 orderAt=speedLogic('obratno','alternate','last-msk-spb');
 [649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
 check('Ласточка по неправильному II пути после Крюково продолжает штатный II путь',orderAt(560500).speed===160);
@@ -138,5 +142,6 @@ check('основные цифры спидометра имеют заданн�
 check('остальные цифры остаются нейтральными и компактными',html.includes('class="g-labelSecondary"')&&html.includes('.g-labelSecondary{fill:#9EABB6'));
 check('переход из сводки прокручивает к текущему перегону времени хода',html.includes('#scheduleBox .schedule-leg.live')&&html.includes('data-schedule-leg='));
 check('легенда приказа прямо объясняет жёлтые 40 и красные 15/25 км/ч',html.includes('🟡 40 км/ч — обычный боковой путь')&&html.includes('🔴 15/25 км/ч — особо малая скорость'));
-check('карточки Сапсана и Ласточки получили спокойную анимацию с отключением по настройке системы',html.includes('@keyframes routeCardSheen')&&html.includes('@keyframes sapsanBreath')&&html.includes('prefers-reduced-motion:reduce'));
+check('карточки Сапсана и Ласточки получили премиальную разнотонную анимацию с отключением по настройке системы',html.includes('@keyframes routePrism')&&html.includes('radial-gradient(circle at 82% 15%')&&html.includes('prefers-reduced-motion:reduce'));
+check('рабочая сводка уплотнена и сохраняет приказ, время и ограничение в двух колонках',html.includes('grid-template-columns:minmax(0,1fr) minmax(0,1fr)')&&html.includes('@media(max-width:340px)')&&html.includes('@keyframes consoleFlow'));
 console.log(`${passed} speed-order scenarios passed`);

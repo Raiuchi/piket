@@ -516,29 +516,32 @@
   .speed-ref-entry .ref-kicker{color:#F0BAC4;text-shadow:0 0 12px rgba(226,68,81,.26)}.speed-ref-entry .row>div:last-child{color:#F08A96!important}
   @keyframes speedRefAura{to{background-position:0 0,300% 0}}
   @keyframes speedRefShine{0%,56%{transform:translateX(-115%)}78%,100%{transform:translateX(115%)}}
-  @keyframes routeCardSheen{0%,64%{transform:translateX(-125%);opacity:0}72%{opacity:.75}88%,100%{transform:translateX(125%);opacity:0}}
+  @keyframes routeCardSheen{0%,60%{transform:translateX(-135%) rotate(8deg);opacity:0}70%{opacity:.72}88%,100%{transform:translateX(135%) rotate(8deg);opacity:0}}
+  @keyframes routePrism{0%,100%{background-position:0 0,0 50%}50%{background-position:0 0,100% 50%}}
+  @keyframes consoleFlow{0%{transform:translateX(-115%);opacity:0}18%{opacity:.75}54%,100%{transform:translateX(115%);opacity:0}}
   @keyframes sapsanBreath{0%,100%{box-shadow:inset 0 1px rgba(255,255,255,.05),0 8px 20px rgba(0,0,0,.24)}50%{box-shadow:inset 0 1px rgba(255,255,255,.09),0 9px 24px rgba(120,174,220,.12)}}
   @keyframes lastochkaBreath{0%,100%{box-shadow:inset 0 1px rgba(255,255,255,.04),0 8px 20px rgba(0,0,0,.24)}50%{box-shadow:inset 0 1px rgba(255,255,255,.07),0 9px 24px rgba(212,60,76,.12)}}
-  @media(prefers-reduced-motion:reduce){.speed-ref-entry,.speed-ref-entry .row::after,.routeCard,.routeCard::after{animation:none!important}}
-  .routeCard{position:relative;overflow:hidden;background:linear-gradient(145deg,#141518,#08090B);border-color:rgba(255,255,255,.105);box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 20px rgba(0,0,0,.24)}
-  .routeCard::after{content:"";position:absolute;inset:-35% -20%;pointer-events:none;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.07) 50%,transparent 62%);transform:translateX(-125%);animation:routeCardSheen 9.5s ease-in-out infinite}
+  @media(prefers-reduced-motion:reduce){.speed-ref-entry,.speed-ref-entry .row::after,.routeCard,.routeCard::after,.trip-console::before,.srRow.srHit{animation:none!important}}
+  .routeCard{position:relative;overflow:hidden;border:1px solid transparent;background:linear-gradient(145deg,#141518,#08090B) padding-box,linear-gradient(115deg,#343945,#8B4252,#3D7297,#343945) border-box;background-size:100% 100%,260% 100%;box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 10px 24px rgba(0,0,0,.28);animation:routePrism 11s ease-in-out infinite}
+  .routeCard::after{content:"";position:absolute;inset:-45% -25%;pointer-events:none;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.10) 50%,transparent 62%);transform:translateX(-135%) rotate(8deg);animation:routeCardSheen 8.5s ease-in-out infinite}
   .routeCard:nth-child(2n)::after{animation-delay:1.2s}.routeCard:nth-child(3n)::after{animation-delay:2.4s}
   .routeCard .rcName{font-family:var(--display);font-size:13.5px;font-weight:620;letter-spacing:-.01em;color:#E5E7EA}.routeCard .rcTrain{font-family:var(--display);font-size:9px;font-weight:780;letter-spacing:.095em}.routeCard svg{color:#747B84}
-  .srGroup{border-color:rgba(255,255,255,.075);background:linear-gradient(155deg,#111317,#08090B);box-shadow:inset 0 1px rgba(255,255,255,.025)}
+  .srGroup{border-color:rgba(141,168,194,.15);background:radial-gradient(circle at 88% 0,rgba(61,93,126,.13),transparent 38%),linear-gradient(155deg,#111720,#08090D);box-shadow:inset 0 1px rgba(255,255,255,.035),0 10px 24px rgba(0,0,0,.18)}
   .srGroup h3{font-family:var(--display);font-size:11px;font-weight:720;letter-spacing:.10em}
-  .srRow{padding:12px;border-color:rgba(255,255,255,.075);background:#111318;box-shadow:none}
+  .srRow{padding:12px;border-color:rgba(255,255,255,.08);background:linear-gradient(125deg,rgba(25,31,42,.96),rgba(11,13,18,.98));box-shadow:inset 0 1px rgba(255,255,255,.025)}
+  .srRow:nth-child(3n+2){background:linear-gradient(125deg,rgba(32,24,34,.94),rgba(11,12,17,.98))}.srRow:nth-child(3n){background:linear-gradient(125deg,rgba(22,31,36,.94),rgba(10,12,16,.98))}
   .srRow .srName{font-family:var(--display);font-size:13.5px;font-weight:560;line-height:1.42;color:#D8DCE1;letter-spacing:-.008em}.srBadge{font-family:var(--display);font-size:13px;font-weight:760;box-shadow:none}
   /* Приказ скоростей: спокойные служебные цвета без свечения и ярких заливок. */
   .srBadge.glp{border-color:rgba(83,176,121,.26);background:rgba(37,112,68,.20);color:#86CAA2}
   .srBadge.bokp{border-color:rgba(213,170,72,.34);background:rgba(145,99,21,.24);color:#E2BD73}
   .srBadge.bokp.sideForty{border-color:rgba(245,190,58,.52);background:linear-gradient(180deg,rgba(174,119,22,.36),rgba(112,74,15,.28));color:#FFD47A;box-shadow:0 0 11px rgba(235,174,42,.12)}
   .srBadge.speedCritical{border-color:rgba(190,66,76,.43);background:rgba(127,28,39,.28);color:#E8A0A6;box-shadow:none}
-  .srRow.srHit{border-color:rgba(200,77,88,.48);background:linear-gradient(90deg,rgba(108,27,38,.24),#111318 48%);box-shadow:inset 3px 0 #A92B37}
-  .routeCard.train-sapsan{border-color:rgba(186,205,222,.29);background:linear-gradient(145deg,#191C20,#090A0C);animation:sapsanBreath 8.5s ease-in-out infinite}
+  .srRow.srHit{border-color:rgba(255,102,116,.58);background:linear-gradient(100deg,rgba(117,24,43,.38),rgba(24,29,40,.98) 58%,rgba(30,52,66,.92));box-shadow:inset 3px 0 #FF5362,0 0 18px rgba(205,47,67,.12);animation:lastochkaBreath 3.8s ease-in-out infinite}
+  .routeCard.train-sapsan{background:radial-gradient(circle at 82% 15%,rgba(75,139,186,.20),transparent 38%),linear-gradient(145deg,#1B2530,#0C1016 64%,#15141A) padding-box,linear-gradient(110deg,#E8F3FA,#4B8CB8,#796A96,#D7E9F4) border-box;background-size:100% 100%,260% 100%;animation:routePrism 10s ease-in-out infinite,sapsanBreath 8.5s ease-in-out infinite}
   .routeCard.train-sapsan::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#EEF4F8,#8DA8BC,#EEF4F8);opacity:.78}
   .routeCard.train-sapsan .rcTrain{border-color:rgba(224,231,237,.68);background:linear-gradient(180deg,#F4F6F8,#D3D9DE);color:#A51F2D;box-shadow:0 0 12px rgba(194,216,232,.11)}
   .routeCard.train-sapsan .rcName{color:#F1F4F6}.routeCard.train-sapsan svg{color:#BACAD6}
-  .routeCard.train-lastochka{border-color:rgba(190,69,82,.34);background:linear-gradient(145deg,#191315,#09090B);animation:lastochkaBreath 8.5s ease-in-out infinite}
+  .routeCard.train-lastochka{background:radial-gradient(circle at 82% 15%,rgba(204,69,85,.18),transparent 38%),linear-gradient(145deg,#25161B,#0D0B10 64%,#16131B) padding-box,linear-gradient(110deg,#E35A69,#8A314B,#B37646,#773E78) border-box;background-size:100% 100%,260% 100%;animation:routePrism 10s ease-in-out infinite,lastochkaBreath 8.5s ease-in-out infinite}
   .routeCard.train-lastochka::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#E54B5B,#80232E,#E54B5B);opacity:.82}
   .routeCard.train-lastochka .rcTrain{border-color:rgba(207,67,82,.50);background:linear-gradient(180deg,#1B0E11,#0D090A);color:#E0616E;box-shadow:0 0 12px rgba(211,50,67,.10)}
   .routeCard.train-lastochka .rcName{color:#F0E5E7}.routeCard.train-lastochka svg{color:#C8636E}
@@ -548,13 +551,14 @@
   .timing-card{margin:12px 0;padding:16px;border:1px solid #3b2a31;border-radius:18px;background:linear-gradient(145deg,#15191f,#101318)}
   .timing-card h3{margin:0 0 5px;font-size:17px}.timing-card .timing-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.timing-card .full{grid-column:1/-1}.timing-result{margin-top:12px;padding:13px;border-radius:13px;background:#0c1118;border-left:3px solid #d71934}.timing-result strong{font-size:24px}.timing-result.bad{border-color:#ff4058;color:#ff9aa8}
   .schedule-box{margin-top:12px;display:grid;gap:7px}.schedule-leg{padding:11px 12px;border:1px solid #29323d;border-radius:13px;background:#0d1218}.schedule-leg.live{border-color:#d71934;box-shadow:inset 3px 0 #d71934}.schedule-stop{display:flex;align-items:center;justify-content:space-between;gap:10px}.schedule-stop b{font-size:14px}.schedule-times{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.schedule-time{border:1px solid #3a4654;border-radius:9px;background:#171e26;color:#fff;padding:7px 9px;font-weight:800;font-size:12px}.schedule-time small{display:block;color:#93a0af;font-size:8px;text-transform:uppercase}.schedule-run{display:flex;justify-content:space-between;gap:8px;margin-top:7px;color:#90a0b2;font-size:12px}.schedule-run strong{color:#ff4058;font-size:15px}.schedule-live-pace{margin-top:9px;padding:9px 10px;border:1px solid #304151;border-radius:11px;background:linear-gradient(135deg,#111a23,#0d1117);display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}.schedule-live-pace span{color:#8ea0b3;font-size:10px;text-transform:uppercase;letter-spacing:.08em}.schedule-live-pace b{display:block;margin-top:2px;color:#f4f7fb;font-size:14px}.schedule-live-pace .pace-target b{color:#48d7ff}.schedule-live-pace.late .pace-target b{color:#ff4058}.schedule-empty{padding:12px;text-align:center;color:#8c99a8;border:1px dashed #38424d;border-radius:12px}.schedule-reset{margin-top:9px;background:none;border:0;color:#9ba8b6;text-decoration:underline;font-size:12px}
-  .trip-console{margin:13px 0;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border:1px solid rgba(255,255,255,.13);border-radius:19px;background:linear-gradient(150deg,rgba(28,29,35,.98),rgba(7,8,11,.99));box-shadow:inset 0 1px rgba(255,255,255,.07),0 14px 35px rgba(0,0,0,.32)}
-  .tc-title{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:1px 3px 4px}.tc-title>b{font-size:13px;letter-spacing:.08em;text-transform:uppercase}.tc-title>span{color:#788492;font-size:10px}
-  .tc-track{appearance:none;-webkit-appearance:none;max-width:58%;padding:6px 9px;border:1px solid #3a414c;border-radius:999px;background:#14181e;color:#b8c4d1;font:700 9px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-track.on{border-color:rgba(255,75,89,.62);color:#fff;background:rgba(103,20,30,.35)}
-  .tc-card{appearance:none;-webkit-appearance:none;min-width:0;min-height:92px;padding:12px;border:1px solid #30343d;border-radius:15px;background:linear-gradient(145deg,#171a20,#0b0d11);color:#f6f7f9;text-align:left;font:inherit;display:flex;flex-direction:column;justify-content:space-between;gap:7px;box-shadow:inset 0 1px rgba(255,255,255,.05)}
-  .tc-card:active{border-color:#ff5965;background:#211216}.tc-card.wide{grid-column:1/-1;min-height:76px}.tc-kicker{color:#8794a4;font-size:9px;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.tc-main{display:flex;align-items:center;gap:9px;min-width:0}.tc-speed{flex:0 0 auto;color:#7df0ad;font-size:31px;font-weight:900;line-height:1}.tc-speed small{font-size:10px;color:#9aa6b4;margin-left:2px}.tc-copy{min-width:0}.tc-copy b{display:block;font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy span{display:block;margin-top:3px;color:#8995a4;font-size:10px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy .tc-next{color:#d9e2ec}.tc-card.schedule .tc-main>b{color:#fff;font-size:18px}.tc-card.restriction{border-color:rgba(255,190,82,.30);background:linear-gradient(145deg,#1b1710,#0b0d11)}.tc-card.restriction .tc-speed{color:#ffcc68}.tc-card.restriction.danger{border-color:rgba(255,82,96,.55);box-shadow:inset 3px 0 #ff4352}.tc-card.restriction.danger .tc-speed{color:#ff5c68}.tc-arrow{margin-left:auto;color:#ff6671;font-size:20px}.tc-empty .tc-speed{color:#687482}
-  .tc-order-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}.tc-order-cell{min-width:0;padding:10px 11px;border:1px solid #303945;border-radius:13px;background:linear-gradient(145deg,#101820,#090c10)}.tc-order-cell.next{border-color:#49343a;background:linear-gradient(145deg,#1a1216,#0c0b0d)}.tc-order-label{display:block;margin-bottom:6px;color:#7f8d9d;font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}.tc-order-line{display:flex;align-items:baseline;gap:7px}.tc-order-line .tc-speed{font-size:28px}.tc-order-cell.next .tc-speed{color:#ffcc68}.tc-order-name{display:block;margin-top:5px;color:#f4f6f8;font-size:12px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-order-mark{display:block;margin-top:3px;color:#8e9baa;font-size:9px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  @media(max-width:380px){.trip-console{grid-template-columns:1fr}.tc-card,.tc-card.wide,.tc-title{grid-column:1}.tc-card{min-height:78px}}
+  .trip-console{position:relative;overflow:hidden;margin:10px 0 14px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;padding:8px;border:1px solid rgba(135,167,197,.22);border-radius:18px;background:radial-gradient(circle at 12% 0,rgba(49,92,130,.17),transparent 36%),radial-gradient(circle at 88% 100%,rgba(135,31,51,.14),transparent 40%),linear-gradient(150deg,rgba(24,28,36,.99),rgba(7,8,11,.99));box-shadow:inset 0 1px rgba(255,255,255,.07),0 12px 30px rgba(0,0,0,.30)}
+  .trip-console::before{content:"";position:absolute;z-index:0;left:0;right:0;top:0;height:1px;background:linear-gradient(90deg,transparent,#6CC6FF,#FF5362,transparent);transform:translateX(-115%);animation:consoleFlow 6.5s ease-in-out infinite}.trip-console>*{position:relative;z-index:1}
+  .tc-title{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:7px;padding:0 2px 2px}.tc-title>b{font-size:11px;letter-spacing:.11em;text-transform:uppercase}.tc-title>span{color:#788492;font-size:9px}
+  .tc-track{appearance:none;-webkit-appearance:none;max-width:62%;padding:5px 8px;border:1px solid #3a4654;border-radius:999px;background:linear-gradient(135deg,#17202A,#101319);color:#C4D4E3;font:700 8.5px var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-track.on{border-color:rgba(255,75,89,.62);color:#fff;background:rgba(103,20,30,.35)}
+  .tc-card{appearance:none;-webkit-appearance:none;min-width:0;min-height:70px;padding:9px;border:1px solid #303945;border-radius:13px;background:linear-gradient(145deg,#171D26,#0A0D12);color:#f6f7f9;text-align:left;font:inherit;display:flex;flex-direction:column;justify-content:space-between;gap:5px;box-shadow:inset 0 1px rgba(255,255,255,.045)}
+  .tc-card:active{border-color:#ff5965;background:#211216}.tc-card.wide{grid-column:1/-1;min-height:64px}.tc-kicker{color:#8C9BAA;font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.tc-main{display:flex;align-items:center;gap:7px;min-width:0}.tc-speed{flex:0 0 auto;color:#7df0ad;font-size:25px;font-weight:900;line-height:1}.tc-speed small{font-size:8px;color:#9aa6b4;margin-left:1px}.tc-copy{min-width:0}.tc-copy b{display:block;font-size:11px;line-height:1.22;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy span{display:block;margin-top:2px;color:#8995a4;font-size:8.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tc-copy .tc-next{color:#d9e2ec}.tc-card.schedule{border-color:rgba(112,126,202,.28);background:linear-gradient(145deg,#17192A,#0B0D13)}.tc-card.schedule .tc-main>b{color:#fff;font-size:15px}.tc-card.restriction{border-color:rgba(255,190,82,.30);background:linear-gradient(145deg,#211A10,#0B0D11)}.tc-card.restriction .tc-speed{color:#ffcc68}.tc-card.restriction.danger{border-color:rgba(255,82,96,.55);box-shadow:inset 3px 0 #ff4352}.tc-card.restriction.danger .tc-speed{color:#ff5c68}.tc-arrow{margin-left:auto;color:#ff6671;font-size:17px}.tc-empty .tc-speed{color:#687482}
+  .tc-order-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}.tc-order-cell{min-width:0;padding:8px 9px;border:1px solid #314052;border-radius:11px;background:linear-gradient(145deg,#11202C,#090C11)}.tc-order-cell.next{border-color:#553A3D;background:linear-gradient(145deg,#21151B,#0C0B0F)}.tc-order-label{display:block;margin-bottom:4px;color:#8494A5;font-size:7.5px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}.tc-order-line{display:flex;align-items:baseline;gap:5px}.tc-order-line .tc-speed{font-size:24px}.tc-order-cell.next .tc-speed{color:#ffcc68}.tc-order-name{display:-webkit-box;margin-top:4px;color:#f4f6f8;font-size:10.5px;font-weight:800;line-height:1.18;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.tc-order-mark{display:block;margin-top:2px;color:#8e9baa;font-size:8px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media(max-width:340px){.trip-console{grid-template-columns:1fr}.tc-card,.tc-card.wide,.tc-title{grid-column:1}.tc-card{min-height:68px}}
   .premium-field{width:100%;min-height:50px;padding:10px 13px;border:1px solid #3a424d;border-radius:13px;background:linear-gradient(145deg,#1a2028,#0d1117);color:#f5f5f7;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font:inherit}.premium-field .pf-copy{min-width:0}.premium-field small{display:block;color:#ff7b84;font-size:9px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:3px}.premium-field b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.premium-field .pf-arrow{color:#ff5965;font-size:18px}.premium-field:active{border-color:#ff5965;background:#23151a}
   .premium-picker{position:fixed;inset:0;z-index:500;display:none;align-items:flex-end;justify-content:center}.premium-picker.on{display:flex}.pp-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.78)}.pp-card{position:relative;width:min(100%,560px);max-height:86vh;padding:10px 16px calc(14px + env(safe-area-inset-bottom));border:1px solid rgba(255,91,102,.30);border-radius:24px 24px 0 0;background:linear-gradient(165deg,#202027,#09090b 70%);box-shadow:0 -18px 60px rgba(0,0,0,.75);overflow:hidden}.pp-grab{width:46px;height:4px;border-radius:4px;background:#55555e;margin:0 auto 15px}.pp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.pp-head h3{margin:0;font-size:20px}.pp-close{width:38px;height:38px;border-radius:12px;border:1px solid #3a3a42;background:#16161a;color:#ddd;font-size:22px}.pp-body{max-height:62vh;overflow:auto;padding:2px}.pp-list{display:grid;gap:8px}.pp-option{width:100%;min-height:54px;padding:11px 14px;border:1px solid #30323a;border-radius:14px;background:#111218;color:#f2f2f4;text-align:left;font:inherit;display:flex;justify-content:space-between;align-items:center;gap:10px}.pp-option.on{border-color:#ff5360;background:linear-gradient(135deg,#55111a,#191218);box-shadow:inset 3px 0 #ff3848}.pp-option small{color:#a4abba}.pp-option.on small{color:#ff9ba2}.pp-dials{display:grid;grid-template-columns:1fr 28px 1fr;align-items:center;gap:8px;padding:8px 0 16px}.pp-col{text-align:center;border:1px solid #353741;border-radius:18px;background:#101116;padding:10px}.pp-col button{width:100%;height:42px;border:0;border-radius:11px;background:#24262e;color:#ff7780;font-size:24px}.pp-value{font-size:48px;font-weight:800;line-height:1.2;padding:12px 0}.pp-sep{font-size:42px;text-align:center}.pp-date{grid-template-columns:1fr 1fr 1.25fr}.pp-date .pp-value{font-size:30px}.pp-actions{display:flex;gap:10px;margin-top:13px}.pp-actions button{flex:1}.date-pair{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .pp-col[data-dial]{touch-action:none;cursor:ns-resize;user-select:none;-webkit-user-select:none;transition:border-color .16s,box-shadow .16s}
@@ -3257,7 +3261,7 @@ window.addEventListener("unhandledrejection",function(e){
   // на обратном Финляндском ходе штатный маршрут кратко проходит по 4 пути перед
   // возвращением на II главный: для этих строк нужна колонка бокового пути.
   var STANDARD_ROUTE_PATHS={
-    "sap-spb-msk":[{from:0,to:89,label:"I главный"},{from:90,to:106,label:"III главный"}],
+    "sap-spb-msk":[{from:0,to:89,label:"I главный"},{from:90,to:106,label:"III главный"},{from:107,to:111,label:"I главный, Крюково"},{from:1000,to:1015,label:"I главный, Крюково — Москва"}],
     "last-spb-msk":[{from:0,to:71,label:"I главный"},{from:72,to:90,label:"III главный"}],
     "sap-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:118,label:"II главный"}],
     "last-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:86,label:"II главный"}],
@@ -3287,6 +3291,27 @@ window.addEventListener("unhandledrejection",function(e){
       {from:72,to:73,label:"альтернативный путь",skip:true},{from:74,to:74,label:"III главный, Волховстрой-2",at:0}
     ]
   };
+  // Отдельная колонка I пути Крюково — Москва из действующего приказа ОКТ-10/ОКТ-54.
+  // Карта полётов определяет только выбор этого пути; все числовые скорости ниже
+  // переписаны из сапсановской выписки приказа от 29.06.2026.
+  var SAPSAN_FIRST_PATH_MOSCOW_ROWS=[
+    {index:1000,rr:{name:"Крюково – Сходня I гл.п. (с 614 км 6 пк)",glp:140}},
+    {index:1001,rr:{name:"Сходня, по 618 км 7 пк",glp:140,bokp:40}},
+    {index:1002,rr:{name:"— 618 км 8 пк – 620 км 6 пк",glp:120}},
+    {index:1003,rr:{name:"— съезды 14/16, 30/28, 20/22, 33/31, 13/15",bokp:25}},
+    {index:1004,rr:{name:"Сходня – Москва-тов. I гл.п., с 622 км 3 пк",glp:120}},
+    {index:1005,rr:{name:"Химки",glp:120,bokp:40}},
+    {index:1006,rr:{name:"— съезды 28/30 с 2 на 4 гл. и 32/34 с 4 гл. на 3 гл.",bokp:25}},
+    {index:1007,rr:{name:"Ховрино (съезд 40/42 с 2 на 1 п/о путь – 25 км/ч)",glp:120,bokp:40}},
+    {index:1008,rr:{name:"— 642 км 8 пк – 643 км 5 пк",glp:60}},
+    {index:1009,rr:{name:"Москва-тов.",glp:120}},
+    {index:1010,rr:{name:"— съезды 17/19, 46/48, 58/60, 40/38, 28/26, 36/34",bokp:25}},
+    {index:1011,rr:{name:"Москва-тов. – Москва-пасс. I гл.п., с 645 км 9 пк",glp:100}},
+    {index:1012,rr:{name:"Москва-пасс. VII путь (648 км 7 пк, съезд 93/94 – 40 км/ч)",glp:90}},
+    {index:1013,rr:{name:"— 648 км 10 пк – 649 км 4 пк",glp:60}},
+    {index:1014,rr:{name:"— 649 км 5 пк – 650 км 2 пк (от маршр. «7НМВ» до стр.19)",glp:50}},
+    {index:1015,rr:{name:"Далее на все перронные пути",bokp:25}}
+  ].map(function(item){item.groupTitle="I путь · Крюково — Москва";return item;});
   function standardRoutePath(routeId,rowIndex,groupTitle){
     var sections=STANDARD_ROUTE_PATHS[routeId]||[],matches=sections.filter(function(section){
       var peregons=section.peregon==null?null:(Array.isArray(section.peregon)?section.peregon:[section.peregon]);
@@ -3320,7 +3345,7 @@ window.addEventListener("unhandledrejection",function(e){
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
     ]:[
       {value:"auto",label:"Авто · I → III",meta:"из Петербурга I, после Крюково III"},
-      ...(baseRouteId==="last-spb-msk"?[{value:"alternate",label:"I путь · Крюково → Москва",meta:"скорости по I пути от Крюково до Москвы"}]:[]),
+      ...((baseRouteId==="sap-spb-msk"||baseRouteId==="last-spb-msk")?[{value:"alternate",label:"I путь · Крюково → Москва",meta:"скорости из приказа по I пути до Москвы"}]:[]),
       {value:"wrong",label:"Неправильный главный",meta:"главный путь направления Москва → Санкт-Петербург"},
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
     ];
@@ -3333,7 +3358,7 @@ window.addEventListener("unhandledrejection",function(e){
       selected=raw.filter(function(item){return (item.groupTitle||"")===wanted;});
     }
     if(routeId==="sap-spb-msk"){
-      selected=mode==="alternate"?raw.slice(0,90).concat(raw.slice(107,112),raw.slice(93,107)):raw.slice(0,107);
+      selected=mode==="alternate"?raw.slice(0,90).concat(raw.slice(107,112),SAPSAN_FIRST_PATH_MOSCOW_ROWS):raw.slice(0,107);
     }
     if(routeId==="sap-msk-spb"){
       selected=mode==="alternate"?[raw[1]].concat(raw.slice(139,151),raw.slice(18,119)).filter(Boolean):raw.slice(0,119);
@@ -3456,13 +3481,14 @@ window.addEventListener("unhandledrejection",function(e){
       var anchors=withKm.filter(function(item){return item.positions.length;}).map(function(item){return item.positions[0];});
       var flow=anchors.length>1&&anchors[anchors.length-1]<anchors[0]?"down":"up";
       var h='<div class="srGroup">'+(title?('<h3>'+escapeHtml(title)+'</h3>'):'')+
-      withKm.map(function(item){ var rr=item.rr, positions=item.positions, seq=rowSeq++,lo=positions.length?Math.min.apply(null,positions):null,hi=positions.length?Math.max.apply(null,positions):null;
+      withKm.map(function(item){ var rr=item.rr, positions=item.positions, seq=rr._seq==null?rowSeq++:rr._seq,lo=positions.length?Math.min.apply(null,positions):null,hi=positions.length?Math.max.apply(null,positions):null;
         var coord=item.stationM!=null?('<div class="srCoord">Станция · '+stationMark(item.stationM)+'</div>'):'';
         return '<div class="srRow" data-seq="'+seq+'" data-flow="'+flow+'" data-min-m="'+(lo==null?'':lo)+'" data-max-m="'+(hi==null?'':hi)+'"><div class="srName">'+escapeHtml(rr.name)+coord+'</div><div class="srSpd">'+
         (rr.glp!=null?'<span class="srBadge glp'+((+rr.glp===15||+rr.glp===25)?' speedCritical':'')+'">'+rr.glp+'</span>':'')+
         (rr.bokp!=null?'<span class="srBadge bokp'+(+rr.bokp===40?' sideForty':'')+((+rr.bokp===15||+rr.bokp===25)?' speedCritical':'')+'">'+rr.bokp+'</span>':'')+'</div></div>'; }).join("")+
       '</div>'; return h; }
-    box.innerHTML=grp(r.groups[0].title,r.groups[0].rows)+(r.groups[1]?grp(r.groups[1].title,r.groups[1].rows):"")+
+    var sapFirstPath=r.id==="sap-spb-msk"?grp("I путь · Крюково — Москва",SAPSAN_FIRST_PATH_MOSCOW_ROWS.map(function(item){return Object.assign({_seq:item.index},item.rr);})):"";
+    box.innerHTML=grp(r.groups[0].title,r.groups[0].rows)+(r.groups[1]?grp(r.groups[1].title,r.groups[1].rows):"")+sapFirstPath+
       '<div class="srNote">🟢 Гл.п — главный путь · 🟡 40 км/ч — обычный боковой путь · 🔴 15/25 км/ч — особо малая скорость'+(r.note?('<br><br>'+escapeHtml(r.note)):'')+'</div>';
     updateSpeedPositionLabel(jumpM);
     if(jumpM!=null) highlightSpeedRefRow(jumpM,true); }
