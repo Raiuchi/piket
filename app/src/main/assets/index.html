@@ -511,13 +511,18 @@
   .speed-ref-entry{border-color:rgba(255,255,255,.12)!important;background:linear-gradient(145deg,#151518,#09090B)!important}
   .speed-ref-entry .row{background:linear-gradient(120deg,rgba(255,255,255,.025),transparent 48%)}.speed-ref-entry .ref-kicker{color:#AEB5BE}.srGroup h3{color:#B9C0C8}
   /* Спокойная «живая» обводка выделяет служебный приказ, не превращая карточку в баннер. */
-  .speed-ref-entry{position:relative;border:1px solid transparent!important;background:linear-gradient(145deg,#151518,#09090B) padding-box,linear-gradient(110deg,#B62839,#D88647,#7C68D8,#3B9AC7,#B62839) border-box!important;background-size:100% 100%,300% 100%!important;box-shadow:0 12px 28px rgba(0,0,0,.30),0 0 18px rgba(105,95,195,.10);animation:speedRefAura 9s linear infinite}
-  .speed-ref-entry .row{position:relative;z-index:1}.speed-ref-entry .row::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 18%,rgba(255,255,255,.055) 46%,transparent 66%);transform:translateX(-110%);animation:speedRefShine 7s ease-in-out infinite}
-  .speed-ref-entry .ref-kicker{color:#D6B6C0}.speed-ref-entry .row>div:last-child{color:#D9818B!important}
+  .speed-ref-entry{position:relative;border:1px solid transparent!important;background:linear-gradient(145deg,#171519,#09090B) padding-box,linear-gradient(110deg,#E24451,#E5A04E,#8C73E8,#4AB9E8,#E24451) border-box!important;background-size:100% 100%,300% 100%!important;box-shadow:0 12px 28px rgba(0,0,0,.30),0 0 22px rgba(121,92,214,.16);animation:speedRefAura 8s linear infinite}
+  .speed-ref-entry .row{position:relative;z-index:1;overflow:hidden}.speed-ref-entry .row::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 15%,rgba(255,255,255,.085) 46%,transparent 70%);transform:translateX(-115%);animation:speedRefShine 6.5s ease-in-out infinite}
+  .speed-ref-entry .ref-kicker{color:#F0BAC4;text-shadow:0 0 12px rgba(226,68,81,.26)}.speed-ref-entry .row>div:last-child{color:#F08A96!important}
   @keyframes speedRefAura{to{background-position:0 0,300% 0}}
-  @keyframes speedRefShine{0%,58%{transform:translateX(-110%)}78%,100%{transform:translateX(110%)}}
-  @media(prefers-reduced-motion:reduce){.speed-ref-entry,.speed-ref-entry .row::after{animation:none!important}}
+  @keyframes speedRefShine{0%,56%{transform:translateX(-115%)}78%,100%{transform:translateX(115%)}}
+  @keyframes routeCardSheen{0%,64%{transform:translateX(-125%);opacity:0}72%{opacity:.75}88%,100%{transform:translateX(125%);opacity:0}}
+  @keyframes sapsanBreath{0%,100%{box-shadow:inset 0 1px rgba(255,255,255,.05),0 8px 20px rgba(0,0,0,.24)}50%{box-shadow:inset 0 1px rgba(255,255,255,.09),0 9px 24px rgba(120,174,220,.12)}}
+  @keyframes lastochkaBreath{0%,100%{box-shadow:inset 0 1px rgba(255,255,255,.04),0 8px 20px rgba(0,0,0,.24)}50%{box-shadow:inset 0 1px rgba(255,255,255,.07),0 9px 24px rgba(212,60,76,.12)}}
+  @media(prefers-reduced-motion:reduce){.speed-ref-entry,.speed-ref-entry .row::after,.routeCard,.routeCard::after{animation:none!important}}
   .routeCard{position:relative;overflow:hidden;background:linear-gradient(145deg,#141518,#08090B);border-color:rgba(255,255,255,.105);box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 8px 20px rgba(0,0,0,.24)}
+  .routeCard::after{content:"";position:absolute;inset:-35% -20%;pointer-events:none;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.07) 50%,transparent 62%);transform:translateX(-125%);animation:routeCardSheen 9.5s ease-in-out infinite}
+  .routeCard:nth-child(2n)::after{animation-delay:1.2s}.routeCard:nth-child(3n)::after{animation-delay:2.4s}
   .routeCard .rcName{font-family:var(--display);font-size:13.5px;font-weight:620;letter-spacing:-.01em;color:#E5E7EA}.routeCard .rcTrain{font-family:var(--display);font-size:9px;font-weight:780;letter-spacing:.095em}.routeCard svg{color:#747B84}
   .srGroup{border-color:rgba(255,255,255,.075);background:linear-gradient(155deg,#111317,#08090B);box-shadow:inset 0 1px rgba(255,255,255,.025)}
   .srGroup h3{font-family:var(--display);font-size:11px;font-weight:720;letter-spacing:.10em}
@@ -525,18 +530,19 @@
   .srRow .srName{font-family:var(--display);font-size:13.5px;font-weight:560;line-height:1.42;color:#D8DCE1;letter-spacing:-.008em}.srBadge{font-family:var(--display);font-size:13px;font-weight:760;box-shadow:none}
   /* Приказ скоростей: спокойные служебные цвета без свечения и ярких заливок. */
   .srBadge.glp{border-color:rgba(83,176,121,.26);background:rgba(37,112,68,.20);color:#86CAA2}
-  .srBadge.bokp{border-color:rgba(190,150,74,.27);background:rgba(127,89,25,.20);color:#D1AE6B}
+  .srBadge.bokp{border-color:rgba(213,170,72,.34);background:rgba(145,99,21,.24);color:#E2BD73}
+  .srBadge.bokp.sideForty{border-color:rgba(245,190,58,.52);background:linear-gradient(180deg,rgba(174,119,22,.36),rgba(112,74,15,.28));color:#FFD47A;box-shadow:0 0 11px rgba(235,174,42,.12)}
   .srBadge.speedCritical{border-color:rgba(190,66,76,.43);background:rgba(127,28,39,.28);color:#E8A0A6;box-shadow:none}
   .srRow.srHit{border-color:rgba(200,77,88,.48);background:linear-gradient(90deg,rgba(108,27,38,.24),#111318 48%);box-shadow:inset 3px 0 #A92B37}
-  .routeCard.train-sapsan{border-color:rgba(163,176,190,.18);background:linear-gradient(145deg,#15171A,#08090B)}
-  .routeCard.train-sapsan::before{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:#A8B1BB;opacity:.62}
-  .routeCard.train-sapsan .rcTrain{border-color:rgba(194,201,208,.50);background:#D9DDE1;color:#9C2430}
-  .routeCard.train-sapsan .rcName{color:#E7EAED}.routeCard.train-sapsan svg{color:#9DA6AF}
-  .routeCard.train-lastochka{border-color:rgba(145,61,70,.23);background:linear-gradient(145deg,#151214,#08090B)}
-  .routeCard.train-lastochka::before{content:"";position:absolute;inset:0 auto 0 0;width:2px;background:#852631;opacity:.72}
-  .routeCard.train-lastochka .rcTrain{border-color:rgba(150,55,66,.34);background:#120B0D;color:#B9505B}
-  .routeCard.train-lastochka .rcName{color:#E2DDDF}.routeCard.train-lastochka svg{color:#8D4B53}
-  #v-speedref.train-sapsan #srTitle{color:#D9DDE1}#v-speedref.train-lastochka #srTitle{color:#C47A82}
+  .routeCard.train-sapsan{border-color:rgba(186,205,222,.29);background:linear-gradient(145deg,#191C20,#090A0C);animation:sapsanBreath 8.5s ease-in-out infinite}
+  .routeCard.train-sapsan::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#EEF4F8,#8DA8BC,#EEF4F8);opacity:.78}
+  .routeCard.train-sapsan .rcTrain{border-color:rgba(224,231,237,.68);background:linear-gradient(180deg,#F4F6F8,#D3D9DE);color:#A51F2D;box-shadow:0 0 12px rgba(194,216,232,.11)}
+  .routeCard.train-sapsan .rcName{color:#F1F4F6}.routeCard.train-sapsan svg{color:#BACAD6}
+  .routeCard.train-lastochka{border-color:rgba(190,69,82,.34);background:linear-gradient(145deg,#191315,#09090B);animation:lastochkaBreath 8.5s ease-in-out infinite}
+  .routeCard.train-lastochka::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#E54B5B,#80232E,#E54B5B);opacity:.82}
+  .routeCard.train-lastochka .rcTrain{border-color:rgba(207,67,82,.50);background:linear-gradient(180deg,#1B0E11,#0D090A);color:#E0616E;box-shadow:0 0 12px rgba(211,50,67,.10)}
+  .routeCard.train-lastochka .rcName{color:#F0E5E7}.routeCard.train-lastochka svg{color:#C8636E}
+  #v-speedref.train-sapsan #srTitle{color:#E8EEF2;text-shadow:0 0 16px rgba(172,205,229,.13)}#v-speedref.train-lastochka #srTitle{color:#DF8D96;text-shadow:0 0 16px rgba(214,64,80,.13)}
   .sheet{background:linear-gradient(180deg,#19191E,#09090B);border-color:rgba(255,255,255,.16)}
   .sheet:not(.on){visibility:hidden!important;box-shadow:none!important}
   .timing-card{margin:12px 0;padding:16px;border:1px solid #3b2a31;border-radius:18px;background:linear-gradient(145deg,#15191f,#101318)}
@@ -3255,10 +3261,39 @@ window.addEventListener("unhandledrejection",function(e){
     "last-spb-msk":[{from:0,to:71,label:"I главный"},{from:72,to:90,label:"III главный"}],
     "sap-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:118,label:"II главный"}],
     "last-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:86,label:"II главный"}],
-    "last-spbfin-kamenn":[{from:0,to:31,label:"I главный"},{from:32,to:57,label:"II главный"}],
-    "last-kamenn-spbfin":[{from:0,to:18,label:"I главный"},{from:19,to:41,label:"II главный"},{from:42,to:44,label:"4 путь",speed:"bokp"},{from:45,to:58,label:"II главный"}]
+    "last-spbfin-kamenn":[{from:0,to:30,label:"I главный"},{from:31,to:31,label:"стрелочная улица Выборга",speed:"bokp"},{from:32,to:57,label:"II главный"}],
+    "last-kamenn-spbfin":[{from:0,to:18,label:"I главный"},{from:19,to:41,label:"II главный"},{from:42,to:44,label:"4 путь",speed:"bokp"},{from:45,to:58,label:"II главный"}],
+    "last-luga":[
+      {from:0,to:1,label:"перронный путь СПб-Балтийского",speed:"bokp",group:"Путь I"},{from:2,to:36,label:"I главный",group:"Путь I"},{from:37,to:39,label:"IIс → IП, Луга",speed:"bokp",group:"Путь I"},
+      {from:41,to:42,label:"IП → IIс → I, Луга",speed:"bokp",group:"Путь II"},{from:43,to:83,label:"II главный",group:"Путь II"}
+    ],
+    "last-dd-ptz":[
+      {from:0,to:17,label:"II главный"},{from:18,to:18,label:"IV главный, Горы",at:42800},{from:19,to:31,label:"II главный"},
+      {from:32,to:32,label:"3 путь, Волховстрой-2",speed:"bokp",at:124400},{from:33,to:70,label:"II главный"},
+      {from:71,to:72,label:"I главный, Свирь"},{from:73,to:73,label:"съезд I → II"},{from:74,to:109,label:"II главный"},
+      {from:110,to:110,label:"11 приёмо-отправочный, Петрозаводск",speed:"bokp",at:402400}
+    ],
+    "last-ptz-dd":[
+      {from:0,to:0,label:"11 приёмо-отправочный, Петрозаводск",speed:"bokp",at:402400},{from:1,to:40,label:"I главный"},
+      {from:41,to:41,label:"II путь Свири",skip:true},{from:42,to:74,label:"I главный"},{from:75,to:75,label:"3 путь, Волховстрой-2",speed:"bokp",at:124400},
+      {from:76,to:76,label:"I мостовой путь"},{from:77,to:77,label:"II мостовой путь",skip:true},{from:78,to:89,label:"I главный"},
+      {from:90,to:90,label:"III главный, Горы",at:42800},{from:91,to:105,label:"I главный"}
+    ],
+    "last-vnov-volh2":[
+      {from:0,to:30,label:"Великий Новгород → Чудово"},{from:31,to:32,label:"парковые пути Чудово",skip:true},
+      {from:33,to:34,label:"III/IV главный, Чудово"},{from:35,to:62,label:"I главный"},
+      {from:63,to:63,label:"5 путь, Пороги",speed:"bokp",at:7000},{from:64,to:65,label:"I главный"},
+      {from:66,to:70,label:"альтернативный путь",skip:true},{from:71,to:71,label:"III путь, Новооктябрьский парк",at:2000},
+      {from:72,to:73,label:"альтернативный путь",skip:true},{from:74,to:74,label:"III главный, Волховстрой-2",at:0}
+    ]
   };
-  function standardRoutePath(routeId,rowIndex){var sections=STANDARD_ROUTE_PATHS[routeId]||[];return sections.find(function(section){return rowIndex>=section.from&&rowIndex<=section.to;})||null;}
+  function standardRoutePath(routeId,rowIndex,groupTitle){
+    var sections=STANDARD_ROUTE_PATHS[routeId]||[],matches=sections.filter(function(section){
+      var peregons=section.peregon==null?null:(Array.isArray(section.peregon)?section.peregon:[section.peregon]);
+      return rowIndex>=section.from&&rowIndex<=section.to&&(!section.group||section.group===groupTitle)&&(!section.towards||section.towards===journeyTowards())&&(!peregons||peregons.indexOf(state.ctx.peregon)>=0);
+    });
+    return matches.length?matches[matches.length-1]:null;
+  }
   function wrongMainRouteId(routeId){return routeId==="last-luga"?routeId:(WRONG_MAIN_ROUTE[routeId]||null);}
   function speedRouteIdForTrip(){var routeId=baseSpeedRouteIdForTrip();return orderPathMode()==="wrong"?(wrongMainRouteId(routeId)||routeId):routeId;}
   function orderPathMode(){
@@ -3294,8 +3329,8 @@ window.addEventListener("unhandledrejection",function(e){
   function orderRowsForSelectedPath(routeId,raw){
     var mode=orderPathMode(),selected=raw;
     if(routeId==="last-luga"){
-      var normalSecond=journeyTowards()==="obratno",wanted=mode==="wrong"?(normalSecond?/Путь I/i:/Путь II/i):(normalSecond?/Путь II/i:/Путь I/i);
-      selected=raw.filter(function(item){return wanted.test(item.groupTitle||"");});
+      var normalSecond=journeyTowards()==="obratno",wanted=mode==="wrong"?(normalSecond?"Путь I":"Путь II"):(normalSecond?"Путь II":"Путь I");
+      selected=raw.filter(function(item){return (item.groupTitle||"")===wanted;});
     }
     if(routeId==="sap-spb-msk"){
       selected=mode==="alternate"?raw.slice(0,90).concat(raw.slice(107,112),raw.slice(93,107)):raw.slice(0,107);
@@ -3320,9 +3355,38 @@ window.addEventListener("unhandledrejection",function(e){
       if(state.ctx.peregon==="Выборг - Каменногорск")selected=selected.filter(function(item){return item.index<=18;});
       else if(state.ctx.peregon==="СПбФин - Выборг")selected=selected.filter(function(item){return item.index>=19;});
     }
+    // В выписке Дача Долгорукова — Петрозаводск три физических участка лежат
+    // в одном списке. Не даём одинаковым километрам соседней оси перехватить строку.
+    if(routeId==="last-dd-ptz"){
+      if(state.ctx.peregon==="Д. Долг - Павлово")selected=selected.filter(function(item){return item.index<=16;});
+      else if(state.ctx.peregon==="Павлово - Горы II путь")selected=selected.filter(function(item){return item.index>=14&&item.index<=18;});
+      else if(state.ctx.peregon==="Горы - Петрозаводск")selected=selected.filter(function(item){return item.index>=17;});
+    }
+    if(routeId==="last-ptz-dd"){
+      if(state.ctx.peregon==="Горы - Петрозаводск")selected=selected.filter(function(item){return item.index<=90;});
+      else if(state.ctx.peregon==="Горы - Павлово I путь")selected=selected.filter(function(item){return item.index>=90&&item.index<=94;});
+      else if(state.ctx.peregon==="Д. Долг - Павлово")selected=selected.filter(function(item){return item.index>=91;});
+    }
+    // Карта Чудово — Волхов содержит обе независимые километровые оси.
+    if(routeId==="last-vnov-volh2"){
+      if(state.ctx.peregon==="Чудово - Новгород")selected=selected.filter(function(item){return item.index<=32;});
+      else if(state.ctx.peregon==="Волховстрой - Чудово")selected=selected.filter(function(item){return item.index>=33;});
+    }
     // Документ встречного пути идёт в противоположной последовательности. Разворачиваем
     // только показ строк: направление поездки и текущий официальный километраж не меняются.
-    return mode==="wrong"?selected.slice().reverse():selected;
+    var reverseRows=mode==="wrong";
+    // Общая карта Новгород — Чудово — Волхов записана в сторону убывания километров.
+    // На обратном рейсе физическое направление растёт, хотя общий переключатель рейса
+    // остаётся «Обратно», поэтому здесь ориентируемся именно на текущий перегон.
+    if(routeId==="last-vnov-volh2"&&!speedTravelReverse())reverseRows=!reverseRows;
+    return reverseRows?selected.slice().reverse():selected;
+  }
+  function speedTravelReverse(){return state.ctx&&state.ctx.towards==="obratno";}
+  function speedPositionsForContext(routeId,item,positions){
+    if(routeId!=="last-vnov-volh2")return positions;
+    if(state.ctx.peregon==="Чудово - Новгород"&&item.index<=8)return positions.map(function(value){return value-101200;});
+    if(state.ctx.peregon==="Волховстрой - Чудово"&&item.index>=33)return positions.map(function(value){return value-1200;});
+    return positions;
   }
   function orderSpeedValue(order){
     if(!order||!order.rr)return null;
@@ -3332,25 +3396,27 @@ window.addEventListener("unhandledrejection",function(e){
   function speedOrderRows(routeId){
     var cacheKey=routeId+"|"+state.ctx.peregon+"|"+journeyTowards()+"|"+orderPathMode();
     if(rt.speedRowsCacheKey===cacheKey&&rt.speedRowsCache)return rt.speedRowsCache;
-    var route=SPEEDROUTES.find(function(x){return x.id===routeId;}),rows=[],seq=0,reverse=journeyTowards()==="obratno",lastProgress=-Infinity;
+    var route=SPEEDROUTES.find(function(x){return x.id===routeId;}),rows=[],seq=0,reverse=speedTravelReverse(),lastProgress=-Infinity;
     if(!route)return rows;
     var raw=[];route.groups.forEach(function(group){group.rows.forEach(function(rr){raw.push({rr:rr,index:seq++,groupTitle:group.title||""});});});
-    orderRowsForSelectedPath(routeId,raw).forEach(function(item){var rr=item.rr;
-      var positions=speedPositionsFromName(rr.name),stationM=positions.length?null:stationPositionForSpeedRow(routeId,rr.name);
+    orderRowsForSelectedPath(routeId,raw).forEach(function(item){var rr=item.rr,standardPath=standardRoutePath(routeId,item.index,item.groupTitle);
+      if(standardPath&&standardPath.skip)return;
+      var positions=standardPath&&standardPath.at!=null?[+standardPath.at,+standardPath.at]:speedPositionsForContext(routeId,item,speedPositionsFromName(rr.name)),stationM=positions.length?null:stationPositionForSpeedRow(routeId,rr.name);
       if(!positions.length&&stationM!=null)positions=[stationM];
       var lo=positions.length?Math.min.apply(null,positions):null,hi=positions.length?Math.max.apply(null,positions):null;
       var entry=positions.length?(reverse?hi:lo):null,progress=entry==null?null:(reverse?-entry:entry);
       // Some station captions and the following "from km" row overlap by 100–200 m.
       // Preserve the document order instead of jumping back to the station caption.
       if(progress!=null){progress=Math.max(progress,lastProgress+.01);lastProgress=progress;}
-      var standardPath=standardRoutePath(routeId,item.index);
       rows.push({rr:rr,index:item.index,pathIndex:rows.length,positions:positions,stationM:stationM,lo:lo,hi:hi,entry:entry,progress:progress,pathLabel:standardPath&&standardPath.label,standardSpeed:standardPath&&standardPath.speed});
     });
+    rows=rows.filter(function(row){return orderSpeedValue(row)!=null;});
+    rows.forEach(function(row,index){row.pathIndex=index;});
     rt.speedRowsCacheKey=cacheKey;rt.speedRowsCache=rows;return rows;
   }
   function activeSpeedOrder(routeId,positionM){
     if(!routeId||positionM==null||!isFinite(positionM))return null;
-    var rows=speedOrderRows(routeId),reverse=journeyTowards()==="obratno",progress=reverse?-positionM:positionM,exact=null;
+    var rows=speedOrderRows(routeId),reverse=speedTravelReverse(),progress=reverse?-positionM:positionM,exact=null;
     rows.forEach(function(row){
       if(row.lo==null)return;
       var isStation=row.stationM!=null&&Math.abs(positionM-row.stationM)<=80;
@@ -3394,10 +3460,10 @@ window.addEventListener("unhandledrejection",function(e){
         var coord=item.stationM!=null?('<div class="srCoord">Станция · '+stationMark(item.stationM)+'</div>'):'';
         return '<div class="srRow" data-seq="'+seq+'" data-flow="'+flow+'" data-min-m="'+(lo==null?'':lo)+'" data-max-m="'+(hi==null?'':hi)+'"><div class="srName">'+escapeHtml(rr.name)+coord+'</div><div class="srSpd">'+
         (rr.glp!=null?'<span class="srBadge glp'+((+rr.glp===15||+rr.glp===25)?' speedCritical':'')+'">'+rr.glp+'</span>':'')+
-        (rr.bokp!=null?'<span class="srBadge bokp'+((+rr.bokp===15||+rr.bokp===25)?' speedCritical':'')+'">'+rr.bokp+'</span>':'')+'</div></div>'; }).join("")+
+        (rr.bokp!=null?'<span class="srBadge bokp'+(+rr.bokp===40?' sideForty':'')+((+rr.bokp===15||+rr.bokp===25)?' speedCritical':'')+'">'+rr.bokp+'</span>':'')+'</div></div>'; }).join("")+
       '</div>'; return h; }
     box.innerHTML=grp(r.groups[0].title,r.groups[0].rows)+(r.groups[1]?grp(r.groups[1].title,r.groups[1].rows):"")+
-      '<div class="srNote">🟢 Гл.п — главный путь · 🟡 Бок.п — боковой путь · 🔴 скорости 15 и 25 км/ч'+(r.note?('<br><br>'+escapeHtml(r.note)):'')+'</div>';
+      '<div class="srNote">🟢 Гл.п — главный путь · 🟡 40 км/ч — обычный боковой путь · 🔴 15/25 км/ч — особо малая скорость'+(r.note?('<br><br>'+escapeHtml(r.note)):'')+'</div>';
     updateSpeedPositionLabel(jumpM);
     if(jumpM!=null) highlightSpeedRefRow(jumpM,true); }
 
