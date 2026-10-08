@@ -112,7 +112,7 @@ class NativeRepositoryContractTest {
         assertTrue("Luga must use its direction-specific order group",
             html.contains("routeId===\"last-luga\"") &&
                 html.contains("normalSecond?\"Путь II\":\"Путь I\"") &&
-                html.contains("g.title.trim()===wanted"))
+                html.contains("(item.groupTitle||\"\")===wanted"))
         assertTrue("wrong main track must stay separate from a station side track",
             html.contains("label:\"Неправильный главный\"") && html.contains("WRONG_MAIN_ROUTE") &&
                 html.contains("mode===\"wrong\"?selected.slice().reverse():selected"))
