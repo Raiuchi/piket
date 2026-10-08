@@ -110,7 +110,9 @@ class NativeRepositoryContractTest {
             html.contains("trackPick.style.display=routeId?\"block\":\"none\"") &&
                 html.contains("label:\"Боковой путь\""))
         assertTrue("Luga must use its direction-specific order group",
-            html.contains("routeId===\"last-luga\"") && html.contains("/Путь II/i:/Путь I/i"))
+            html.contains("routeId===\"last-luga\"") &&
+                html.contains("normalSecond?\"Путь II\":\"Путь I\"") &&
+                html.contains("g.title.trim()===wanted"))
         assertTrue("wrong main track must stay separate from a station side track",
             html.contains("label:\"Неправильный главный\"") && html.contains("WRONG_MAIN_ROUTE") &&
                 html.contains("mode===\"wrong\"?selected.slice().reverse():selected"))
@@ -230,7 +232,7 @@ class NativeRepositoryContractTest {
         assertTrue(html.contains("data-dial=\"m\""))
         assertTrue(html.contains("half?\":30\":\"\""))
         assertTrue(html.contains(".srBadge.speedCritical"))
-        assertTrue(html.contains("🔴 скорости 15 и 25 км/ч"))
+        assertTrue(html.contains("🔴 15/25 км/ч — особо малая скорость"))
         assertTrue(html.contains("+rr.glp===15||+rr.glp===25"))
         assertTrue(html.contains("+rr.bokp===15||+rr.bokp===25"))
         assertTrue(html.contains("genericTimeHalf"))
