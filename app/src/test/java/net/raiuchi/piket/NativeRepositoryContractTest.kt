@@ -115,7 +115,8 @@ class NativeRepositoryContractTest {
                 html.contains("(item.groupTitle||\"\")===wanted"))
         assertTrue("wrong main track must stay separate from a station side track",
             html.contains("label:\"Неправильный главный\"") && html.contains("WRONG_MAIN_ROUTE") &&
-                html.contains("mode===\"wrong\"?selected.slice().reverse():selected"))
+                html.contains("var reverseRows=mode===\"wrong\"") &&
+                html.contains("return reverseRows?selected.slice().reverse():selected"))
         assertTrue("timetable card must scroll to the live leg",
             html.contains("#scheduleBox .schedule-leg.live") && html.contains("data-schedule-leg="))
         assertTrue("overlapping native restriction speech must be queued instead of cancelled",
