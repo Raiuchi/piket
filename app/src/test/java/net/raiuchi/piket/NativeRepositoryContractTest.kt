@@ -175,7 +175,9 @@ class NativeRepositoryContractTest {
             }
             assertTrue("$number has multiple midnight transitions", wraps <= 1)
         }
-        assertEquals(2_712, passages)
+        // Nine adjacent alias duplicates were removed from the source timetable;
+        // every operational stop remains covered without rendering a zero-length card.
+        assertEquals(2_703, passages)
     }
 
     @Test fun everyTimetableRendersFromItsFirstStopAndProgressesOnlyForward() {
