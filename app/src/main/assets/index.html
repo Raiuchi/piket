@@ -521,6 +521,7 @@
   @keyframes sapsanAurora{0%,100%{background-position:100% 0,0 100%,0 0,0 50%}50%{background-position:72% 22%,22% 78%,0 0,100% 50%}}
   @keyframes sapsanFlight{0%,64%{transform:translateX(-155%) skewX(-18deg);opacity:0}70%{opacity:.18}84%{opacity:.72}96%,100%{transform:translateX(155%) skewX(-18deg);opacity:0}}
   @keyframes sapsanRailPulse{0%,100%{opacity:.62;filter:brightness(.9)}50%{opacity:1;filter:brightness(1.24)}}
+  @keyframes lastochkaFlight{0%,58%{transform:translateX(-160%) skewX(-20deg);opacity:0}66%{opacity:.12}80%{opacity:.78}94%,100%{transform:translateX(160%) skewX(-20deg);opacity:0}}
   @keyframes consoleFlow{0%{transform:translateX(-115%);opacity:0}18%{opacity:.75}54%,100%{transform:translateX(115%);opacity:0}}
   @keyframes sapsanBreath{0%,100%{box-shadow:inset 0 1px rgba(255,255,255,.05),0 8px 20px rgba(0,0,0,.24)}50%{box-shadow:inset 0 1px rgba(255,255,255,.09),0 9px 24px rgba(120,174,220,.12)}}
   @keyframes lastochkaBreath{0%,100%{box-shadow:inset 0 1px rgba(255,255,255,.04),0 8px 20px rgba(0,0,0,.24)}50%{box-shadow:inset 0 1px rgba(255,255,255,.07),0 9px 24px rgba(212,60,76,.12)}}
@@ -540,19 +541,21 @@
   .srBadge.bokp.sideForty{border-color:rgba(245,190,58,.52);background:linear-gradient(180deg,rgba(174,119,22,.36),rgba(112,74,15,.28));color:#FFD47A;box-shadow:0 0 11px rgba(235,174,42,.12)}
   .srBadge.speedCritical{border-color:rgba(190,66,76,.43);background:rgba(127,28,39,.28);color:#E8A0A6;box-shadow:none}
   .srRow.srHit{border-color:rgba(255,102,116,.58);background:linear-gradient(100deg,rgba(117,24,43,.38),rgba(24,29,40,.98) 58%,rgba(30,52,66,.92));box-shadow:inset 3px 0 #FF5362,0 0 18px rgba(205,47,67,.12);animation:lastochkaBreath 3.8s ease-in-out infinite}
-  .routeCard.train-sapsan{background:radial-gradient(circle at 88% 8%,rgba(126,203,242,.24),transparent 36%),radial-gradient(circle at 8% 92%,rgba(111,91,181,.16),transparent 43%),linear-gradient(145deg,#1B2835,#0A0F16 58%,#171724) padding-box,linear-gradient(110deg,#F3FAFF,#75BCE1,#536F9F,#8B72B4,#DCECF5) border-box;background-size:120% 120%,120% 120%,100% 100%,300% 100%;animation:sapsanAurora 11s ease-in-out infinite,sapsanBreath 8.5s ease-in-out infinite}
-  .routeCard.train-sapsan:nth-child(even){background:radial-gradient(circle at 12% 12%,rgba(151,126,217,.20),transparent 38%),radial-gradient(circle at 90% 88%,rgba(83,176,218,.20),transparent 42%),linear-gradient(145deg,#1B2031,#0A0F16 58%,#10232A) padding-box,linear-gradient(110deg,#EAF7FF,#8573BA,#4D91B8,#A7DDF2,#DDE7F4) border-box;background-size:120% 120%,120% 120%,100% 100%,300% 100%}
+  .routeCard.train-sapsan{background:radial-gradient(circle at 88% 8%,rgba(91,160,201,.20),transparent 38%),radial-gradient(circle at 8% 92%,rgba(66,94,122,.13),transparent 44%),linear-gradient(145deg,#172432,#080D13 58%,#101923) padding-box,linear-gradient(110deg,#EDF6FB,#7BAEC9,#415F77,#9CB8C8,#E3EDF2) border-box;background-size:120% 120%,120% 120%,100% 100%,300% 100%;animation:sapsanAurora 11s ease-in-out infinite,sapsanBreath 8.5s ease-in-out infinite}
   .routeCard.train-sapsan::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#F4FBFF,#70BDE5,#806EB1,#EAF7FF);opacity:.78;box-shadow:0 0 13px rgba(101,188,232,.28);animation:sapsanRailPulse 5.6s ease-in-out infinite}
   .routeCard.train-sapsan::after{inset:-30% -22%;background:linear-gradient(102deg,transparent 43%,rgba(224,246,255,.04) 47%,rgba(224,246,255,.34) 50%,rgba(137,204,238,.10) 53%,transparent 57%);transform:translateX(-155%) skewX(-18deg);animation:sapsanFlight 9.5s cubic-bezier(.3,.05,.2,1) infinite}
   .routeCard.train-sapsan .rcTrain{border-color:rgba(224,238,247,.76);background:linear-gradient(145deg,#F8FBFD,#D8E5EC 58%,#C8D4DE);color:#A51F2D;box-shadow:inset 0 1px rgba(255,255,255,.92),0 0 16px rgba(126,199,235,.16)}
   .routeCard.train-sapsan .rcName{color:#F1F4F6}.routeCard.train-sapsan svg{color:#BACAD6}
-  .routeCard.train-lastochka{background:radial-gradient(circle at 84% 14%,rgba(219,73,104,.22),transparent 38%),radial-gradient(circle at 12% 92%,rgba(121,77,184,.14),transparent 44%),linear-gradient(145deg,#25161B,#0D0B10 58%,#17131D) padding-box,linear-gradient(110deg,#F06272,#8F3551,#C18A4C,#704A99,#D84965) border-box;background-size:100% 100%,100% 100%,100% 100%,280% 100%;animation:routePrism 10s ease-in-out infinite,lastochkaBreath 8.5s ease-in-out infinite}
-  .routeCard.train-lastochka:nth-child(3n+2){background:radial-gradient(circle at 82% 12%,rgba(90,137,202,.22),transparent 40%),radial-gradient(circle at 10% 90%,rgba(207,65,93,.17),transparent 42%),linear-gradient(145deg,#111A27,#0C0C12 58%,#21121C) padding-box,linear-gradient(110deg,#6EA9D9,#7B5CAD,#D84C69,#A86D49,#5F8DBB) border-box;background-size:100% 100%,100% 100%,100% 100%,280% 100%}
-  .routeCard.train-lastochka:nth-child(3n){background:radial-gradient(circle at 85% 18%,rgba(193,127,63,.22),transparent 40%),radial-gradient(circle at 8% 88%,rgba(67,151,145,.14),transparent 42%),linear-gradient(145deg,#201A15,#0C0D10 60%,#111D1D) padding-box,linear-gradient(110deg,#D39A59,#A44D62,#6267A4,#4F9B94,#C56B55) border-box;background-size:100% 100%,100% 100%,100% 100%,280% 100%}
-  .routeCard.train-lastochka::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#F16A79,#88405A,#C89455,#73569B);opacity:.9;box-shadow:0 0 12px rgba(220,75,99,.25)}
+  .routeCard.train-lastochka{--lc-a:rgba(244,80,104,.40);--lc-b:rgba(222,194,190,.18);background:radial-gradient(circle at 84% 14%,rgba(213,48,76,.24),transparent 39%),radial-gradient(circle at 12% 92%,rgba(112,29,47,.18),transparent 45%),linear-gradient(145deg,#281219,#0B090C 57%,#180D12) padding-box,linear-gradient(110deg,#F16476,#8C2B40,#4D202B,#C69B9C,#A8324B) border-box;background-size:100% 100%,100% 100%,100% 100%,280% 100%;box-shadow:inset 0 1px rgba(255,255,255,.065),0 11px 28px rgba(0,0,0,.36),0 0 17px rgba(197,38,66,.11);animation:routePrism 10s ease-in-out infinite,lastochkaBreath 8.5s ease-in-out infinite}
+  .routeCard.train-lastochka::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:linear-gradient(#F66B7D,#A3324A,#6D2638,#D5A7A8);opacity:.94;box-shadow:0 0 13px rgba(222,55,83,.30)}
+  .routeCard.train-lastochka::after{inset:-32% -22%;background:linear-gradient(102deg,transparent 42%,var(--lc-b) 47%,var(--lc-a) 50%,rgba(255,235,239,.20) 52%,transparent 58%);transform:translateX(-160%) skewX(-20deg);animation:lastochkaFlight 9s cubic-bezier(.3,.05,.2,1) infinite}
   .routeCard.train-lastochka .rcTrain{border-color:rgba(224,95,116,.52);background:linear-gradient(135deg,rgba(65,22,32,.95),rgba(23,17,27,.96) 55%,rgba(72,43,84,.9));color:#F08A97;box-shadow:inset 0 1px rgba(255,255,255,.05),0 0 14px rgba(211,50,67,.12)}
   .routeCard.train-lastochka .rcName{color:#F0E5E7}.routeCard.train-lastochka svg{color:#C8636E}
-  #v-speedref.train-sapsan #srTitle{color:#E8EEF2;text-shadow:0 0 16px rgba(172,205,229,.13)}#v-speedref.train-lastochka #srTitle{color:#DF8D96;text-shadow:0 0 16px rgba(214,64,80,.13)}
+  #srTitle{font-family:var(--display);font-size:clamp(25px,6.6vw,34px);font-weight:820;line-height:1.16;letter-spacing:-.032em;text-wrap:balance}
+  #srTitle::after{content:"";display:block;width:72px;height:2px;margin-top:10px;border-radius:999px;background:currentColor;opacity:.72;box-shadow:0 0 14px currentColor}
+  #v-speedref.train-sapsan #srTitle{color:#EAF4F9;background:linear-gradient(100deg,#FFFFFF 0,#B6D4E4 48%,#789CB3 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 9px rgba(105,165,196,.16))}
+  #v-speedref.train-lastochka #srTitle{color:#F3A0AD;background:linear-gradient(100deg,#FFD4D9 0,#EE8293 48%,#B84A60 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 9px rgba(211,55,82,.18))}
+  #v-speedref.train-sapsan #srTitle::after,#v-speedref.train-lastochka #srTitle::after{-webkit-text-fill-color:initial}
   .sheet{background:linear-gradient(180deg,#19191E,#09090B);border-color:rgba(255,255,255,.16)}
   .sheet:not(.on){visibility:hidden!important;box-shadow:none!important}
   .timing-card{margin:12px 0;padding:16px;border:1px solid #3b2a31;border-radius:18px;background:linear-gradient(145deg,#15191f,#101318)}
@@ -3335,9 +3338,9 @@ window.addEventListener("unhandledrejection",function(e){
   function speedRouteIdForTrip(){var routeId=baseSpeedRouteIdForTrip();return orderPathMode()==="wrong"?(wrongMainRouteId(routeId)||routeId):routeId;}
   function orderPathMode(){
     var mode=journeyTowards()==="obratno"?(state.settings.orderPathObratno||"auto"):(state.settings.orderPathTuda||"auto");
-    // В прежних версиях отдельный пункт «III путь от Крюково» дублировал
-    // автоматический I → III. Сохранённую настройку мягко возвращаем в «Авто».
-    if(state.ctx.peregon==="СпбГл - Москва"&&journeyTowards()!=="obratno"&&mode==="primary")mode="auto";
+    // Отдельные «штатные» карточки I/III и IV/II дублируют автоматический
+    // профиль. Сохранённую настройку мягко возвращаем в «Авто» в обе стороны.
+    if(state.ctx.peregon==="СпбГл - Москва"&&mode==="primary")mode="auto";
     // Не переносим специальный режим на маршрут, для которого встречной таблицы нет.
     return mode==="wrong"&&!wrongMainRouteId(baseSpeedRouteIdForTrip())?"auto":mode;
   }
@@ -3350,8 +3353,7 @@ window.addEventListener("unhandledrejection",function(e){
       {value:"side",label:"Боковой путь",meta:"скорость бокового пути, где она указана"}
     ];
     return journeyTowards()==="obratno"?[
-      {value:"auto",label:"Авто · IV → II",meta:"Москва — Крюково IV, после Крюково II"},
-      {value:"primary",label:"IV путь до Крюково",meta:"штатный путь из Москвы"},
+      {value:"auto",label:"Авто · перрон → IV → II",meta:"любой перронный путь при отправлении; далее IV до Крюково, после Крюково II"},
       {value:"alternate",label:"II путь до Крюково",meta:"неправильный путь; далее штатный II"},
       {value:"wrong",label:"Неправильный главный",meta:"главный путь направления Санкт-Петербург → Москва"},
       {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}

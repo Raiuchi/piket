@@ -54,7 +54,10 @@ function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap
   };
   vm.createContext(context);vm.runInContext(html.slice(speedLogicStart,speedLogicEnd),context);
   const effectiveRouteId=context.speedRouteIdForTrip();
-  return position=>{const order=context.activeSpeedOrder(effectiveRouteId,position);return{order,speed:context.orderSpeedValue(order),next:context.nextSpeedOrder(effectiveRouteId,order),routeId:effectiveRouteId};};
+  const lookup=position=>{const order=context.activeSpeedOrder(effectiveRouteId,position);return{order,speed:context.orderSpeedValue(order),next:context.nextSpeedOrder(effectiveRouteId,order),routeId:effectiveRouteId};};
+  lookup.mode=context.orderPathMode();
+  lookup.options=context.orderPathOptions();
+  return lookup;
 }
 function checkNextSequence(label,direction,routeId,peregon,from,to,step=250,physicalDirection=direction){
   const orderAt=speedLogic(direction,'auto',routeId,peregon,physicalDirection);
@@ -70,9 +73,13 @@ check('после Крюково в Москву автоматически вы
 check('прибытие в Москву переключается на 25 км/ч перронного пути',orderAt(649500).speed===25);
 orderAt=speedLogic('obratno','auto');
 check('Москва — Петербург начинает с 25 км/ч на перронном пути',orderAt(649500).speed===25);
+check('авторежим из Москвы прямо объясняет любой перронный путь и не дублируется отдельной карточкой IV пути',
+  orderAt.options[0].label.includes('перрон')&&orderAt.options[0].meta.includes('любой перронный путь')&&!orderAt.options.some(item=>item.value==='primary'));
 check('из Москвы до Крюково автоматически выбран IV путь',orderAt(635400).speed===140);
 check('после Крюково в Петербург автоматически выбран II путь',orderAt(610300).speed===140);
 check('прибытие в Петербург переключается на 25 км/ч перронного пути',orderAt(200).speed===25);
+orderAt=speedLogic('obratno','primary');
+check('сохранённый старый режим IV пути безопасно мигрирует в авто',orderAt.mode==='auto'&&orderAt(649500).speed===25&&orderAt(635400).speed===140);
 const nearPetersburg=orderAt(19_556);
 check(`на 19 км обратного хода следующая скорость находится впереди, а не в уже пройденном диапазоне (${nearPetersburg.speed} → ${nearPetersburg.next&&nearPetersburg.next.rr.name})`,
   nearPetersburg.speed===200&&nearPetersburg.next&&nearPetersburg.next.rr.name.includes('12 км 5 пк'));
@@ -174,6 +181,7 @@ check('основные цифры спидометра имеют заданн�
 check('остальные цифры остаются нейтральными и компактными',html.includes('class="g-labelSecondary"')&&html.includes('.g-labelSecondary{fill:#9EABB6'));
 check('переход из сводки прокручивает к текущему перегону времени хода',html.includes('#scheduleBox .schedule-leg.live')&&html.includes('data-schedule-leg='));
 check('легенда приказа прямо объясняет жёлтые 40 и красные 15/25 км/ч',html.includes('🟡 40 км/ч — обычный боковой путь')&&html.includes('🔴 15/25 км/ч — особо малая скорость'));
-check('карточки Сапсана и Ласточки получили разные премиальные разнотонные анимации с отключением по настройке системы',html.includes('@keyframes sapsanAurora')&&html.includes('@keyframes sapsanFlight')&&html.includes('@keyframes sapsanRailPulse')&&html.includes('.routeCard.train-sapsan:nth-child(even)')&&html.includes('.routeCard.train-lastochka:nth-child(3n+2)')&&html.includes('.routeCard.train-lastochka:nth-child(3n)')&&html.includes('#6EA9D9')&&html.includes('#D39A59')&&html.includes('.routeCard::before,.routeCard::after')&&html.includes('prefers-reduced-motion:reduce'));
+check('карточки Сапсана и Ласточки получили разные сдержанные премиальные палитры и анимации',html.includes('@keyframes sapsanAurora')&&html.includes('@keyframes sapsanFlight')&&html.includes('@keyframes sapsanRailPulse')&&html.includes('@keyframes lastochkaFlight')&&html.includes('.routeCard.train-sapsan{background:radial-gradient')&&html.includes('#7BAEC9')&&html.includes('.routeCard.train-lastochka{--lc-a:')&&html.includes('#F16476')&&html.includes('#C69B9C')&&!html.includes('.routeCard.train-lastochka:nth-child(3n+2)')&&!html.includes('.routeCard.train-lastochka:nth-child(3n)')&&html.includes('.routeCard.train-lastochka::after')&&html.includes('.routeCard::before,.routeCard::after')&&html.includes('prefers-reduced-motion:reduce'));
+check('заголовки приказов получили контрастный сдержанный градиент и читаемую типографику',html.includes('#srTitle{font-family:var(--display)')&&html.includes('#v-speedref.train-lastochka #srTitle{color:#F3A0AD')&&html.includes('#B84A60')&&html.includes('-webkit-background-clip:text'));
 check('рабочая сводка уплотнена и сохраняет приказ, время и ограничение в двух колонках',html.includes('grid-template-columns:minmax(0,1fr) minmax(0,1fr)')&&html.includes('@media(max-width:340px)')&&html.includes('@keyframes consoleFlow'));
 console.log(`${passed} speed-order scenarios passed`);
