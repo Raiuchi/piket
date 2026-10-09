@@ -41,7 +41,9 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
     private var previousAlertPhysicalM: Double? = null
 
     fun configure(route: String, direction: String, manualOfficialM: Double,
-                  active: Boolean, restrictions: List<Restriction>, forceCalibration: Boolean = false) {
+                  active: Boolean, restrictions: List<Restriction>, forceCalibration: Boolean = false,
+                  manualPhysicalM: Double? = null) {
+        val wasActive = this.active
         val routeChanged = this.route != route || this.direction != direction
         val calibrationChanged = abs(this.manualOfficialM - manualOfficialM) > 0.5
         this.route = route
@@ -49,7 +51,26 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         this.manualOfficialM = manualOfficialM
         this.active = active
         this.restrictions = restrictions
-        if (forceCalibration && !routeChanged && physicalM != null) {
+        val mappedManualPhysical = manualPhysicalM?.takeIf { candidate ->
+            candidate.isFinite() && routes.route(route)?.points?.let { points ->
+                points.isNotEmpty() && candidate in points.minOf { it.physicalM }..points.maxOf { it.physicalM }
+            } == true
+        }
+        if (forceCalibration && mappedManualPhysical != null) {
+            // A fresh manual kilometre is authoritative. In particular, never anchor a
+            // new trip to physicalM restored from an already stopped session: that was
+            // the cause of 19 km jumping back to the 1 km area after Start.
+            physicalM = mappedManualPhysical
+            val base = routes.officialMeters(route, mappedManualPhysical, direction) ?: manualOfficialM
+            officialOffsetM = manualOfficialM - base
+            speedMps = 0f
+            lastElapsedMs = 0L
+            recovering = false
+            recoveryCandidateM = null
+            recoveryConfirmations = 0
+            calibrationWaitStartedElapsedMs = 0L
+            beginCalibrationHold(mappedManualPhysical)
+        } else if (forceCalibration && wasActive && !routeChanged && physicalM != null) {
             // Pressing "Set" is an action, even when the entered number equals the
             // previous calibration. Re-anchor the displayed axis at the current place
             // instead of silently ignoring that action.

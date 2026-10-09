@@ -295,6 +295,26 @@ class NativeTripEngineTest {
         assertEquals(0f, recalibrated.speedMps)
     }
 
+    @Test fun freshManualCalibrationCannotReuseStoppedSessionPhysicalAnchor() {
+        val label = "СпбГл - Москва"
+        val testedRoute = routes.route(label)!!
+        val stalePhysical = testedRoute.points.first().physicalM
+        val staleOfficial = routes.officialMeters(label, stalePhysical, "obratno")!!
+        val local = NativeTripEngine(routes)
+        local.restore(NativeTripEngine.SavedState(false, label, "obratno", staleOfficial,
+            stalePhysical, 0.0, 0f, 0L))
+        val enteredOfficial = 19_365.0
+        val enteredPhysical = routes.physicalMeters(label, enteredOfficial, null, "obratno")!!
+
+        local.configure(label, "obratno", enteredOfficial, true, emptyList(),
+            forceCalibration = true, manualPhysicalM = enteredPhysical)
+        val output = local.update(NativeTripEngine.Input(1_000, null, false, null))
+
+        assertEquals(enteredPhysical, output.physicalM!!, 0.01)
+        assertEquals(enteredOfficial, output.officialM!!, 0.01)
+        assertNotEquals(stalePhysical, output.physicalM!!, 0.01)
+    }
+
     @Test fun freshCalibrationIgnoresSmallFalseMovementUntilDepartureIsConfirmed() {
         val start = route.points.first().physicalM
         val manual = routes.officialMeters(route.label, start, "tuda")!!

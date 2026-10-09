@@ -1135,8 +1135,9 @@ class TrackingService : Service() {
         }
         val calibrationRevision = root.optLong("calibrationRevision", 0L)
         val forceCalibration = calibrationRevision > 0L && calibrationRevision != lastCalibrationRevision
+        val calibrationTrackM = root.optDouble("calibrationTrackM", Double.NaN).takeIf { it.isFinite() }
         tripEngine?.configure(routeLabel, nextDirection, root.optDouble("manualOfficialM"),
-            nextActive, restrictions, forceCalibration)
+            nextActive, restrictions, forceCalibration, calibrationTrackM)
         if (calibrationRevision > 0L) lastCalibrationRevision = calibrationRevision
         val startsNewSession = nextActive && (previousState?.active != true ||
             previousState?.route != routeLabel || previousState?.direction != nextDirection)
@@ -1151,6 +1152,7 @@ class TrackingService : Service() {
             "trusted_speed_ceiling_kmh" to RouteSpeedCeilings.trustedKmh(routeLabel, trainNumber),
             "direction" to nextDirection, "active" to nextActive,
             "manual_official_m" to root.optDouble("manualOfficialM"),
+            "manual_physical_m" to calibrationTrackM,
             "lead_m" to root.optDouble("lead", 3_000.0), "voice" to voiceEnabled, "sound" to soundEnabled,
             "vibration" to vibrationEnabled, "restrictions" to restrictions.size))
         diagnostics.event("restrictions_configured", diagnosticContext() + mapOf(

@@ -25,6 +25,9 @@ class NativeRepositoryContractTest {
         val html = projectFile("app/src/main/assets/index.html").readText()
         assertTrue(main.contains("WebView") && main.contains("publishSnapshot"))
         assertTrue(main.contains("api.github.com/repos/Raiuchi/piket/releases/latest"))
+        assertTrue("GitHub API 403/429 must fall back to the public latest-release redirect",
+            main.contains("code!=403&&code!=429") && main.contains("instanceFollowRedirects=false") &&
+                main.contains("update_check_fallback") && main.contains("releases/download/v\$latest/piket.apk"))
         assertTrue(main.contains("override fun onResume()"))
         assertFalse("failed update checks must not retry repeatedly during a trip",
             main.contains("handler.postDelayed({checkForUpdate(true)}"))

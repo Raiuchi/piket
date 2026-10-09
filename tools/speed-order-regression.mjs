@@ -56,6 +56,14 @@ function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap
   const effectiveRouteId=context.speedRouteIdForTrip();
   return position=>{const order=context.activeSpeedOrder(effectiveRouteId,position);return{order,speed:context.orderSpeedValue(order),next:context.nextSpeedOrder(effectiveRouteId,order),routeId:effectiveRouteId};};
 }
+function checkNextSequence(label,direction,routeId,peregon,from,to,step=250,physicalDirection=direction){
+  const orderAt=speedLogic(direction,'auto',routeId,peregon,physicalDirection);
+  const reverse=physicalDirection==='obratno';
+  const errors=[];
+  if(reverse){for(let pos=from;pos>=to;pos-=step){const result=orderAt(pos),next=result.next;if(next?.entry!=null&&pos-next.entry < -5)errors.push(`${pos} -> ${next.entry} ${next.rr.name}`);}}
+  else {for(let pos=from;pos<=to;pos+=step){const result=orderAt(pos),next=result.next;if(next?.entry!=null&&next.entry-pos < -5)errors.push(`${pos} -> ${next.entry} ${next.rr.name}`);}}
+  check(`${label}: следующая скорость всегда впереди (${Math.floor(Math.abs(from-to)/step)+1} точек)`,errors.length===0);
+}
 let orderAt=speedLogic('tuda','auto');
 check('Петербург — Москва начинает с 25 км/ч на перронном пути',orderAt(200).speed===25);
 check('после Крюково в Москву автоматически выбран III путь',orderAt(614300).speed===160);
@@ -65,6 +73,29 @@ check('Москва — Петербург начинает с 25 км/ч на �
 check('из Москвы до Крюково автоматически выбран IV путь',orderAt(635400).speed===140);
 check('после Крюково в Петербург автоматически выбран II путь',orderAt(610300).speed===140);
 check('прибытие в Петербург переключается на 25 км/ч перронного пути',orderAt(200).speed===25);
+const nearPetersburg=orderAt(19_556);
+check(`на 19 км обратного хода следующая скорость находится впереди, а не в уже пройденном диапазоне (${nearPetersburg.speed} → ${nearPetersburg.next&&nearPetersburg.next.rr.name})`,
+  nearPetersburg.speed===200&&nearPetersburg.next&&nearPetersburg.next.rr.name.includes('12 км 5 пк'));
+checkNextSequence('Сапсан Петербург — Москва','tuda','sap-spb-msk','СпбГл - Москва',0,650000,500);
+checkNextSequence('Сапсан Москва — Петербург','obratno','sap-msk-spb','СпбГл - Москва',650000,0,500);
+checkNextSequence('Ласточка Петербург — Москва','tuda','last-spb-msk','СпбГл - Москва',0,650000,500);
+checkNextSequence('Ласточка Москва — Петербург','obratno','last-msk-spb','СпбГл - Москва',650000,0,500);
+checkNextSequence('Балтийский — Луга','tuda','last-luga','Броневая - Луга',0,138000,250);
+checkNextSequence('Луга — Балтийский','obratno','last-luga','Броневая - Луга',138000,0,250);
+checkNextSequence('Финляндский — Выборг','tuda','last-spbfin-kamenn','СПбФин - Выборг',0,130000,250);
+checkNextSequence('Выборг — Финляндский','obratno','last-kamenn-spbfin','СПбФин - Выборг',130000,0,250);
+checkNextSequence('Выборг — Каменногорск','tuda','last-spbfin-kamenn','Выборг - Каменногорск',0,42000,100);
+checkNextSequence('Каменногорск — Выборг','obratno','last-kamenn-spbfin','Выборг - Каменногорск',42000,0,100);
+checkNextSequence('Дача Долгорукова — Павлово','tuda','last-dd-ptz','Д. Долг - Павлово',0,29200,100);
+checkNextSequence('Павлово — Дача Долгорукова','obratno','last-ptz-dd','Д. Долг - Павлово',29200,0,100);
+checkNextSequence('Павлово — Горы','tuda','last-dd-ptz','Павлово - Горы II путь',29200,42000,50);
+checkNextSequence('Горы — Павлово','obratno','last-ptz-dd','Горы - Павлово I путь',42000,29200,50);
+checkNextSequence('Горы — Петрозаводск','tuda','last-dd-ptz','Горы - Петрозаводск',42000,402400,250);
+checkNextSequence('Петрозаводск — Горы','obratno','last-ptz-dd','Горы - Петрозаводск',402400,42000,250);
+checkNextSequence('Новгород — Чудово','tuda','last-vnov-volh2','Чудово - Новгород',70000,0,100,'obratno');
+checkNextSequence('Чудово — Новгород','obratno','last-vnov-volh2','Чудово - Новгород',0,70000,100,'tuda');
+checkNextSequence('Чудово — Волхов','tuda','last-vnov-volh2','Волховстрой - Чудово',101000,0,100,'obratno');
+checkNextSequence('Волхов — Чудово','obratno','last-vnov-volh2','Волховстрой - Чудово',0,101000,100,'tuda');
 orderAt=speedLogic('obratno','alternate');
 [649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
 check('вариант II пути из Москвы после Крюково продолжает штатный II путь',orderAt(560500).speed===120);
@@ -79,7 +110,8 @@ check(`Сапсан получает полный I путь Крюково — 
 check('дублирующий III путь убран, а полный I путь доступен для Сапсана и Ласточки',!html.includes('label:"III путь от Крюково"')&&html.includes('baseRouteId==="sap-spb-msk"||baseRouteId==="last-spb-msk"'));
 orderAt=speedLogic('obratno','alternate','last-msk-spb');
 [649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
-check('Ласточка по неправильному II пути после Крюково продолжает штатный II путь',orderAt(560500).speed===160);
+const lastochkaAltAfterKriukovo=orderAt(560500);
+check(`Ласточка по неправильному II пути после Крюково продолжает штатный II путь (${lastochkaAltAfterKriukovo.speed}, ${lastochkaAltAfterKriukovo.order&&lastochkaAltAfterKriukovo.order.rr.name})`,lastochkaAltAfterKriukovo.speed===160);
 orderAt=speedLogic('tuda','wrong');
 check('неправильный главный в Москву берёт встречный приказ и сохраняет рост километража',orderAt(249500).routeId==='sap-msk-spb'&&orderAt(249500).speed===200);
 orderAt=speedLogic('obratno','wrong');
@@ -142,6 +174,6 @@ check('основные цифры спидометра имеют заданн�
 check('остальные цифры остаются нейтральными и компактными',html.includes('class="g-labelSecondary"')&&html.includes('.g-labelSecondary{fill:#9EABB6'));
 check('переход из сводки прокручивает к текущему перегону времени хода',html.includes('#scheduleBox .schedule-leg.live')&&html.includes('data-schedule-leg='));
 check('легенда приказа прямо объясняет жёлтые 40 и красные 15/25 км/ч',html.includes('🟡 40 км/ч — обычный боковой путь')&&html.includes('🔴 15/25 км/ч — особо малая скорость'));
-check('карточки Сапсана и Ласточки получили премиальную разнотонную анимацию с отключением по настройке системы',html.includes('@keyframes routePrism')&&html.includes('radial-gradient(circle at 82% 15%')&&html.includes('prefers-reduced-motion:reduce'));
+check('карточки Сапсана и Ласточки получили разные премиальные разнотонные анимации с отключением по настройке системы',html.includes('@keyframes sapsanAurora')&&html.includes('@keyframes sapsanFlight')&&html.includes('@keyframes sapsanRailPulse')&&html.includes('.routeCard.train-sapsan:nth-child(even)')&&html.includes('.routeCard.train-lastochka:nth-child(3n+2)')&&html.includes('.routeCard.train-lastochka:nth-child(3n)')&&html.includes('#6EA9D9')&&html.includes('#D39A59')&&html.includes('.routeCard::before,.routeCard::after')&&html.includes('prefers-reduced-motion:reduce'));
 check('рабочая сводка уплотнена и сохраняет приказ, время и ограничение в двух колонках',html.includes('grid-template-columns:minmax(0,1fr) minmax(0,1fr)')&&html.includes('@media(max-width:340px)')&&html.includes('@keyframes consoleFlow'));
 console.log(`${passed} speed-order scenarios passed`);

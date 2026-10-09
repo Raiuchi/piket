@@ -276,14 +276,14 @@ class MainActivity : Activity() {
                     setRequestProperty("User-Agent","Piket-Android-Update-Check")
                 }
                 val code=connection.responseCode
-                if(code !in 200..299)throw java.io.IOException("GitHub update check HTTP $code")
-                val payload=connection.inputStream.bufferedReader().use{it.readText()}
-                connection.disconnect()
-                val release=JSONObject(payload)
-                val latest=release.optString("tag_name").removePrefix("v")
-                val current=packageManager.getPackageInfo(packageName,0).versionName?:"0.0.0"
-                if(isNewerVersion(latest,current)){
-                    var download=release.optString("html_url","https://github.com/Raiuchi/piket/releases/latest")
+                var latest:String
+                var download:String
+                if(code in 200..299){
+                    val payload=connection.inputStream.bufferedReader().use{it.readText()}
+                    connection.disconnect()
+                    val release=JSONObject(payload)
+                    latest=release.optString("tag_name").removePrefix("v")
+                    download=release.optString("html_url","https://github.com/Raiuchi/piket/releases/latest")
                     val assets=release.optJSONArray("assets")
                     if(assets!=null)for(i in 0 until assets.length()){
                         val asset=assets.optJSONObject(i)?:continue
@@ -291,6 +291,30 @@ class MainActivity : Activity() {
                             download=asset.optString("browser_download_url",download);break
                         }
                     }
+                }else{
+                    connection.disconnect()
+                    // GitHub API can answer 403 behind a VPN or after its anonymous
+                    // rate limit. The public latest-release redirect is not API-rated,
+                    // so use its tag and the stable asset name as a safe fallback.
+                    if(code!=403&&code!=429)throw java.io.IOException("GitHub update check HTTP $code")
+                    val redirect=(URL("https://github.com/Raiuchi/piket/releases/latest").openConnection() as HttpURLConnection).apply{
+                        connectTimeout=7_000;readTimeout=7_000
+                        instanceFollowRedirects=false
+                        useCaches=false
+                        setRequestProperty("User-Agent","Piket-Android-Update-Check")
+                    }
+                    val redirectCode=redirect.responseCode
+                    val location=redirect.getHeaderField("Location")
+                    redirect.disconnect()
+                    if(redirectCode !in 300..399||location.isNullOrBlank())
+                        throw java.io.IOException("GitHub update check HTTP $code; fallback HTTP $redirectCode")
+                    latest=Uri.parse(location).lastPathSegment?.removePrefix("v").orEmpty()
+                    if(latest.isBlank())throw java.io.IOException("GitHub latest release tag is missing")
+                    download="https://github.com/Raiuchi/piket/releases/download/v$latest/piket.apk"
+                    diagnostics.event("update_check_fallback",mapOf("api_http" to code,"latest" to latest))
+                }
+                val current=packageManager.getPackageInfo(packageName,0).versionName?:"0.0.0"
+                if(isNewerVersion(latest,current)){
                     latestUpdateVersion=latest
                     latestUpdateUrl=download
                     diagnostics.event("update_available", mapOf("current" to current, "latest" to latest,
