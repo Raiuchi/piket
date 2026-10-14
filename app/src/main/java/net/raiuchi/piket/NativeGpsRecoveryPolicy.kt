@@ -26,11 +26,22 @@ object NativeGpsRecoveryPolicy {
     // before this check, so 250 m accepts a precise railway fix without accepting
     // the 300-550 m coarse fused fixes seen in real diagnostics.
     const val MAX_TRUSTED_ROUTE_DISTANCE_M = 250.0
+    // Speed may remain useful while the position accuracy is temporarily too poor
+    // for an exact snap. It must still belong to the selected railway corridor.
+    // Real diagnostics contained fresh 130 km/h fixes almost 60 km away from the
+    // Finland-station route; feeding that Doppler value into dead reckoning moved a
+    // freshly calibrated train while it was actually standing at the platform.
+    const val MAX_SPEED_ROUTE_DISTANCE_M = 1_000.0
 
     fun isRoutePositionPlausible(routeLabel: String, distanceToRouteM: Double?): Boolean =
         routeLabel == "Все участки" ||
             (distanceToRouteM != null && distanceToRouteM.isFinite() &&
                 distanceToRouteM <= MAX_TRUSTED_ROUTE_DISTANCE_M)
+
+    fun isRouteSpeedPlausible(routeLabel: String, distanceToRouteM: Double?): Boolean =
+        routeLabel == "Все участки" ||
+            (distanceToRouteM != null && distanceToRouteM.isFinite() &&
+                distanceToRouteM <= MAX_SPEED_ROUTE_DISTANCE_M)
 
     fun shouldStartDirect(
         tripActive: Boolean,
@@ -60,8 +71,10 @@ object NativeGpsRecoveryPolicy {
     fun shouldRestartDirectRequest(
         directActive: Boolean,
         sinceLastDirectCallbackMs: Long,
-        sinceLastDirectRequestMs: Long
+        sinceLastDirectRequestMs: Long,
+        restartsSinceCallback: Int = 0
     ): Boolean = directActive &&
+        restartsSinceCallback == 0 &&
         sinceLastDirectCallbackMs >= DIRECT_REQUEST_RESTART_AFTER_MS &&
         sinceLastDirectRequestMs >= DIRECT_REQUEST_RESTART_COOLDOWN_MS
 

@@ -54,6 +54,10 @@ class NativeRepositoryContractTest {
         assertTrue("GPS recovery must keep an Android-provider one-shot path independent of fused location",
             service.contains("native_location_probe_started") &&
                 service.contains("LocationManagerCompat.getCurrentLocation"))
+        assertTrue("off-route Doppler must not move a manually calibrated train",
+            service.contains("isRouteSpeedPlausible") && service.contains("speed_route_plausible"))
+        assertTrue("a cold direct-GPS acquisition must not be reset every two minutes",
+            service.contains("directGpsRestartsSinceCallback"))
         assertTrue("continuous documented route junctions must not freeze during a GPS outage",
             service.contains("dead-reckoning-boundary") && service.contains("advanceRouteByCounting"))
         assertTrue("operational route limit must stay separate from the sensor sanity ceiling",
@@ -126,6 +130,8 @@ class NativeRepositoryContractTest {
             service.contains("TextToSpeech.QUEUE_ADD") && engine.contains("val alerts: List<Alert>"))
         assertTrue("speed order row must progress in document order instead of sticking at departure",
             html.contains("function activeSpeedOrder") && html.contains("speedOrderIndex"))
+        assertTrue("speed-order progress must reset when a through trip changes physical axes",
+            html.contains("routeId+\"|\"+state.ctx.peregon+\"|\"+journeyTowards()"))
         assertTrue("wipe action must be hidden while the restriction list is empty",
             html.contains("id=\"wipeCard\"") &&
                 html.contains("style.display=arr.length?\"block\":\"none\""))

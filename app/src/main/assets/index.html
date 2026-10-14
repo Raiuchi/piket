@@ -1313,7 +1313,7 @@ window.addEventListener("unhandledrejection",function(e){
   if(savedStop&&isFinite(+savedStop.position)&&savedStop.route===state.ctx.peregon&&savedStop.direction===state.ctx.towards){rt.stoppedPositionM=+savedStop.position;rt.stoppedRoute=savedStop.route;rt.stoppedDirection=savedStop.direction;rt.posM=rt.stoppedPositionM;}
   var TIMING_STATIONS={
     "СпбГл - Москва":[["Санкт-Петербург-Главный",200],["Навалочная",3000],["Фарфоровская",6500],["Санкт-Петербург-Сортировочный-Московский",8000],["Обухово",10600],["Славянка",16300],["Металлострой",19000],["Ижорский Завод",22800],["Колпино",24600],["Поповка",34400],["Саблино",40200],["Тосно-2",49800],["Тосно",52500],["Ушаки",62800],["Георгиевская",67900],["Рябово",72400],["Соколов Ручей",74500],["Болотницкая",77600],["Любань",82500],["Померанье",88700],["Трубниково",95300],["Бабино",99600],["Бабино-2",102600],["Торфяное",109300],["Чудово-Московское",117800],["Волхово",124000],["Волхов Мост",125600],["Дубцы",133700],["Гряды",141100],["Большая Вишера",151600],["Малая Вишера",161700],["Краснёнка",173500],["Бурга",180900],["Мстинский Мост",188800],["Торбино",215200],["Вялка",222700],["Боровёнка",230900],["Заозерье",238900],["Окуловка",249000],["Яблоновка",260300],["Угловка",268700],["Селище",277200],["Лыкошино",287500],["Заключье",291600],["Алёшинка",296200],["Березайка",304900],["Поплавенец",312000],["Бологое-Московское",319400],["Бушевец",326200],["Бочановка",333400],["Академическая",345300],["Леонтьево",355500],["Цна",359700],["Вышний Волочёк",364200],["Елизаровка",370500],["Терелесовская",374900],["Осеченка",379900],["Индустрия",382800],["Спирово",397800],["Калашниково",418600],["Лихославль",441200],["Тверца",465900],["Дорошиха",478000],["Пролетарская",480200],["Тверь",483000],["Лазурная",489600],["Чуприяновка",496100],["Кузьминка",503400],["Редкино",517200],["Московское Море",521800],["Завидово",531000],["Решетниково",544700],["Клин",560600],["Подсолнечная",584900],["Поварово-1",598300],["Алабушево",607400],["Крюково",611200],["Сходня",619700],["Химки",631200],["Ховрино",633900],["Грачёвская",635800],["Москва-Товарная",646600],["Москва-Пассажирская",649500]],
-    "СПбФин - Выборг":[["Санкт-Петербург-Финляндский",500],["Ланская",5100],["Удельная",7700],["Озерки",10300],["Шувалово",11100],["Парголово",15600],["Левашово",19100],["Песочная",23200],["Дибуны",24500],["Белоостров",31300],["Солнечное",35500],["Репино",39800],["Комарово",43500],["Зеленогорск",49900],["Ушково",54600],["Рощино",58700],["Каннельярви",74700],["Захонское",80800],["Кирилловское",88300],["Лейпясуо",100200],["Гаврилово",107700],["Лебедевка",113800],["Верхне-Черкасово",119300],["Лазаревка",124200],["Выборг-Товарный",126500],["Выборг-Пассажирский",128900]],
+    "СПбФин - Выборг":[["Санкт-Петербург-Финляндский",1000],["Ланская",5100],["Удельная",7700],["Озерки",10300],["Шувалово",11100],["Парголово",15600],["Левашово",19100],["Песочная",23200],["Дибуны",24500],["Белоостров",31300],["Солнечное",35500],["Репино",39800],["Комарово",43500],["Зеленогорск",49900],["Ушково",54600],["Рощино",58700],["Каннельярви",74700],["Захонское",80800],["Кирилловское",88300],["Лейпясуо",100200],["Гаврилово",107700],["Лебедевка",113800],["Верхне-Черкасово",119300],["Лазаревка",124200],["Выборг-Товарный",126500],["Выборг-Пассажирский",128900]],
     "Выборг - Каменногорск":[["Выборг",0],["Таммисуо",5600],["Пальцево",11200],["Гвардейское",17300],["Возрождение",24300],["Ханнила",31300],["Никифоровское",33300],["Каменногорск",41100]],
     "Д. Долг - Павлово":[["Дача Долгорукова",0],["Заневский Пост-2",4800],["Мяглово",10900],["Колтуши",15400],["Манушкино",19900],["Павлово-на-Неве",29200]],
     "Павлово - Горы II путь":[["Павлово-на-Неве",29200],["Горы · смена оси 34 → 42 км",42000]],
@@ -3228,7 +3228,7 @@ window.addEventListener("unhandledrejection",function(e){
     if(routeId==="last-spbfin-kamenn"||routeId==="last-kamenn-spbfin")return (TIMING_STATIONS["СПбФин - Выборг"]||[]).concat(TIMING_STATIONS["Выборг - Каменногорск"]||[]);
     return[];
   }
-  function speedPlaceKey(value){return String(value||"").toLowerCase().replace(/ё/g,"е").replace(/с\.?\s*пб\.?\s*гл\.?\s*моск/g,"санкт петербург главный").replace(/москва[-– ]?пасс(?:ажирская)?/g,"москва пассажирская").replace(/москва[-– ]?тов(?:арная)?/g,"москва товарная").replace(/петрозаводск[-– ]пассажирский/g,"петрозаводск").replace(/блок[-– ]пост/g,"пост").replace(/[^а-яa-z0-9]+/g," ").trim();}
+  function speedPlaceKey(value){return String(value||"").toLowerCase().replace(/ё/g,"е").replace(/с\.?\s*пб\.?\s*гл\.?\s*моск/g,"санкт петербург главный").replace(/(?:с\.?\s*)?пб\.?\s*[-–]?\s*финл(?:яндский)?\.?/g,"санкт петербург финляндский").replace(/^выборг(?!\s*[-– ]?пасс)/,"выборг пассажирский").replace(/москва[-– ]?пасс(?:ажирская)?/g,"москва пассажирская").replace(/москва[-– ]?тов(?:арная)?/g,"москва товарная").replace(/петрозаводск[-– ]пассажирский/g,"петрозаводск").replace(/блок[-– ]пост/g,"пост").replace(/[^а-яa-z0-9]+/g," ").trim();}
   function stationPositionForSpeedRow(routeId,name){
     var row=speedPlaceKey(name),best=null,bestAt=Infinity;
     speedStationRows(routeId).forEach(function(st){
@@ -3240,6 +3240,8 @@ window.addEventListener("unhandledrejection",function(e){
     if(/перрон/i.test(name||"")){
       if(routeId==="sap-spb-msk"||routeId==="last-spb-msk")return /отпр/i.test(name)?200:649500;
       if(routeId==="sap-msk-spb"||routeId==="last-msk-spb")return /отпр/i.test(name)?649500:200;
+      if(routeId==="last-spbfin-kamenn")return 1000;
+      if(routeId==="last-kamenn-spbfin")return state.ctx.peregon==="СПбФин - Выборг"?1000:0;
     }
     return null;
   }
@@ -3472,8 +3474,12 @@ window.addEventListener("unhandledrejection",function(e){
     if(!candidate)rows.forEach(function(row){if(row.progress!=null&&row.progress<=progress+5)candidate=row;});
     if(!candidate)candidate=rows.find(function(row){return row.progress!=null;})||null;
     if(!candidate)return null;
-    var key=routeId+"|"+journeyTowards()+"|"+orderPathMode(),moved=rt.speedOrderLastM==null?0:(reverse?rt.speedOrderLastM-positionM:positionM-rt.speedOrderLastM);
-    if(rt.speedOrderKey!==key||moved < -500){rt.speedOrderKey=key;rt.speedOrderIndex=candidate.pathIndex;}
+    // One order document can contain several physical axes (for example the
+    // Finland–Vyborg and Vyborg–Kamennogorsk legs). Reset monotonic row progress
+    // when the active leg changes; otherwise an index from the first filtered list
+    // points at an unrelated card in the second list after the Vyborg transition.
+    var key=routeId+"|"+state.ctx.peregon+"|"+journeyTowards()+"|"+orderPathMode(),moved=rt.speedOrderLastM==null?0:(reverse?rt.speedOrderLastM-positionM:positionM-rt.speedOrderLastM);
+    if(rt.speedOrderKey!==key||moved < -500){rt.speedOrderKey=key;rt.speedOrderIndex=candidate.pathIndex;rt.speedOrderLastM=null;}
     else if(rt.speedOrderIndex==null||candidate.pathIndex>=rt.speedOrderIndex)rt.speedOrderIndex=candidate.pathIndex;
     rt.speedOrderLastM=positionM;
     return rows[rt.speedOrderIndex]||candidate;

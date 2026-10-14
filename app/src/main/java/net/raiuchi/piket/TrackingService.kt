@@ -78,6 +78,7 @@ class TrackingService : Service() {
     private var directGpsMinimumStopAt = 0L
     private var directGpsLastCallbackAt = 0L
     private var directGpsLastRequestAt = 0L
+    private var directGpsRestartsSinceCallback = 0
     private var directGpsRequestRestartCount = 0
     private var primaryStableSinceAt = 0L
     private var lastPrimaryHealthyFixAt = 0L
@@ -520,7 +521,8 @@ class TrackingService : Service() {
                     lastGnssStatusAtElapsed > 0L &&
                     elapsedNow - lastGnssStatusAtElapsed <= 15_000L
                 if (!gnssActivelyAcquiring && NativeGpsRecoveryPolicy.shouldRestartDirectRequest(directGpsActive,
-                        now - directGpsLastCallbackAt, now - directGpsLastRequestAt)) {
+                        now - directGpsLastCallbackAt, now - directGpsLastRequestAt,
+                        directGpsRestartsSinceCallback)) {
                     restartDirectGpsRequest(now, "callback-stalled")
                 }
                 if (NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(directGpsActive,
@@ -592,6 +594,7 @@ class TrackingService : Service() {
             override fun onLocationChanged(location: Location) {
                 locationCallbackCount++
                 directGpsLastCallbackAt = System.currentTimeMillis()
+                directGpsRestartsSinceCallback = 0
                 if (!directGpsFirstCallbackSeen) {
                     directGpsFirstCallbackSeen = true
                     diagnostics.event("direct_gps_first_fix", diagnosticContext() + mapOf(
@@ -617,6 +620,7 @@ class TrackingService : Service() {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
             directGpsListener = listener; directGpsActive = true; directGpsStartedAt = now
             directGpsLastCallbackAt = now; directGpsLastRequestAt = now
+            directGpsRestartsSinceCallback = 0
             lastFusedRecoveryFixNanos = 0L
             primaryStableSinceAt = 0L; lastPrimaryHealthyFixAt = 0L
             directGpsExtendedLogged = false; directGpsFirstCallbackSeen = false
@@ -641,6 +645,7 @@ class TrackingService : Service() {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f,
                 listener, Looper.getMainLooper())
             directGpsLastRequestAt = now
+            directGpsRestartsSinceCallback++
             directGpsRequestRestartCount++
             diagnostics.event("direct_gps_request_restarted", diagnosticContext() + mapOf(
                 "reason" to reason,
@@ -792,6 +797,7 @@ class TrackingService : Service() {
         directGpsExtendedLogged = false; directGpsFirstCallbackSeen = false
         directGpsWaitingStage = 0; directGpsMinimumStopAt = 0L
         directGpsLastCallbackAt = 0L; directGpsLastRequestAt = 0L
+        directGpsRestartsSinceCallback = 0
         primaryStableSinceAt = 0L; lastPrimaryHealthyFixAt = 0L
         releaseRecoveryWakeLock()
     }
@@ -884,7 +890,13 @@ class TrackingService : Service() {
         val routePositionPlausible = NativeGpsRecoveryPolicy.isRoutePositionPlausible(
             routeLabel, currentSnap?.distanceM)
         val positionAccepted = basePositionAccepted && routePositionPlausible
-        val engineSpeed = result.filteredSpeedMps
+        // Never move a manual calibration using Doppler from a fresh but physically
+        // impossible coordinate. Keep dead reckoning for coarse fixes near the same
+        // railway corridor, but quarantine spoofed/off-route fixes such as the 59 km
+        // jump recorded at Finland station.
+        val speedRoutePlausible = NativeGpsRecoveryPolicy.isRouteSpeedPlausible(
+            routeLabel, currentSnap?.distanceM)
+        val engineSpeed = result.filteredSpeedMps?.takeIf { speedRoutePlausible }
         val beforeUpdate = tripEngine?.save()
         // A fresh coarse fix near the selected route is good enough to remember where
         // the manual calibration was made. It is never shown as a trusted GPS fix; the
@@ -1026,6 +1038,11 @@ class TrackingService : Service() {
             "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
             "bearing_deg" to if (location.hasBearing()) location.bearing else null,
             "filtered_speed_kmh" to result.filteredSpeedMps?.times(3.6f),
+            "engine_speed_kmh" to result.filteredSpeedMps?.takeIf {
+                NativeGpsRecoveryPolicy.isRouteSpeedPlausible(routeLabel, snap?.distanceM)
+            }?.times(3.6f),
+            "speed_route_plausible" to NativeGpsRecoveryPolicy.isRouteSpeedPlausible(
+                routeLabel, snap?.distanceM),
             "accepted" to result.accepted, "stationary" to result.stationary,
             "quality" to result.quality, "reason" to result.reason,
             "satellites" to satellitesUsed, "average_cn0" to averageCn0,

@@ -57,6 +57,7 @@ function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap
   const lookup=position=>{const order=context.activeSpeedOrder(effectiveRouteId,position);return{order,speed:context.orderSpeedValue(order),next:context.nextSpeedOrder(effectiveRouteId,order),routeId:effectiveRouteId};};
   lookup.mode=context.orderPathMode();
   lookup.options=context.orderPathOptions();
+  lookup.setPeregon=value=>{context.state.ctx.peregon=value;};
   return lookup;
 }
 function checkNextSequence(label,direction,routeId,peregon,from,to,step=250,physicalDirection=direction){
@@ -66,6 +67,26 @@ function checkNextSequence(label,direction,routeId,peregon,from,to,step=250,phys
   if(reverse){for(let pos=from;pos>=to;pos-=step){const result=orderAt(pos),next=result.next;if(next?.entry!=null&&pos-next.entry < -5)errors.push(`${pos} -> ${next.entry} ${next.rr.name}`);}}
   else {for(let pos=from;pos<=to;pos+=step){const result=orderAt(pos),next=result.next;if(next?.entry!=null&&next.entry-pos < -5)errors.push(`${pos} -> ${next.entry} ${next.rr.name}`);}}
   check(`${label}: следующая скорость всегда впереди (${Math.floor(Math.abs(from-to)/step)+1} точек)`,errors.length===0);
+}
+function checkOrderCoverage(label,direction,routeId,peregon,from,to,step,physicalDirection=direction,indexRange=null){
+  const orderAt=speedLogic(direction,'auto',routeId,peregon,physicalDirection);
+  const reverse=physicalDirection==='obratno';
+  const errors=[];
+  let previousEntry=null;
+  const visit=pos=>{
+    const result=orderAt(pos),order=result.order;
+    if(!order){errors.push(`${pos}: карточка не найдена`);return;}
+    if(!Number.isFinite(result.speed)||result.speed<=0)errors.push(`${pos}: скорость ${result.speed}`);
+    if(indexRange&&(order.index<indexRange[0]||order.index>indexRange[1]))errors.push(`${pos}: индекс ${order.index} вне ${indexRange.join('..')}`);
+    if(Number.isFinite(order.entry)&&Number.isFinite(previousEntry)){
+      if(!reverse&&order.entry+5<previousEntry)errors.push(`${pos}: карточка вернулась ${previousEntry} -> ${order.entry}`);
+      if(reverse&&order.entry-5>previousEntry)errors.push(`${pos}: карточка вернулась ${previousEntry} -> ${order.entry}`);
+    }
+    if(Number.isFinite(order.entry))previousEntry=order.entry;
+  };
+  if(reverse){for(let pos=from;pos>=to;pos-=step)visit(pos);}else{for(let pos=from;pos<=to;pos+=step)visit(pos);}
+  if(errors.length)console.error(`${label}: ${errors.slice(0,10).join('; ')}`);
+  check(`${label}: текущая карточка непрерывна и не возвращается назад (${Math.floor(Math.abs(from-to)/step)+1} точек)`,errors.length===0);
 }
 let orderAt=speedLogic('tuda','auto');
 check('Петербург — Москва начинает с 25 км/ч на перронном пути',orderAt(200).speed===25);
@@ -93,6 +114,10 @@ checkNextSequence('Финляндский — Выборг','tuda','last-spbfin-
 checkNextSequence('Выборг — Финляндский','obratno','last-kamenn-spbfin','СПбФин - Выборг',130000,0,250);
 checkNextSequence('Выборг — Каменногорск','tuda','last-spbfin-kamenn','Выборг - Каменногорск',0,42000,100);
 checkNextSequence('Каменногорск — Выборг','obratno','last-kamenn-spbfin','Выборг - Каменногорск',42000,0,100);
+checkOrderCoverage('Финляндский — Выборг','tuda','last-spbfin-kamenn','СПбФин - Выборг',0,130000,50,'tuda',[0,31]);
+checkOrderCoverage('Выборг — Каменногорск','tuda','last-spbfin-kamenn','Выборг - Каменногорск',0,42000,25,'tuda',[32,57]);
+checkOrderCoverage('Каменногорск — Выборг','obratno','last-kamenn-spbfin','Выборг - Каменногорск',42000,0,25,'obratno',[0,18]);
+checkOrderCoverage('Выборг — Финляндский','obratno','last-kamenn-spbfin','СПбФин - Выборг',130000,0,50,'obratno',[19,58]);
 checkNextSequence('Дача Долгорукова — Павлово','tuda','last-dd-ptz','Д. Долг - Павлово',0,29200,100);
 checkNextSequence('Павлово — Дача Долгорукова','obratno','last-ptz-dd','Д. Долг - Павлово',29200,0,100);
 checkNextSequence('Павлово — Горы','tuda','last-dd-ptz','Павлово - Горы II путь',29200,42000,50);
@@ -135,13 +160,23 @@ check('после Выборга приказ использует только 
 orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','Выборг - Каменногорск');
 check('до Выборга обратный приказ использует только строки Каменногорского участка',orderAt(40000).order.index<=18);
 orderAt=speedLogic('tuda','auto','last-spbfin-kamenn','СПбФин - Выборг');
+check('Финляндский ход начинает с карточки 25 км/ч для перронных путей',orderAt(1000).speed===25&&/перрон/i.test(orderAt(1000).order.rr.name));
 check('Финляндский — Выборг штатно идёт по I главному',orderAt(80000).order.pathLabel==='I главный');
+orderAt(120000);
+orderAt.setPeregon('Выборг - Каменногорск');
+check('переход в Выборге сбрасывает индекс карточки на Каменногорскую ось',orderAt(5000).order.index>=32&&orderAt(5000).order.index<=57);
 orderAt=speedLogic('tuda','auto','last-spbfin-kamenn','Выборг - Каменногорск');
 check('Выборг — Каменногорск штатно идёт по II главному',orderAt(20000).order.pathLabel==='II главный');
 orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','Выборг - Каменногорск');
 check('Каменногорск — Выборг штатно идёт по I главному',orderAt(20000).order.pathLabel==='I главный');
 orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','СПбФин - Выборг');
 check('Выборг — Финляндский после 4 пути возвращается на II главный',orderAt(100000).order.pathLabel==='II главный');
+const finArrival=orderAt(1000);
+check(`прибытие на Финляндский заканчивается карточкой перронных путей (${finArrival.speed}, ${finArrival.order&&finArrival.order.rr.name})`,finArrival.speed===25&&/перрон/i.test(finArrival.order.rr.name));
+orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','Выборг - Каменногорск');
+orderAt(35000);
+orderAt.setPeregon('СПбФин - Выборг');
+check('обратный переход в Выборге сбрасывает индекс карточки на Петербургскую ось',orderAt(120000).order.index>=19);
 orderAt=speedLogic('tuda','auto','last-luga','Броневая - Луга');
 const lugaOutboundMain=orderAt(50000),lugaOutboundArrival=orderAt(137900);
 check(`Балтийский ход следует по I главному и заходит в Луге через IIс на IП (${lugaOutboundMain.order.pathLabel}, ${lugaOutboundArrival.order.index}, ${lugaOutboundArrival.speed})`,lugaOutboundMain.order.pathLabel==='I главный'&&lugaOutboundArrival.speed===40);

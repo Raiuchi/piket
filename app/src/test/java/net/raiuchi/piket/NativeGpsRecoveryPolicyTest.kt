@@ -32,12 +32,16 @@ class NativeGpsRecoveryPolicyTest {
         assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", 250.1))
         assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", null))
         assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("Все участки", null))
+        assertTrue(NativeGpsRecoveryPolicy.isRouteSpeedPlausible("СПбФин - Выборг", 999.9))
+        assertFalse(NativeGpsRecoveryPolicy.isRouteSpeedPlausible("СПбФин - Выборг", 1_000.1))
+        assertTrue(NativeGpsRecoveryPolicy.isRouteSpeedPlausible("Все участки", null))
     }
 
-    @Test fun stalledNativeGpsRequestIsActivelyRestarted() {
+    @Test fun stalledNativeGpsRequestIsRestartedOnlyOncePerCallbackCycle() {
         assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 119_999, 120_000))
         assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 180_000, 119_999))
         assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 120_000, 120_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 600_000, 120_000, 1))
         assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(false, 180_000, 180_000))
     }
 
