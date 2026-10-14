@@ -159,6 +159,12 @@
   .trav{text-align:center;font-size:11px;color:var(--dim2);margin-top:7px;font-family:var(--mono)}
   .zone-hint{display:none;align-items:center;justify-content:center;gap:7px;width:max-content;max-width:100%;margin:9px auto 0;padding:7px 11px;border:1px solid rgba(245,165,36,.42);border-radius:999px;background:linear-gradient(180deg,rgba(245,165,36,.16),rgba(62,42,8,.18));color:#ffd27a;font-size:11px;font-weight:750;letter-spacing:.02em;box-shadow:0 0 18px rgba(245,165,36,.08)}
   .zone-hint.on{display:flex}.zone-hint .zh-dot{width:7px;height:7px;border-radius:50%;background:#f5a524;box-shadow:0 0 9px rgba(245,165,36,.9)}
+  .trip-health{display:flex;align-items:flex-start;gap:10px;margin:10px 0 0;padding:10px 12px;border-radius:13px;border:1px solid var(--line);background:linear-gradient(135deg,rgba(22,29,40,.96),rgba(9,13,20,.96));color:var(--dim);box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+  .trip-health .th-dot{width:9px;height:9px;margin-top:4px;flex:none;border-radius:50%;background:#7f8a98;box-shadow:0 0 10px rgba(127,138,152,.3)}
+  .trip-health .th-copy{min-width:0;display:flex;flex-direction:column;gap:2px}.trip-health b{font-size:12px;color:var(--txt);font-weight:800}.trip-health span{font-size:10.5px;line-height:1.35}
+  .trip-health.ok{border-color:rgba(47,191,113,.34)}.trip-health.ok .th-dot{background:var(--green);box-shadow:0 0 11px rgba(47,191,113,.7)}
+  .trip-health.check{border-color:rgba(245,165,36,.4)}.trip-health.check .th-dot{background:var(--amber);box-shadow:0 0 11px rgba(245,165,36,.7);animation:pulse 1.1s infinite}
+  .trip-health.bad{border-color:rgba(255,77,79,.42)}.trip-health.bad .th-dot{background:var(--rsig);box-shadow:0 0 11px rgba(255,77,79,.65)}
 
   .signal{margin:14px 0 0;border-radius:17px;padding:15px;border:1px solid var(--line);background:var(--panel);
           transition:border-color .4s,background .4s,box-shadow .4s;position:relative;overflow:hidden;
@@ -755,6 +761,7 @@
     <div class="trav">пройдено от калибровки: <span class="num" id="oTrav">0 м</span></div>
     <div class="trav" id="autoCalWarn" style="display:none;color:#f5a623;font-weight:600">⚠ Позиция определена автоматически — проверь и поправь при возможности</div>
     <div class="zone-hint" id="zoneHint"><span class="zh-dot"></span><span>Частая зона помех GPS</span></div>
+    <div class="trip-health" id="tripHealth" role="status" aria-live="polite"><i class="th-dot"></i><span class="th-copy"><b id="tripHealthTitle">Проверка перед стартом</b><span id="tripHealthDetail">Откалибруйся — затем проверю готовность GPS.</span></span></div>
     <div class="trip-console" id="tripConsole">
       <div class="tc-title"><b>Рабочая сводка</b><button type="button" class="tc-track" id="tripTrackPick">Путь: авто</button></div>
       <button type="button" class="tc-card wide tc-empty" id="tripOrderCard">
@@ -1306,9 +1313,76 @@ window.addEventListener("unhandledrejection",function(e){
     if(active)$("#gpsTxt").textContent="частая зона помех";
   }
 
-  var rt={tracking:false,watchId:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,stoppedPositionM:null,stoppedRoute:null,stoppedDirection:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserFixAt:0,lastGpsRestartAt:0,webHiddenAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting"};
+  var rt={tracking:false,watchId:null,tickTimer:null,lastTick:null,lastGoodFix:null,pendingCandM:null,pendingCount:0,srLiveTimer:null,srRouteId:null,autoCalib:false,last:null,odo:0,speed:0,posM:null,stoppedPositionM:null,stoppedRoute:null,stoppedDirection:null,wake:null,audio:null,mirrorGen:0,fixQuality:null,zeroSpeedSince:null,zeroSpeedAnchor:null,driftSince:null,driftCandM:null,peregonCandLabel:null,peregonCandCount:0,trackMCand:null,autoCalCand:null,autoCalCount:0,autoCalWeakStreak:0,autoCalNullStreak:0,trackingSince:null,activeAlert:null,lastShownAlertKey:null,ackedAlertKey:null,awaitingManualCalib:false,pendingCalibConfirm:false,accelMag:0,accelAvailable:false,lastBrowserFixAt:0,lastGpsRestartAt:0,webHiddenAt:0,speedRecovery:false,lastZoneRecordAt:0,zoneWarnedKey:null,correctionTargetOdo:null,gpsState:"waiting",recoveryReason:null,transitionAudit:null,preflight:null};
   rt.gpsResiduals=[]; rt.gpsResidualAt=0; rt.signalLostAt=0; rt.lastLossDecayAt=0; rt.speedCand=null; rt.speedCandCount=0; rt.stationaryAnchor=null; rt.stationarySince=0; rt.lastSnapSegIdx=-1; rt.zoneBadSince=0; rt.zoneHintActive=false;
   rt.lastAccuracy=999; rt.directionMismatchCount=0; rt.directionWarning=false; rt.alertRepeatAt=0;
+  function setTripHealth(kind,title,detail){
+    var box=document.getElementById("tripHealth"),head=document.getElementById("tripHealthTitle"),copy=document.getElementById("tripHealthDetail");
+    if(!box||!head||!copy)return;box.className="trip-health"+(kind?(" "+kind):"");head.textContent=title;copy.textContent=detail;
+  }
+  function collectGpsPreflight(){
+    var result={calibrated:!!(state.calib&&state.calib._manual===true),permission:true,providerEnabled:true,available:("geolocation" in navigator),platform:window.Android?"android":"web"};
+    try{if(window.Android&&window.Android.gpsPreflight){var native=JSON.parse(window.Android.gpsPreflight()||"{}");result.permission=native.permission!==false;result.providerEnabled=native.providerEnabled!==false;result.available=true;}}catch(e){result.available=false;}
+    result.ready=result.calibrated&&result.available&&result.permission&&result.providerEnabled;return result;
+  }
+  function recoveryReasonCopy(reason,satellites,accuracy){
+    var sats=Math.max(0,+satellites||0),acc=+accuracy||999;
+    var copy={
+      "permission-denied":"Нет разрешения на точную геолокацию",
+      "gps-disabled":"GPS выключен в настройках телефона",
+      "no-fresh-fix":"Нет свежих координат — продолжаю счёт по пути",
+      "reserve-searching":"Основной канал молчит — запускаю резервный GPS",
+      "reserve-acquiring":"Резервный GPS видит спутники — жду точную координату",
+      "low-accuracy":"Координата слишком неточная — не применяю её",
+      "position-unconfirmed":"Координата получена, но ещё не подтверждена на выбранном пути",
+      "position-confirming":"Подтверждаю найденную позицию перед коррекцией",
+      "off-route":"Координата не совпала с выбранным железнодорожным путём",
+      "stale":"Координата устарела — жду новый замер"
+    }[reason];
+    if(copy)return copy;
+    if(sats===0)return "Спутники пока не используются — сохраняю расчётную позицию";
+    if(acc>70)return "Сигнал есть, но точность "+Math.round(acc)+" м — жду лучший замер";
+    return "Сигнал есть — проверяю координату и направление движения";
+  }
+  function beginTransitionAudit(from,to,source){
+    if(!from||!to||from===to)return;
+    rt.transitionAudit={from:from,to:to,source:source||"auto",startedAt:Date.now(),confirmations:0,status:"checking"};
+    appDiagnostic("route_transition_audit_started",{from:from,to:to,source:source||"auto"});
+    setTripHealth("check","Проверяю переход на новый участок",to+" · сверяю километровую ось с GPS");
+  }
+  function confirmTransitionAudit(distanceM){
+    var audit=rt.transitionAudit;if(!audit||audit.status!=="checking")return;
+    audit.status="ok";audit.finishedAt=Date.now();audit.distanceM=distanceM;
+    appDiagnostic("route_transition_audit_confirmed",{from:audit.from,to:audit.to,source:audit.source,duration_ms:audit.finishedAt-audit.startedAt,distance_to_route_m:distanceM});
+  }
+  function verifyBrowserTransition(lat,lon,accuracy){
+    var audit=rt.transitionAudit;if(!audit||audit.status!=="checking"||audit.to!==state.ctx.peregon)return;
+    var idx=TRACK.labels.indexOf(audit.to);if(idx<0)return;var match=findNearestSegment(lat,lon,TRACK.segs[idx],null,null),good=+accuracy<=70&&match&&match.dist<=120;
+    audit.confirmations=good?(audit.confirmations+1):0;
+    if(audit.confirmations>=2)confirmTransitionAudit(match.dist);
+    else if(Date.now()-audit.startedAt>20000){audit.status="warning";audit.distanceM=match?match.dist:null;appDiagnostic("route_transition_audit_warning",{from:audit.from,to:audit.to,distance_to_route_m:audit.distanceM,accuracy_m:accuracy});}
+  }
+  function verifyNativeTransition(recovering){
+    var audit=rt.transitionAudit;if(!audit||audit.status!=="checking"||audit.to!==state.ctx.peregon)return;
+    audit.confirmations=recovering?0:(audit.confirmations+1);if(audit.confirmations>=2)confirmTransitionAudit(null);
+    else if(Date.now()-audit.startedAt>20000){audit.status="warning";appDiagnostic("route_transition_audit_warning",{from:audit.from,to:audit.to,source:"native"});}
+  }
+  function renderTripHealth(){
+    var audit=rt.transitionAudit;
+    if(audit&&audit.status==="checking"){setTripHealth("check","Проверяю переход на новый участок",audit.to+" · сверяю километровую ось с GPS");return;}
+    if(audit&&audit.status==="warning"){setTripHealth("bad","Переход требует проверки",audit.to+" · GPS пока не подтвердил новую ось, проверь километровый столб");return;}
+    if(audit&&audit.status==="ok"&&Date.now()-(audit.finishedAt||0)<12000){setTripHealth("ok","Переход подтверждён",audit.to+" · новая километровая ось совпала с путём");return;}
+    if(rt.tracking){
+      if(rt.fixQuality==="good"||rt.gpsState==="precise"||(!rt.nativeSnapshot&&rt.lastGoodFix)){setTripHealth("ok","GPS и позиция готовы","Координата подтверждена на выбранном пути");return;}
+      setTripHealth("check","Позиция восстанавливается",recoveryReasonCopy(rt.recoveryReason,rt.satellitesUsed,rt.lastAccuracy));return;
+    }
+    var p=collectGpsPreflight();rt.preflight=p;
+    if(!p.calibrated){setTripHealth("bad","Проверка перед стартом","Сначала введи километраж через «Калибровка»");return;}
+    if(!p.permission){setTripHealth("bad","GPS не готов","Нужно разрешение на точную геолокацию");return;}
+    if(!p.providerEnabled){setTripHealth("bad","GPS выключен","Включи геолокацию телефона перед поездкой");return;}
+    if(!p.available){setTripHealth("bad","GPS недоступен","На этом устройстве геолокация недоступна");return;}
+    setTripHealth("ok","К старту готово","Калибровка принята · GPS доступен · сигнал проверю после запуска");
+  }
   var savedStop=load("sap_lastStop",null);
   if(savedStop&&isFinite(+savedStop.position)&&savedStop.route===state.ctx.peregon&&savedStop.direction===state.ctx.towards){rt.stoppedPositionM=+savedStop.position;rt.stoppedRoute=savedStop.route;rt.stoppedDirection=savedStop.direction;rt.posM=rt.stoppedPositionM;}
   var TIMING_STATIONS={
@@ -1863,7 +1937,7 @@ window.addEventListener("unhandledrejection",function(e){
             toast("Смена кабины — откалибруйся по новому столбу");
           }
           var vyborgAxisChange=isVyborgLeg(state.ctx.peregon)&&isVyborgLeg(label),dachaAxisChange=isDachaLeg(state.ctx.peregon)&&isDachaLeg(label);
-          var previousChainPeregon=state.ctx.peregon;state.ctx.peregon=label;webLog("route_transition",{from:previousChainPeregon,to:label,kind:"journey-chain",place:chainNext.place||null,physical_m:currentTrackMeters()}); persist(); renderTrip(); toast(chainNext.trainChange?("Великий Новгород: смена поезда "+chainNext.trainChange):(chainNext.cabChange?("Чудово: смена кабины, маршрут продолжен автоматически"):(activeThrough()==="chudovo"?((chainNext.place||"Маршрут")+": участок и километровая ось переключены автоматически"):(vyborgAxisChange?"Выборг: километровая ось переключена автоматически":(dachaAxisChange?(label.indexOf("Горы")>=0?"Горы: километровая ось переключена автоматически":"Маршрут продолжен автоматически"):("Перегон: "+label)))))); setSeg("#dirSeg",journeyTowards(),"d");
+          var previousChainPeregon=state.ctx.peregon;state.ctx.peregon=label;beginTransitionAudit(previousChainPeregon,label,"journey-chain");webLog("route_transition",{from:previousChainPeregon,to:label,kind:"journey-chain",place:chainNext.place||null,physical_m:currentTrackMeters()}); persist(); renderTrip(); toast(chainNext.trainChange?("Великий Новгород: смена поезда "+chainNext.trainChange):(chainNext.cabChange?("Чудово: смена кабины, маршрут продолжен автоматически"):(activeThrough()==="chudovo"?((chainNext.place||"Маршрут")+": участок и километровая ось переключены автоматически"):(vyborgAxisChange?"Выборг: километровая ось переключена автоматически":(dachaAxisChange?(label.indexOf("Горы")>=0?"Горы: километровая ось переключена автоматически":"Маршрут продолжен автоматически"):("Перегон: "+label)))))); setSeg("#dirSeg",journeyTowards(),"d");
         }
         return;
       }
@@ -1904,7 +1978,7 @@ window.addEventListener("unhandledrejection",function(e){
           rt.peregonCandLabel=null; rt.peregonCandCount=0;
         }
         var previousPeregon=state.ctx.peregon;
-        state.ctx.peregon=label; webLog("route_transition",{from:previousPeregon,to:label,distance_to_route_m:bestDist,physical_m:currentTrackMeters()}); persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
+        state.ctx.peregon=label; beginTransitionAudit(previousPeregon,label,"geometry"); webLog("route_transition",{from:previousPeregon,to:label,distance_to_route_m:bestDist,physical_m:currentTrackMeters()}); persist(); renderTrip(); toast("Перегон: "+label); setSeg("#dirSeg",state.ctx.towards,"d");
       } else if(strictMode){ rt.peregonCandLabel=null; rt.peregonCandCount=0; }
     }
   }
@@ -1958,10 +2032,12 @@ window.addEventListener("unhandledrejection",function(e){
     // но не маскирует зависание основного точного watchPosition.
     var fixAge=(c.fixAgeMs==null?Math.max(0,Date.now()-(p.timestamp||Date.now())):+c.fixAgeMs);
     var sats=+c.satellitesUsed||0, cn0=+c.averageCn0||0, diversity=+c.constellationDiversity||0;
-    if(c.mockLocation===true || fixAge>5000 || !isFinite(c.latitude) || !isFinite(c.longitude)){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; onErr({code:2,stale:true}); return; }
+    rt.satellitesUsed=sats;
+    if(c.mockLocation===true || fixAge>5000 || !isFinite(c.latitude) || !isFinite(c.longitude)){ rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning";rt.recoveryReason="stale"; onErr({code:2,stale:true}); return; }
     if(!fromBackup && acc<=70) rt.lastBrowserFixAt=Date.now(); // только свежая пригодная позиция считается восстановлением основного GPS
     var satelliteWeak=(c.gnssTelemetry===true && (sats<4 || cn0<18 || (diversity<2 && sats<6)));
     var signalGood=acc<=30 && !satelliteWeak;
+    rt.recoveryReason=signalGood?null:(sats===0?"no-fresh-fix":(acc>70?"low-accuracy":"position-confirming"));
     rt.gpsState=signalGood?(rt.lastGoodFix==null?"checking":"precise"):(acc<=70?"degraded":"deadreckoning");
     $("#gps").className="gps "+(signalGood?"live":(acc<=70?"weak":"dead"));
     $("#gpsTxt").textContent=rt.zoneHintActive?"частая зона помех":(signalGood?"GPS точный":(acc<=70?"GPS слабый":"счёт по пути"));
@@ -2368,11 +2444,12 @@ window.addEventListener("unhandledrejection",function(e){
     }
     rt.last=pt;
     autoDetectPeregon(c.latitude, c.longitude, acc);
+    verifyBrowserTransition(c.latitude,c.longitude,acc);
     updateAndroidNotification();
     renderTripAdaptive(false); evalAlerts(); }
   function onErr(e){
     if(!rt.signalLostAt){rt.signalLostAt=Date.now();webLog("gps_outage_started",{error_code:e&&e.code||null,stale:!!(e&&e.stale),last_accuracy_m:rt.lastAccuracy});}
-    rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning"; // watchdog ориентируется только на последнюю пригодную позицию
+    rt.gpsState="deadreckoning"; rt.fixQuality="deadreckoning";rt.recoveryReason=(e&&e.code===1)?"permission-denied":((e&&e.stale)?"stale":"no-fresh-fix"); // watchdog ориентируется только на последнюю пригодную позицию
     if(rt.last){ $("#spdSrc").textContent="GPS потерян — счёт вдоль пути"; $("#spdSrc").className="src dr"; $("#gps").className="gps dead"; $("#gpsTxt").textContent="счёт по пути";
       // КРИТИЧНО: при полной потере сигнала скорость раньше оставалась ЗАСТЫВШЕЙ на
       // последнем известном значении - если перед самой потерей был случайный шумовой
@@ -2476,12 +2553,13 @@ window.addEventListener("unhandledrejection",function(e){
   function saveTrackSnapshot(){
     try{ save("sap_snap",{ posM:rt.posM, speed:rt.speed, odo:rt.odo, tracking:rt.tracking, ts:Date.now(),
       peregon:state.ctx.peregon, towards:state.ctx.towards, fixQuality:rt.fixQuality, autoCalib:rt.autoCalib,
+      recoveryReason:rt.recoveryReason||null, satellitesUsed:rt.satellitesUsed||0, lastAccuracy:rt.lastAccuracy,
       activeAlert:rt.activeAlert||null }); }catch(e){}
   }
   function readTrackSnapshot(){ return load("sap_snap",null); }
-  function fixQualityText(q){
+  function fixQualityText(q,reason,satellites,accuracy){
     if(q==="good") return {gps:"live", txt:"GPS вкл", src:"GPS активен — позиция точная", srcCls:"src live"};
-    if(q==="recovering") return {gps:"weak", txt:"GPS восстановлен", src:"GPS восстановлен — плавно уточняю позицию", srcCls:"src dr"};
+    if(q==="recovering") return {gps:"weak", txt:"GPS уточняется", src:recoveryReasonCopy(reason,satellites,accuracy), srcCls:"src dr"};
     if(q==="deadreckoning") return {gps:"dead", txt:"счёт по пути", src:"GPS недоступен — счёт по скорости вдоль пути", srcCls:"src dr"};
     if(q==="checking") return {gps:"weak", txt:"GPS — проверяю", src:"Сигнал есть, уточняю позицию", srcCls:"src dr"};
     if(q==="weak") return {gps:"dead", txt:"GPS слабый", src:"Сигнал слабый — счёт по скорости", srcCls:"src dr"};
@@ -2507,13 +2585,13 @@ window.addEventListener("unhandledrejection",function(e){
     }
     if(gen!==rt.mirrorGen) return;
     rt.posM=snap.posM; rt.speed=snap.speed; rt.odo=(snap.odo!=null?snap.odo:rt.odo); rt.tracking=true;
-    rt.autoCalib=!!snap.autoCalib;
+    rt.autoCalib=!!snap.autoCalib;rt.recoveryReason=snap.recoveryReason||null;rt.satellitesUsed=+snap.satellitesUsed||0;rt.lastAccuracy=+snap.lastAccuracy||999;
     // Если headless только что сама определила позицию (запасная автокалибровка), а на
     // видимом экране калибровки до сих пор не было - подхватываем её из localStorage,
     // иначе экран продолжал бы показывать "Откалибруйся по столбу", хотя headless уже
     // считает и калибровка реально есть (просто на другой стороне, headless её записала).
     if(state.calib==null && rt.autoCalib){ state.calib=load("sap_cal",null); }
-    var st=fixQualityText(snap.fixQuality);
+    var st=fixQualityText(snap.fixQuality,snap.recoveryReason,snap.satellitesUsed,snap.lastAccuracy);
     $("#gps").className="gps "+st.gps; $("#gpsTxt").textContent=st.txt; $("#spdSrc").textContent=st.src; $("#spdSrc").className=st.srcCls;
     setTrackBtn(true); renderTrip(); setGauge();
     // КРИТИЧНО: видимый экран сам никогда не вызывал evalAlerts() (он вызывается только
@@ -2557,6 +2635,12 @@ window.addEventListener("unhandledrejection",function(e){
       openCal();
       return;
     }
+    rt.preflight=collectGpsPreflight();
+    appDiagnostic("gps_preflight",rt.preflight);
+    if(!rt.preflight.permission){setTripHealth("bad","GPS не готов","Разреши точную геолокацию и повторно нажми «Старт»");toast("Разреши точную геолокацию");try{if(window.Android&&window.Android.startTracking)window.Android.startTracking();}catch(e){}return;}
+    if(!rt.preflight.providerEnabled){setTripHealth("bad","GPS выключен","Включи геолокацию телефона и повторно нажми «Старт»");toast("Включи GPS в настройках телефона");return;}
+    if(!rt.preflight.available){setTripHealth("bad","GPS недоступен","На этом устройстве геолокация недоступна");toast("GPS недоступен");return;}
+    setTripHealth("check","Запускаю GPS","Жду первый свежий замер и проверяю привязку к пути");
     rt.diagnosticSessionId=rt.restoredDiagnosticSessionId||(Date.now()+"-"+Math.random().toString(36).slice(2,8));rt.restoredDiagnosticSessionId=null;rt.diagnosticSeq=0;
     webLog("trip_started",{manual_official_m:state.calib.m,calibration_track_m:state.calib._trackM,lead_m:state.settings.lead,restrictions:state.restrictions.length});
     rt.stoppedPositionM=null;rt.stoppedRoute=null;rt.stoppedDirection=null;save("sap_lastStop",null);
@@ -2574,6 +2658,7 @@ window.addEventListener("unhandledrejection",function(e){
       // позицию/скорость из её снэпшота, не пытаясь сам слушать onNativeLocation (туда больше
       // ничего не приходит, см. TrackingService).
       rt.nativeSessionId=+window.Android.startTracking()||0;
+      if(!rt.nativeSessionId){rt.tracking=false;setTrackBtn(false);setTripHealth("bad","GPS не запущен","Проверь разрешение на точную геолокацию");return;}
       IS_MIRROR=true; rt.tracking=true; setTrackBtn(true);
       toast("Отслеживание включено");
       return;
@@ -2612,7 +2697,7 @@ window.addEventListener("unhandledrejection",function(e){
     if(rt.nativeSessionId&&+nativeSessionId!==+rt.nativeSessionId)return;
     renderSatellites(satellitesUsed,gnssTelemetry===true);
     var nativeStructureChanged=!!(nativeRoute&&nativeRoute!==state.ctx.peregon),nativeAlertChanged=nativeAlertId!==rt.nativeAlertId||nativeAlertInZone!==rt.nativeAlertInZone;
-    if(nativeStructureChanged){state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);}
+    if(nativeStructureChanged){var priorNativeRoute=state.ctx.peregon;state.ctx.peregon=nativeRoute;if(nativeDirection)state.ctx.towards=nativeDirection;save("sap_ctx",state.ctx);beginTransitionAudit(priorNativeRoute,nativeRoute,"native");}
     // Kotlin is the source of truth for the safety-critical trip state; HTML only renders it.
     if(nativeOfficialM!=null){
       rt.nativeSnapshot=true;
@@ -2621,11 +2706,12 @@ window.addEventListener("unhandledrejection",function(e){
       rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
       rt.posM=+nativeOfficialM; rt.physicalM=nativeTripPhysicalM==null?null:+nativeTripPhysicalM; rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
       rt.fixQuality=nativeTripRecovering?"recovering":(nativeTripSource||"native");
-      rt.gpsState=nativeTripRecovering?"checking":"precise"; rt.satellitesUsed=+satellitesUsed||0; rt.averageCn0=+averageCn0||0;
+      rt.gpsState=nativeTripRecovering?"checking":"precise"; rt.satellitesUsed=+satellitesUsed||0; rt.averageCn0=+averageCn0||0;rt.lastAccuracy=+acc||999;rt.recoveryReason=nativeReason||null;
       $("#gps").className="gps "+(nativeTripRecovering?"weak":"live");
-      $("#gpsTxt").textContent=nativeTripRecovering?"позиция восстанавливается":"GPS + Kotlin";
-      $("#spdSrc").textContent=nativeTripRecovering?"Расчётная позиция":"Нативная позиция ✓";
+      $("#gpsTxt").textContent=nativeTripRecovering?(satellitesUsed>0?"GPS уточняется":"жду GPS"):"GPS + Kotlin";
+      $("#spdSrc").textContent=nativeTripRecovering?recoveryReasonCopy(rt.recoveryReason,satellitesUsed,acc):"Нативная позиция ✓";
       $("#spdSrc").className="src"+(nativeTripRecovering?" dr":"");
+      verifyNativeTransition(nativeTripRecovering===true);
       var nativeNow=Date.now(),fullRenderEvery=rt.thermalHot?5000:3000;
       var fullNativeRender=nativeStructureChanged||nativeAlertChanged||!rt.lastFullNativeRenderAt||nativeNow-rt.lastFullNativeRenderAt>=fullRenderEvery;
       if(document.getElementById("v-trip").classList.contains("on")){
@@ -2640,7 +2726,7 @@ window.addEventListener("unhandledrejection",function(e){
 
   function setTrackBtn(on){ var b=$("#btnTrack"); if(on){ b.textContent="■ Стоп"; b.classList.remove("primary"); b.classList.add("stop"); } else { b.textContent="▶ Старт"; b.classList.add("primary"); b.classList.remove("stop"); }
     var dirSeg=$("#dirSeg"); if(dirSeg) dirSeg.style.opacity = on ? "0.5" : "1"; }
-  function stopTrack(){ webLog("trip_session_summary",{duration_ms:rt.trackingSince?Math.max(0,Date.now()-rt.trackingSince):null,final_official_m:rt.posM,final_physical_m:rt.physicalM});webLog("trip_stopped"); if(rt.posM!=null){rt.stoppedPositionM=+rt.posM;rt.stoppedRoute=state.ctx.peregon;rt.stoppedDirection=state.ctx.towards;save("sap_lastStop",{position:rt.stoppedPositionM,route:rt.stoppedRoute,direction:rt.stoppedDirection,time:Date.now()});} rt.tracking=false;saveWebTripSession(false);
+  function stopTrack(){ webLog("trip_session_summary",{duration_ms:rt.trackingSince?Math.max(0,Date.now()-rt.trackingSince):null,final_official_m:rt.posM,final_physical_m:rt.physicalM});webLog("trip_stopped"); if(rt.posM!=null){rt.stoppedPositionM=+rt.posM;rt.stoppedRoute=state.ctx.peregon;rt.stoppedDirection=state.ctx.towards;save("sap_lastStop",{position:rt.stoppedPositionM,route:rt.stoppedRoute,direction:rt.stoppedDirection,time:Date.now()});} rt.tracking=false;rt.recoveryReason=null;rt.transitionAudit=null;saveWebTripSession(false);
     var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.remove("on");
     if(rt.watchId!=null){ navigator.geolocation.clearWatch(rt.watchId); rt.watchId=null; }
     if(rt.backupWatchId!=null){ try{navigator.geolocation.clearWatch(rt.backupWatchId);}catch(e){} rt.backupWatchId=null; }
@@ -2842,6 +2928,7 @@ window.addEventListener("unhandledrejection",function(e){
       confEl.className="conf-dots"+(rt.fixQuality?(" q-"+rt.fixQuality):"");
     }
     var acwEl=$("#autoCalWarn"); if(acwEl) acwEl.style.display=rt.autoCalib?"block":"none";
+    renderTripHealth();
     renderTripConsole();
     updateScheduleLivePace(false);
   }
@@ -3336,34 +3423,20 @@ window.addEventListener("unhandledrejection",function(e){
     });
     return matches.length?matches[matches.length-1]:null;
   }
-  function wrongMainRouteId(routeId){return routeId==="last-luga"?routeId:(WRONG_MAIN_ROUTE[routeId]||null);}
+  function wrongMainRouteId(routeId){return routeId?(WRONG_MAIN_ROUTE[routeId]||routeId):null;}
   function speedRouteIdForTrip(){var routeId=baseSpeedRouteIdForTrip();return orderPathMode()==="wrong"?(wrongMainRouteId(routeId)||routeId):routeId;}
   function orderPathMode(){
     var mode=journeyTowards()==="obratno"?(state.settings.orderPathObratno||"auto"):(state.settings.orderPathTuda||"auto");
-    // Отдельные «штатные» карточки I/III и IV/II дублируют автоматический
-    // профиль. Сохранённую настройку мягко возвращаем в «Авто» в обе стороны.
-    if(state.ctx.peregon==="СпбГл - Москва"&&mode==="primary")mode="auto";
-    // Не переносим специальный режим на маршрут, для которого встречной таблицы нет.
-    return mode==="wrong"&&!wrongMainRouteId(baseSpeedRouteIdForTrip())?"auto":mode;
+    // Старые ручные варианты главного пути дублировали автоматический профиль.
+    // После обновления безопасно возвращаем их в единый режим «Авто».
+    if(mode==="primary"||mode==="alternate")mode="auto";
+    return mode;
   }
   function orderPathOptions(){
-    var baseRouteId=baseSpeedRouteIdForTrip(),wrongAvailable=!!wrongMainRouteId(baseRouteId);
-    if(state.ctx.peregon!=="СпбГл - Москва")return[
-      {value:"auto",label:"Авто · главный",meta:"главный путь по выбранному направлению"},
-      {value:"primary",label:"Главный путь",meta:"скорость главного пути из приказа"},
-      ...(wrongAvailable?[{value:"wrong",label:"Неправильный главный",meta:"главный путь встречного направления без смены километража"}]:[]),
-      {value:"side",label:"Боковой путь",meta:"скорость бокового пути, где она указана"}
-    ];
-    return journeyTowards()==="obratno"?[
-      {value:"auto",label:"Авто · перрон → IV → II",meta:"любой перронный путь при отправлении; далее IV до Крюково, после Крюково II"},
-      {value:"alternate",label:"II путь до Крюково",meta:"неправильный путь; далее штатный II"},
-      {value:"wrong",label:"Неправильный главный",meta:"главный путь направления Санкт-Петербург → Москва"},
-      {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
-    ]:[
-      {value:"auto",label:"Авто · I → III",meta:"из Петербурга I, после Крюково III"},
-      ...((baseRouteId==="sap-spb-msk"||baseRouteId==="last-spb-msk")?[{value:"alternate",label:"I путь · Крюково → Москва",meta:"скорости из приказа по I пути до Москвы"}]:[]),
-      {value:"wrong",label:"Неправильный главный",meta:"главный путь направления Москва → Санкт-Петербург"},
-      {value:"side",label:"Боковой / перронный",meta:"показывать скорость бокового пути, где она указана"}
+    return[
+      {value:"auto",label:"Авто",meta:"штатный путь по выбранному направлению"},
+      {value:"wrong",label:"Неправильный главный",meta:"главный путь встречного направления без смены километража"},
+      {value:"side",label:"Боковой путь",meta:"скорость бокового или перронного пути, где она указана"}
     ];
   }
   function orderPathLabel(order){var mode=orderPathMode();if(mode==="auto"&&order&&order.pathLabel)return"Авто · "+order.pathLabel;var item=orderPathOptions().find(function(x){return x.value===mode;});return item?item.label:"Автоматически";}
@@ -3373,18 +3446,10 @@ window.addEventListener("unhandledrejection",function(e){
       var normalSecond=journeyTowards()==="obratno",wanted=mode==="wrong"?(normalSecond?"Путь I":"Путь II"):(normalSecond?"Путь II":"Путь I");
       selected=raw.filter(function(item){return (item.groupTitle||"")===wanted;});
     }
-    if(routeId==="sap-spb-msk"){
-      selected=mode==="alternate"?raw.slice(0,90).concat(raw.slice(107,112),SAPSAN_FIRST_PATH_MOSCOW_ROWS):raw.slice(0,107);
-    }
-    if(routeId==="sap-msk-spb"){
-      selected=mode==="alternate"?[raw[1]].concat(raw.slice(139,151),raw.slice(18,119)).filter(Boolean):raw.slice(0,119);
-    }
-    if(routeId==="last-spb-msk"){
-      selected=mode==="alternate"?raw.slice(0,72).concat(raw.slice(91,116)):raw.slice(0,91);
-    }
-    if(routeId==="last-msk-spb"){
-      selected=mode==="alternate"?[raw[2]].concat(raw.slice(103,115),raw.slice(18,87)).filter(Boolean):raw.slice(0,87);
-    }
+    if(routeId==="sap-spb-msk")selected=raw.slice(0,107);
+    if(routeId==="sap-msk-spb")selected=raw.slice(0,119);
+    if(routeId==="last-spb-msk")selected=raw.slice(0,91);
+    if(routeId==="last-msk-spb")selected=raw.slice(0,87);
     // На сквозном Финляндском маршруте километраж после Выборга начинается заново.
     // Оставляем только строки текущего физического участка, иначе одинаковые 1–41 км
     // могли подсветить строку между Петербургом и Выборгом вместо Каменногорского хода.

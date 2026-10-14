@@ -94,13 +94,14 @@ check('после Крюково в Москву автоматически вы
 check('прибытие в Москву переключается на 25 км/ч перронного пути',orderAt(649500).speed===25);
 orderAt=speedLogic('obratno','auto');
 check('Москва — Петербург начинает с 25 км/ч на перронном пути',orderAt(649500).speed===25);
-check('авторежим из Москвы прямо объясняет любой перронный путь и не дублируется отдельной карточкой IV пути',
-  orderAt.options[0].label.includes('перрон')&&orderAt.options[0].meta.includes('любой перронный путь')&&!orderAt.options.some(item=>item.value==='primary'));
+check('из Москвы доступны только Авто, Неправильный главный и Боковой путь',
+  JSON.stringify(orderAt.options.map(item=>item.value))===JSON.stringify(['auto','wrong','side']));
 check('из Москвы до Крюково автоматически выбран IV путь',orderAt(635400).speed===140);
 check('после Крюково в Петербург автоматически выбран II путь',orderAt(610300).speed===140);
 check('прибытие в Петербург переключается на 25 км/ч перронного пути',orderAt(200).speed===25);
 orderAt=speedLogic('obratno','primary');
 check('сохранённый старый режим IV пути безопасно мигрирует в авто',orderAt.mode==='auto'&&orderAt(649500).speed===25&&orderAt(635400).speed===140);
+check('сохранённый старый альтернативный главный путь безопасно мигрирует в авто',speedLogic('tuda','alternate').mode==='auto');
 const nearPetersburg=orderAt(19_556);
 check(`на 19 км обратного хода следующая скорость находится впереди, а не в уже пройденном диапазоне (${nearPetersburg.speed} → ${nearPetersburg.next&&nearPetersburg.next.rr.name})`,
   nearPetersburg.speed===200&&nearPetersburg.next&&nearPetersburg.next.rr.name.includes('12 км 5 пк'));
@@ -128,22 +129,24 @@ checkNextSequence('Новгород — Чудово','tuda','last-vnov-volh2','
 checkNextSequence('Чудово — Новгород','obratno','last-vnov-volh2','Чудово - Новгород',0,70000,100,'tuda');
 checkNextSequence('Чудово — Волхов','tuda','last-vnov-volh2','Волховстрой - Чудово',101000,0,100,'obratno');
 checkNextSequence('Волхов — Чудово','obratno','last-vnov-volh2','Волховстрой - Чудово',0,101000,100,'tuda');
-orderAt=speedLogic('obratno','alternate');
-[649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
-check('вариант II пути из Москвы после Крюково продолжает штатный II путь',orderAt(560500).speed===120);
-orderAt=speedLogic('tuda','alternate','last-spb-msk');
-[610500,614600,622300,632600,646000,649500].forEach(orderAt);
-orderAt=speedLogic('tuda','alternate','last-spb-msk');
-check('I путь от Крюково использует отдельные строки приказа до самой Москвы',orderAt(619700).speed===120&&orderAt(631200).speed===120&&orderAt(649500).speed===50);
-orderAt=speedLogic('tuda','alternate','sap-spb-msk');
-const sapsanFirstKriukovo=orderAt(614600),sapsanFirstSkhodnya=orderAt(619700),sapsanFirstKhimki=orderAt(631200),sapsanFirstMoscow=orderAt(649500);
-check(`Сапсан получает полный I путь Крюково — Москва именно из действующего приказа (${sapsanFirstKriukovo.speed}/${sapsanFirstSkhodnya.speed}/${sapsanFirstKhimki.speed}/${sapsanFirstMoscow.speed})`,
-  sapsanFirstKriukovo.speed===140&&sapsanFirstSkhodnya.speed===120&&sapsanFirstKhimki.speed===120&&sapsanFirstMoscow.speed===50&&sapsanFirstKhimki.order.pathLabel==='I главный, Крюково — Москва');
-check('дублирующий III путь убран, а полный I путь доступен для Сапсана и Ласточки',!html.includes('label:"III путь от Крюково"')&&html.includes('baseRouteId==="sap-spb-msk"||baseRouteId==="last-spb-msk"'));
-orderAt=speedLogic('obratno','alternate','last-msk-spb');
-[649500,646600,639900,632600,621900,616900,612400,610300,560500].forEach(orderAt);
-const lastochkaAltAfterKriukovo=orderAt(560500);
-check(`Ласточка по неправильному II пути после Крюково продолжает штатный II путь (${lastochkaAltAfterKriukovo.speed}, ${lastochkaAltAfterKriukovo.order&&lastochkaAltAfterKriukovo.order.rr.name})`,lastochkaAltAfterKriukovo.speed===160);
+[
+  ['Сапсан Петербург — Москва','tuda','sap-spb-msk','СпбГл - Москва','tuda'],
+  ['Сапсан Москва — Петербург','obratno','sap-msk-spb','СпбГл - Москва','obratno'],
+  ['Ласточка Петербург — Москва','tuda','last-spb-msk','СпбГл - Москва','tuda'],
+  ['Ласточка Москва — Петербург','obratno','last-msk-spb','СпбГл - Москва','obratno'],
+  ['Балтийский — Луга','tuda','last-luga','Броневая - Луга','tuda'],
+  ['Луга — Балтийский','obratno','last-luga','Броневая - Луга','obratno'],
+  ['Финляндский — Каменногорск','tuda','last-spbfin-kamenn','СПбФин - Выборг','tuda'],
+  ['Каменногорск — Финляндский','obratno','last-kamenn-spbfin','СПбФин - Выборг','obratno'],
+  ['Дача — Петрозаводск','tuda','last-dd-ptz','Горы - Петрозаводск','tuda'],
+  ['Петрозаводск — Дача','obratno','last-ptz-dd','Горы - Петрозаводск','obratno'],
+  ['Новгород — Чудово','tuda','last-vnov-volh2','Чудово - Новгород','obratno'],
+  ['Чудово — Волхов','obratno','last-vnov-volh2','Волховстрой - Чудово','tuda']
+].forEach(function(item){
+  const options=speedLogic(item[1],'auto',item[2],item[3],item[4]).options;
+  check(`${item[0]}: ровно три понятных режима пути`,JSON.stringify(options.map(option=>option.value))===JSON.stringify(['auto','wrong','side']));
+});
+check('дублирующие ручные главные пути полностью удалены из меню',!html.includes('value:"primary"')&&!html.includes('value:"alternate"')&&!html.includes('label:"Главный путь"'));
 orderAt=speedLogic('tuda','wrong');
 check('неправильный главный в Москву берёт встречный приказ и сохраняет рост километража',orderAt(249500).routeId==='sap-msk-spb'&&orderAt(249500).speed===200);
 orderAt=speedLogic('obratno','wrong');

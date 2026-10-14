@@ -113,9 +113,21 @@ class NativeRepositoryContractTest {
         assertTrue("trip screen must show current and next order speeds as separate readable values",
             html.contains("id=\"tripOrderNextSpeed\"") && html.contains("id=\"tripOrderNextName\"") &&
                 html.contains("id=\"tripOrderNextMark\""))
-        assertTrue("main and side path selection must be available on every linked speed-order route",
+        assertTrue("start must show a GPS readiness result without changing location cadence",
+            html.contains("id=\"tripHealth\"") && html.contains("collectGpsPreflight") &&
+                html.contains("gps_preflight") && main.contains("@JavascriptInterface fun gpsPreflight()"))
+        assertTrue("recovery UI must explain the concrete cause supplied by the native service",
+            html.contains("recoveryReasonCopy") && html.contains("reserve-searching") &&
+                service.contains("snapshotRecoveryReason") && service.contains("recoveryReason"))
+        assertTrue("route transitions must be audited without rewriting the selected position",
+            html.contains("beginTransitionAudit") && html.contains("verifyBrowserTransition") &&
+                html.contains("verifyNativeTransition") && html.contains("route_transition_audit_confirmed"))
+        assertTrue("path picker must expose only auto, wrong main and side modes",
             html.contains("trackPick.style.display=routeId?\"block\":\"none\"") &&
-                html.contains("label:\"Боковой путь\""))
+                html.contains("value:\"auto\",label:\"Авто\"") &&
+                html.contains("value:\"wrong\",label:\"Неправильный главный\"") &&
+                html.contains("value:\"side\",label:\"Боковой путь\"") &&
+                !html.contains("value:\"primary\"") && !html.contains("value:\"alternate\""))
         assertTrue("Luga must use its direction-specific order group",
             html.contains("routeId===\"last-luga\"") &&
                 html.contains("normalSecond?\"Путь II\":\"Путь I\"") &&

@@ -24,6 +24,7 @@ data class TripSnapshot(
     val speedKmh: Float = 0f,
     val recovering: Boolean = false,
     val source: String = "inactive",
+    val recoveryReason: String = "inactive",
     val satellites: Int = 0,
     val averageCn0: Float = 0f,
     val accuracyM: Float? = null,

@@ -1064,6 +1064,7 @@ class TrackingService : Service() {
             .put("route", saved?.route ?: routeLabel).put("direction", saved?.direction ?: "tuda")
             .put("speedKmh", (output?.speedMps ?: 0f) * 3.6f).put("recovering", output?.recovering ?: false)
             .put("source", output?.source ?: "unavailable").put("satellites", satellitesUsed)
+            .put("recoveryReason", snapshotRecoveryReason(output, accuracy))
             .put("averageCn0", averageCn0).put("accuracyM", accuracy)
             .put("directGpsReserve", directGpsActive)
             .put("alertInZone", output?.alertInZone ?: false)
@@ -1074,6 +1075,32 @@ class TrackingService : Service() {
         if(force||now-lastSnapshotDiskAt>=10_000){
             lastSnapshotDiskAt=now
             getSharedPreferences("piket_native", MODE_PRIVATE).edit().putString("snapshot",raw).apply()
+        }
+    }
+
+    /**
+     * UI-only explanation of the current recovery state. This never changes request
+     * frequency, filtering or coordinates; it only makes the already selected safety
+     * state understandable to the driver.
+     */
+    private fun snapshotRecoveryReason(output: NativeTripEngine.Output?, accuracy: Float): String {
+        if (output?.active != true) return "inactive"
+        if (!output.recovering) return "ok"
+        val now = System.currentTimeMillis()
+        val silenceMs = (now - lastFixReceivedAt).coerceAtLeast(0L)
+        val unusableMs = (now - lastUsableFixAt).coerceAtLeast(0L)
+        val gpsEnabled = runCatching {
+            locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) != false
+        }.getOrDefault(true)
+        return when {
+            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED -> "permission-denied"
+            !gpsEnabled -> "gps-disabled"
+            silenceMs > 8_000L && satellitesUsed == 0 -> "no-fresh-fix"
+            directGpsActive && !directGpsFirstCallbackSeen && satellitesUsed == 0 -> "reserve-searching"
+            directGpsActive && !directGpsFirstCallbackSeen -> "reserve-acquiring"
+            accuracy > 120f -> "low-accuracy"
+            unusableMs > 8_000L -> "position-unconfirmed"
+            else -> "position-confirming"
         }
     }
 

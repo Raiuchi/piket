@@ -168,7 +168,7 @@ class MainActivity : Activity() {
             return
         }
         val q={v:String->v.replace("\\","\\\\").replace("'","\\'")}
-        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.source)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone},'${q(s.route)}','${q(s.direction)}',${s.frequentInterference},$nativeSessionId);"
+        val js="if(window.onNativeLocation)window.onNativeLocation(0,0,${s.accuracyM?:999f},${s.speedKmh/3.6f},${System.currentTimeMillis()},0,null,${s.satellites},${s.averageCn0},true,1,false,null,'native','${q(s.recoveryReason)}',${s.physicalM?:"null"},${s.officialM?:"null"},null,${s.physicalM?:"null"},${s.officialM?:"null"},${s.recovering},'${q(s.source)}',${s.alertId?.let{"'${q(it)}'"}?:"null"},${s.alertDistanceM?:"null"},${s.alertInZone},'${q(s.route)}','${q(s.direction)}',${s.frequentInterference},$nativeSessionId);"
         web?.evaluateJavascript(js,null)
     }
     private fun startNative(rawConfig:String?, sessionId:Long){
@@ -526,6 +526,14 @@ class MainActivity : Activity() {
         @JavascriptInterface fun isServiceTracking()=serviceRunning()
         @JavascriptInterface fun isHeadless()=false
         @JavascriptInterface fun isTtsReady()=ttsReady
+        @JavascriptInterface fun gpsPreflight():String {
+            val permission = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+            val manager = getSystemService(LOCATION_SERVICE) as? android.location.LocationManager
+            val providerEnabled = runCatching {
+                manager?.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER) != false
+            }.getOrDefault(true)
+            return JSONObject().put("permission", permission).put("providerEnabled", providerEnabled).toString()
+        }
         @JavascriptInterface fun getAppVersion():String=packageManager.getPackageInfo(packageName,0).versionName?:"0.0.0"
         @JavascriptInterface fun getUpdateIntervalHours():Int=updateIntervalHours()
         @JavascriptInterface fun setUpdateIntervalHours(hours:Int)=runOnUiThread{this@MainActivity.setUpdateIntervalHours(hours)}
@@ -536,6 +544,26 @@ class MainActivity : Activity() {
         @JavascriptInterface fun beep(kind:String){}
         @JavascriptInterface fun updatePosition(text:String){}
         @JavascriptInterface fun logUiDiagnostic(event:String, json:String) {
+            if (event in setOf("gps_preflight", "route_transition_audit_started",
+                    "route_transition_audit_confirmed", "route_transition_audit_warning")) {
+                runCatching {
+                    val row = JSONObject(json)
+                    diagnostics.event(event, mapOf(
+                        "native_session_id" to nativeSessionId,
+                        "route" to row.optString("to", row.optString("route")),
+                        "from" to row.optString("from").takeIf(String::isNotBlank),
+                        "source" to row.optString("source").takeIf(String::isNotBlank),
+                        "ready" to row.optBoolean("ready"),
+                        "calibrated" to row.optBoolean("calibrated"),
+                        "permission" to row.optBoolean("permission", true),
+                        "provider_enabled" to row.optBoolean("providerEnabled", true),
+                        "duration_ms" to row.optLong("duration_ms").takeIf { row.has("duration_ms") },
+                        "distance_to_route_m" to row.optDouble("distance_to_route_m").takeIf {
+                            row.has("distance_to_route_m") && it.isFinite()
+                        }))
+                }
+                return
+            }
             if (event == "trip_stop_confirmed") {
                 runCatching {
                     val row = JSONObject(json)

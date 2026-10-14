@@ -72,6 +72,7 @@ class PiketRepository(private val context: Context) {
             officialM = json.optNullableDouble("officialM"), physicalM = json.optNullableDouble("physicalM"),
             speedKmh = json.optDouble("speedKmh", 0.0).toFloat(), recovering = json.optBoolean("recovering"),
             source = json.optString("source", "inactive"), satellites = json.optInt("satellites"),
+            recoveryReason = json.optString("recoveryReason", "inactive"),
             averageCn0 = json.optDouble("averageCn0", 0.0).toFloat(),
             accuracyM = json.optNullableDouble("accuracyM")?.toFloat(),
             alertId = json.optString("alertId").takeIf { it.isNotBlank() },
