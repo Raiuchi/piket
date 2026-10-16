@@ -21,16 +21,19 @@ const timing = JSON.parse(fs.readFileSync('app/src/main/assets/data/timing.json'
 const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
   RAILCHAINS: timing.railChains, TIMING_STATIONS: timing.stations,
   state:{ctx:{peregon:'Павлово - Горы II путь'}}, rt:{tracking:true,posM:31000,physicalM:0},
-  activeThrough:()=> 'dacha'};
+  activeThrough:()=> 'dacha',
+  load:(key,fallback)=>key==='sap_routeOffsets'?{'СпбГл - Москва':275}:fallback};
 box.journeyTowards=()=>box.state.ctx.towards||'tuda';
 box.dirDown=()=>box.state.ctx.towards==='obratno';
 vm.createContext(box);
-for (const name of ['exactAxisProfile','profileOfficial','baseOfficialTrackM','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes','nextInChain','boundedTrackMetersForTransition']) {
+for (const name of ['exactAxisProfile','profileOfficial','baseOfficialTrackM','routeOfficialOffset','manualCalibrationMappingM','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes','nextInChain','boundedTrackMetersForTransition']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = html.indexOf('\n  function ', start + 1);
   vm.runInContext(html.slice(start, end), box);
 }
+assert.equal(box.manualCalibrationMappingM(16000,'СпбГл - Москва'),15725,
+  'manual calibration must remove a learned route offset before mapping to physical track');
 box.metersOf=(km,pk=1,m=0)=>km*1000+(pk-1)*100+(m||0);
 for (const name of ['speedPositionsFromName']) {
   const start = html.indexOf(`  function ${name}(`);

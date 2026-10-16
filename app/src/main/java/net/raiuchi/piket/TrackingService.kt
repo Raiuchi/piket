@@ -174,6 +174,10 @@ class TrackingService : Service() {
     private var networkReserveStartCount = 0
     private var positionReconciliationCount = 0
     private var maxPositionCorrectionM = 0.0
+    private var liveInterferenceReason: String? = null
+    private var preciseOffRouteSinceAt = 0L
+    private var liveInterferenceDetections = 0
+    private var spoofingDetections = 0
     private var routeTransitionCount = 0
     private var countedTransitionKey = ""
     private var countedTransitionConfirmations = 0
@@ -197,6 +201,8 @@ class TrackingService : Service() {
         directGpsRequestRestartCount = 0; currentLocationProbeCount = 0; nativeLocationProbeCount = 0
         processedLocationCount = 0; locationRequestRestartCount = 0; snapshotPublishCount = 0
         networkReserveStartCount = 0; positionReconciliationCount = 0; maxPositionCorrectionM = 0.0
+        liveInterferenceReason = null; preciseOffRouteSinceAt = 0L
+        liveInterferenceDetections = 0; spoofingDetections = 0
         if (directGpsActive) { directGpsStartedAt = tripStartedAt; directGpsStartCount = 1 }
         routeTransitionCount = 0; maxBatteryTemperatureC = null
         diagnostics.event("trip_session_started", diagnosticContext() + mapOf(
@@ -231,6 +237,8 @@ class TrackingService : Service() {
             "network_reserve_starts" to networkReserveStartCount,
             "position_reconciliations" to positionReconciliationCount,
             "max_position_correction_m" to maxPositionCorrectionM,
+            "live_interference_detections" to liveInterferenceDetections,
+            "spoofing_detections" to spoofingDetections,
             "route_transitions" to routeTransitionCount,
             "max_battery_temperature_c" to maxBatteryTemperatureC,
             "final_physical_m" to tripEngine?.save()?.physicalM,
@@ -965,6 +973,7 @@ class TrackingService : Service() {
                 diagnostics.event("usable_gps_lost", diagnosticContext() + fields)
             }
         }
+        updateLiveInterferenceState(output, currentSnap, accuracy, result.accepted, wallNow)
         handleAlert(output)
         tripEngine?.save()?.let(::persistTripState)
         output?.let {
@@ -1095,6 +1104,7 @@ class TrackingService : Service() {
         return when {
             checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED -> "permission-denied"
             !gpsEnabled -> "gps-disabled"
+            liveInterferenceReason != null -> liveInterferenceReason!!
             silenceMs > 8_000L && satellitesUsed == 0 -> "no-fresh-fix"
             directGpsActive && !directGpsFirstCallbackSeen && satellitesUsed == 0 -> "reserve-searching"
             directGpsActive && !directGpsFirstCallbackSeen -> "reserve-acquiring"
@@ -1102,6 +1112,34 @@ class TrackingService : Service() {
             unusableMs > 8_000L -> "position-unconfirmed"
             else -> "position-confirming"
         }
+    }
+
+    private fun updateLiveInterferenceState(output: NativeTripEngine.Output?, snap: NativeRouteEngine.Snap?,
+        accuracy: Float, motionAccepted: Boolean, now: Long) {
+        if (output?.active != true || !output.recovering) preciseOffRouteSinceAt = 0L
+        val preciseOffRoute = output?.active == true && output.recovering && motionAccepted &&
+            satellitesUsed >= 4 && accuracy in 1f..50f && (snap?.distanceM ?: 0.0) > 1_000.0
+        if (preciseOffRoute) {
+            if (preciseOffRouteSinceAt == 0L) preciseOffRouteSinceAt = now
+        } else preciseOffRouteSinceAt = 0L
+        val outageMs = if (gpsOutageStartedAt > 0L) (now - gpsOutageStartedAt).coerceAtLeast(0L) else 0L
+        val next = NativeInterferenceZones.liveReason(output?.active == true,
+            output?.recovering == true, directGpsActive, outageMs, satellitesUsed,
+            accuracy, snap?.distanceM,
+            if (preciseOffRouteSinceAt > 0L) (now - preciseOffRouteSinceAt).coerceAtLeast(0L) else 0L)
+        if (next == liveInterferenceReason) return
+        val previous = liveInterferenceReason
+        liveInterferenceReason = next
+        if (next == NativeInterferenceZones.LIVE_INTERFERENCE) liveInterferenceDetections++
+        if (next == NativeInterferenceZones.LIVE_SPOOFING) spoofingDetections++
+        diagnostics.event("gps_live_interference_changed", diagnosticContext() + mapOf(
+            "visible" to (next != null), "reason" to next, "previous_reason" to previous,
+            "outage_ms" to outageMs, "satellites" to satellitesUsed,
+            "average_cn0" to averageCn0, "accuracy_m" to accuracy,
+            "distance_to_route_m" to snap?.distanceM,
+            "precise_off_route_ms" to if (preciseOffRouteSinceAt > 0L)
+                (now - preciseOffRouteSinceAt).coerceAtLeast(0L) else 0L,
+            "physical_m" to output?.physicalM, "official_m" to output?.officialM))
     }
 
     private fun persistTripState(state: NativeTripEngine.SavedState, force:Boolean=false) = runCatching {

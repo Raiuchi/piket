@@ -760,7 +760,7 @@
     </div>
     <div class="trav">пройдено от калибровки: <span class="num" id="oTrav">0 м</span></div>
     <div class="trav" id="autoCalWarn" style="display:none;color:#f5a623;font-weight:600">⚠ Позиция определена автоматически — проверь и поправь при возможности</div>
-    <div class="zone-hint" id="zoneHint"><span class="zh-dot"></span><span>Частая зона помех GPS</span></div>
+    <div class="zone-hint" id="zoneHint"><span class="zh-dot"></span><span id="zoneHintText">Частая зона помех GPS</span></div>
     <div class="trip-health" id="tripHealth" role="status" aria-live="polite"><i class="th-dot"></i><span class="th-copy"><b id="tripHealthTitle">Проверка перед стартом</b><span id="tripHealthDetail">Откалибруйся — затем проверю готовность GPS.</span></span></div>
     <div class="trip-console" id="tripConsole">
       <div class="tc-title"><b>Рабочая сводка</b><button type="button" class="tc-track" id="tripTrackPick">Путь: авто</button></div>
@@ -1205,6 +1205,9 @@ window.addEventListener("unhandledrejection",function(e){
     var offsets=load("sap_routeOffsets",{}), value=+(offsets[label]);
     return isFinite(value) && Math.abs(value)<=1500 ? value : 0;
   }
+  function manualCalibrationMappingM(enteredOfficialM,label){
+    return enteredOfficialM-routeOfficialOffset(label);
+  }
   function officialTrackM(trackM,label){ return baseOfficialTrackM(trackM,label,journeyTowards())+routeOfficialOffset(label); }
   function learnRouteOffset(label,officialM,trackM){
     if(!label || label==="Все участки" || !isFinite(officialM) || !isFinite(trackM)) return null;
@@ -1337,6 +1340,8 @@ window.addEventListener("unhandledrejection",function(e){
       "position-unconfirmed":"Координата получена, но ещё не подтверждена на выбранном пути",
       "position-confirming":"Подтверждаю найденную позицию перед коррекцией",
       "off-route":"Координата не совпала с выбранным железнодорожным путём",
+      "interference-suspected":"Вероятные помехи или экранирование GPS: резервный канал работает, но спутники не используются",
+      "spoofing-suspected":"Возможна подмена GPS: точная координата далеко от выбранного железнодорожного пути",
       "stale":"Координата устарела — жду новый замер"
     }[reason];
     if(copy)return copy;
@@ -2702,13 +2707,16 @@ window.addEventListener("unhandledrejection",function(e){
     if(nativeOfficialM!=null){
       rt.nativeSnapshot=true;
       rt.nativeOfficialOffset=nativeTripPhysicalM==null?0:(+nativeOfficialM-baseOfficialTrackM(+nativeTripPhysicalM,nativeRoute));
-      var zoneHint=document.getElementById("zoneHint");if(zoneHint)zoneHint.classList.toggle("on",nativeFrequentInterference===true);
+      var zoneHint=document.getElementById("zoneHint"),zoneHintText=document.getElementById("zoneHintText");
+      var liveInterference=nativeReason==="interference-suspected",liveSpoofing=nativeReason==="spoofing-suspected";
+      if(zoneHint){zoneHint.classList.toggle("on",nativeFrequentInterference===true||liveInterference||liveSpoofing);}
+      if(zoneHintText)zoneHintText.textContent=liveSpoofing?"Возможна подмена координат GPS":(liveInterference?"Вероятные помехи GPS":"Частая зона помех GPS");
       rt.nativeAlertId=nativeAlertId; rt.nativeAlertDistanceM=nativeAlertDistanceM; rt.nativeAlertInZone=nativeAlertInZone===true;
       rt.posM=+nativeOfficialM; rt.physicalM=nativeTripPhysicalM==null?null:+nativeTripPhysicalM; rt.speed=Math.max(0,Math.min(255,(+speedMps||0)*3.6));
       rt.fixQuality=nativeTripRecovering?"recovering":(nativeTripSource||"native");
       rt.gpsState=nativeTripRecovering?"checking":"precise"; rt.satellitesUsed=+satellitesUsed||0; rt.averageCn0=+averageCn0||0;rt.lastAccuracy=+acc||999;rt.recoveryReason=nativeReason||null;
       $("#gps").className="gps "+(nativeTripRecovering?"weak":"live");
-      $("#gpsTxt").textContent=nativeTripRecovering?(satellitesUsed>0?"GPS уточняется":"жду GPS"):"GPS + Kotlin";
+      $("#gpsTxt").textContent=nativeTripRecovering?(liveSpoofing?"подмена GPS?":(liveInterference?"помехи GPS":(satellitesUsed>0?"GPS уточняется":"жду GPS"))):"GPS + Kotlin";
       $("#spdSrc").textContent=nativeTripRecovering?recoveryReasonCopy(rt.recoveryReason,satellitesUsed,acc):"Нативная позиция ✓";
       $("#spdSrc").className="src"+(nativeTripRecovering?" dr":"");
       verifyNativeTransition(nativeTripRecovering===true);
@@ -3190,7 +3198,11 @@ window.addEventListener("unhandledrejection",function(e){
       }
       rt.pendingCalibConfirm=false;
     }
-    var mappedTracks=officialToTrackCandidates(enteredM,state.ctx.peregon,state.ctx.towards),nearTrack=currentTrackMeters();
+    // routeOfficialOffset is added back when a physical point is rendered. Remove
+    // it while mapping a freshly entered official value so an old learned offset
+    // cannot visibly move manual calibration before the native trip starts.
+    var mappingOfficialM=manualCalibrationMappingM(enteredM,state.ctx.peregon);
+    var mappedTracks=officialToTrackCandidates(mappingOfficialM,state.ctx.peregon,state.ctx.towards),nearTrack=currentTrackMeters();
     if(mappedTracks.length>1&&nearTrack!=null)mappedTracks.sort(function(a,b){return Math.abs(a.track-nearTrack)-Math.abs(b.track-nearTrack);});
     var mappedTrack=mappedTracks.length===1||(mappedTracks.length>1&&nearTrack!=null)?mappedTracks[0].track:null;
     var cal={km:km,pk:Math.max(1,Math.min(10,pk)),m:mm,dir:(state.ctx.towards==="obratno"?"down":"up"),_trackM:mappedTrack,_manual:true,_revision:Date.now()};

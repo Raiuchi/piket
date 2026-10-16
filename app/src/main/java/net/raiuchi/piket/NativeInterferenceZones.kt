@@ -4,6 +4,9 @@ import kotlin.math.floor
 
 /** Pure rules for the quiet, visual-only frequent GPS interference hint. */
 object NativeInterferenceZones {
+    const val LIVE_INTERFERENCE = "interference-suspected"
+    const val LIVE_SPOOFING = "spoofing-suspected"
+
     fun currentAndAheadBuckets(officialM: Double, directionSign: Int): List<Int> =
         listOf(officialM, officialM + directionSign.coerceIn(-1, 1) * 1_500.0)
             .map { floor(it / 1_000.0).toInt() }
@@ -15,4 +18,30 @@ object NativeInterferenceZones {
 
     fun shouldShowHint(currentBucketKnown: Boolean, badForMs: Long): Boolean =
         currentBucketKnown && badForMs >= 8_000L
+
+    /**
+     * Describes live evidence only. It never changes coordinates or GPS requests.
+     * "Interference" deliberately includes shielding/tunnels because Android cannot
+     * prove intent from radio symptoms alone. A precise fix far outside the selected
+     * railway corridor is a stronger, separate spoofing signal.
+     */
+    fun liveReason(
+        active: Boolean,
+        recovering: Boolean,
+        directGpsActive: Boolean,
+        outageMs: Long,
+        satellites: Int,
+        accuracyM: Float?,
+        distanceToRouteM: Double?,
+        preciseOffRouteMs: Long
+    ): String? {
+        if (!active || !recovering) return null
+        val accuracy = accuracyM ?: Float.POSITIVE_INFINITY
+        if (satellites >= 4 && accuracy <= 50f &&
+            (distanceToRouteM ?: 0.0) > 1_000.0 && preciseOffRouteMs >= 3_000L
+        ) return LIVE_SPOOFING
+        if (directGpsActive && outageMs >= 15_000L && satellites == 0 && accuracy > 120f)
+            return LIVE_INTERFERENCE
+        return null
+    }
 }
