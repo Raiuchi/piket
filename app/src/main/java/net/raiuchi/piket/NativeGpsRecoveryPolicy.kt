@@ -14,8 +14,11 @@ object NativeGpsRecoveryPolicy {
     const val PRIMARY_STABLE_FIX_MAX_GAP_MS = 5_000L
     // Re-registering GPS every 20 seconds repeatedly reset Samsung's weak-signal
     // acquisition. Leave the continuous request alive long enough for a cold fix.
-    const val DIRECT_REQUEST_RESTART_AFTER_MS = 120_000L
-    const val DIRECT_REQUEST_RESTART_COOLDOWN_MS = 120_000L
+    // If Android silently stalls GPS_PROVIDER with no satellites in use, repeat
+    // the internal navigator kick automatically. The watchdog never restarts a
+    // request while GNSS is actively acquiring satellites.
+    const val DIRECT_REQUEST_RESTART_AFTER_MS = 60_000L
+    const val DIRECT_REQUEST_RESTART_COOLDOWN_MS = 60_000L
     const val CURRENT_LOCATION_PROBE_AFTER_MS = 12_000L
     const val CURRENT_LOCATION_PROBE_COOLDOWN_MS = 20_000L
     const val NATIVE_LOCATION_PROBE_AFTER_MS = 30_000L
@@ -71,12 +74,16 @@ object NativeGpsRecoveryPolicy {
     fun shouldRestartDirectRequest(
         directActive: Boolean,
         sinceLastDirectCallbackMs: Long,
-        sinceLastDirectRequestMs: Long,
-        restartsSinceCallback: Int = 0
+        sinceLastDirectRequestMs: Long
     ): Boolean = directActive &&
-        restartsSinceCallback == 0 &&
         sinceLastDirectCallbackMs >= DIRECT_REQUEST_RESTART_AFTER_MS &&
         sinceLastDirectRequestMs >= DIRECT_REQUEST_RESTART_COOLDOWN_MS
+
+    fun isGnssActivelyAcquiring(
+        telemetrySeen: Boolean,
+        satellitesVisible: Int,
+        sinceLastGnssStatusMs: Long
+    ): Boolean = telemetrySeen && satellitesVisible > 0 && sinceLastGnssStatusMs in 0L..15_000L
 
     fun shouldProbeCurrentLocation(
         directActive: Boolean,

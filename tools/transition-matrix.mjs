@@ -10,6 +10,7 @@ const routes = JSON.parse(fs.readFileSync('app/src/main/assets/data/routes.json'
 const timing = JSON.parse(fs.readFileSync('app/src/main/assets/data/timing.json', 'utf8'));
 const box = {
   TRACK: routes.tracks,
+  CHAINAGE: routes.chainage,
   RAILCHAINS: timing.railChains,
   state: {ctx: {peregon: '', towards: 'tuda'}},
   through: null,
@@ -19,12 +20,13 @@ box.activeThrough = () => box.through;
 box.journeyTowards = () => box.journeyDirection;
 box.dirDown = () => box.state.ctx.towards === 'obratno';
 vm.createContext(box);
-for (const name of ['nextInChain', 'boundedTrackMetersForTransition']) {
+for (const name of ['ensureVyborgStationAnchor', 'nextInChain', 'boundedTrackMetersForTransition']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, `${name} must be shipped`);
   const end = html.indexOf('\n  function ', start + 1);
   vm.runInContext(html.slice(start, end), box);
 }
+box.ensureVyborgStationAnchor();
 
 let scenarios = 0;
 for (const chain of timing.railChains) {

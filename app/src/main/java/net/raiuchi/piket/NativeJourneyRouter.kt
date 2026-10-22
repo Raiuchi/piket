@@ -55,7 +55,7 @@ class NativeJourneyRouter private constructor(
                 Transition(next.route, next.direction, boundaryM = 128_900.0,
                     maxBoundaryOffsetM = 1_500.0, maxNextDistanceM = 1_000.0, requireStop = true)
             current == "Выборг - Каменногорск" && direction == "obratno" && next.route == "СПбФин - Выборг" ->
-                Transition(next.route, next.direction, boundaryM = 1_000.0,
+                Transition(next.route, next.direction, boundaryM = 0.0,
                     maxBoundaryOffsetM = 1_500.0, maxNextDistanceM = 1_000.0, requireStop = true)
             journey == "819" && current == "Волховстрой - Чудово" && direction == "obratno" ->
                 Transition(next.route, next.direction, boundaryM = 1_000.0, maxNextDistanceM = 150.0)

@@ -37,6 +37,7 @@ class TrackingService : Service() {
         @Volatile internal var latestSnapshotJson: String? = null
         const val ACTION_RECALIBRATE = "net.raiuchi.piket.ACTION_RECALIBRATE"
         const val ACTION_CONFIGURE_NATIVE = "net.raiuchi.piket.ACTION_CONFIGURE_NATIVE"
+        const val ACTION_FOREGROUND_RECOVERY = "net.raiuchi.piket.ACTION_FOREGROUND_RECOVERY"
         const val EXTRA_NATIVE_CONFIG = "net.raiuchi.piket.extra.NATIVE_CONFIG"
 
         fun updateNotificationText(context: Context, text: String) {
@@ -94,6 +95,7 @@ class TrackingService : Service() {
     private var interferencePrewarmPending = false
     private var lastProcessedFixNanos = 0L
     @Volatile private var satellitesUsed = 0
+    @Volatile private var satellitesVisible = 0
     @Volatile private var averageCn0 = 0f
     @Volatile private var gnssTelemetrySeen = false
     @Volatile private var lastGnssStatusAtElapsed = 0L
@@ -445,6 +447,7 @@ class TrackingService : Service() {
             override fun onSatelliteStatusChanged(status: GnssStatus) {
                 gnssTelemetrySeen = true
                 lastGnssStatusAtElapsed = SystemClock.elapsedRealtime()
+                satellitesVisible = status.satelliteCount
                 var used = 0; var sum = 0f
                 repeat(status.satelliteCount) { index ->
                     if (status.usedInFix(index)) { used++; sum += status.getCn0DbHz(index) }
@@ -452,7 +455,7 @@ class TrackingService : Service() {
                 satellitesUsed = used; averageCn0 = if (used > 0) sum / used else 0f
             }
             override fun onStopped() {
-                satellitesUsed = 0; averageCn0 = 0f
+                satellitesUsed = 0; satellitesVisible = 0; averageCn0 = 0f
                 gnssTelemetrySeen = false; lastGnssStatusAtElapsed = 0L
                 diagnostics.event("gnss_status", diagnosticContext() + mapOf("state" to "stopped"))
             }
@@ -469,7 +472,7 @@ class TrackingService : Service() {
                 if (gnssTelemetrySeen && lastGnssStatusAtElapsed > 0L &&
                     elapsedNow - lastGnssStatusAtElapsed > 10_000L) {
                     val staleFor = elapsedNow - lastGnssStatusAtElapsed
-                    satellitesUsed = 0; averageCn0 = 0f
+                    satellitesUsed = 0; satellitesVisible = 0; averageCn0 = 0f
                     gnssTelemetrySeen = false; lastGnssStatusAtElapsed = 0L
                     diagnostics.event("gnss_status_stale", diagnosticContext() + mapOf(
                         "stale_ms" to staleFor))
@@ -518,19 +521,19 @@ class TrackingService : Service() {
                         directGpsWaitingStage = nextStage
                         diagnostics.event("direct_gps_waiting", diagnosticContext() + mapOf(
                             "waiting_ms" to waitingMs, "stage" to nextStage,
-                            "satellites" to satellitesUsed, "average_cn0" to averageCn0,
+                            "satellites" to satellitesUsed, "satellites_visible" to satellitesVisible,
+                            "average_cn0" to averageCn0,
                             "fused_silence_ms" to silence, "unusable_ms" to unusableFor))
                     }
                 }
                 // Do not tear down a live satellite acquisition merely because a fix has
                 // not been emitted yet. Re-registering the listener every few seconds was
                 // resetting weak-signal cold starts which Yandex was then able to finish.
-                val gnssActivelyAcquiring = gnssTelemetrySeen && satellitesUsed > 0 &&
-                    lastGnssStatusAtElapsed > 0L &&
-                    elapsedNow - lastGnssStatusAtElapsed <= 15_000L
+                val gnssActivelyAcquiring = NativeGpsRecoveryPolicy.isGnssActivelyAcquiring(
+                    gnssTelemetrySeen, satellitesVisible,
+                    if (lastGnssStatusAtElapsed > 0L) elapsedNow - lastGnssStatusAtElapsed else Long.MAX_VALUE)
                 if (!gnssActivelyAcquiring && NativeGpsRecoveryPolicy.shouldRestartDirectRequest(directGpsActive,
-                        now - directGpsLastCallbackAt, now - directGpsLastRequestAt,
-                        directGpsRestartsSinceCallback)) {
+                        now - directGpsLastCallbackAt, now - directGpsLastRequestAt)) {
                     restartDirectGpsRequest(now, "callback-stalled")
                 }
                 if (NativeGpsRecoveryPolicy.shouldProbeCurrentLocation(directGpsActive,
@@ -566,6 +569,27 @@ class TrackingService : Service() {
             mainLocationCallback?.let { fusedClient?.requestLocationUpdates(locationRequest(), it, Looper.getMainLooper()) }
             lastFusedRestartAt = now
         }
+    }
+
+    private fun kickRecoveryFromForeground() {
+        val now = System.currentTimeMillis()
+        val tripActive = tripEngine?.save()?.active == true
+        val unusableFor = (now - lastUsableFixAt).coerceAtLeast(0)
+        if (!tripActive || unusableFor < NativeGpsRecoveryPolicy.DIRECT_START_AFTER_UNUSABLE_MS) return
+        diagnostics.event("foreground_gps_recovery_kick", diagnosticContext() + mapOf(
+            "unusable_ms" to unusableFor, "direct_gps_active" to directGpsActive,
+            "satellites" to satellitesUsed, "satellites_visible" to satellitesVisible,
+            "average_cn0" to averageCn0))
+        restartFused(now)
+        if (!networkBackupActive) startNetworkBackup()
+        if (!directGpsActive) {
+            startDirectGps(now, (now - lastFixReceivedAt).coerceAtLeast(0), unusableFor,
+                "foreground-resume")
+        } else if (satellitesVisible == 0) {
+            restartDirectGpsRequest(now, "foreground-resume")
+        }
+        if (!currentLocationProbeInFlight) probeCurrentLocation(now)
+        if (!nativeLocationProbeInFlight) probeNativeLocation(now)
     }
 
     private fun startNetworkBackup() {
@@ -657,8 +681,10 @@ class TrackingService : Service() {
             directGpsRequestRestartCount++
             diagnostics.event("direct_gps_request_restarted", diagnosticContext() + mapOf(
                 "reason" to reason,
+                "restart_count_since_callback" to directGpsRestartsSinceCallback,
                 "without_callback_ms" to (now - directGpsLastCallbackAt).coerceAtLeast(0),
-                "satellites" to satellitesUsed, "average_cn0" to averageCn0))
+                "satellites" to satellitesUsed, "satellites_visible" to satellitesVisible,
+                "average_cn0" to averageCn0))
         }.onFailure {
             diagnostics.event("direct_gps_request_restart_error", diagnosticContext() + mapOf(
                 "error" to it.javaClass.simpleName, "message" to it.message))
@@ -1054,7 +1080,8 @@ class TrackingService : Service() {
                 routeLabel, snap?.distanceM),
             "accepted" to result.accepted, "stationary" to result.stationary,
             "quality" to result.quality, "reason" to result.reason,
-            "satellites" to satellitesUsed, "average_cn0" to averageCn0,
+            "satellites" to satellitesUsed, "satellites_visible" to satellitesVisible,
+            "average_cn0" to averageCn0,
             "distance_to_route_m" to snap?.distanceM,
             "snapped_physical_m" to snap?.physicalM,
             "snap_minus_engine_m" to if (snap != null && output?.physicalM != null)
@@ -1072,7 +1099,11 @@ class TrackingService : Service() {
         val json = JSONObject().put("active", output?.active ?: saved?.active ?: false)
             .put("route", saved?.route ?: routeLabel).put("direction", saved?.direction ?: "tuda")
             .put("speedKmh", (output?.speedMps ?: 0f) * 3.6f).put("recovering", output?.recovering ?: false)
-            .put("source", output?.source ?: "unavailable").put("satellites", satellitesUsed)
+            .put("source", output?.source ?: "unavailable")
+            // The driver needs to see that the receiver is alive while Android is
+            // still forming a fix. Keep used/visible separately for diagnostics.
+            .put("satellites", maxOf(satellitesUsed, satellitesVisible))
+            .put("satellitesUsed", satellitesUsed).put("satellitesVisible", satellitesVisible)
             .put("recoveryReason", snapshotRecoveryReason(output, accuracy))
             .put("averageCn0", averageCn0).put("accuracyM", accuracy)
             .put("directGpsReserve", directGpsActive)
@@ -1105,9 +1136,9 @@ class TrackingService : Service() {
             checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED -> "permission-denied"
             !gpsEnabled -> "gps-disabled"
             liveInterferenceReason != null -> liveInterferenceReason!!
-            silenceMs > 8_000L && satellitesUsed == 0 -> "no-fresh-fix"
-            directGpsActive && !directGpsFirstCallbackSeen && satellitesUsed == 0 -> "reserve-searching"
+            directGpsActive && !directGpsFirstCallbackSeen && satellitesVisible == 0 -> "reserve-searching"
             directGpsActive && !directGpsFirstCallbackSeen -> "reserve-acquiring"
+            silenceMs > 8_000L && satellitesVisible == 0 -> "no-fresh-fix"
             accuracy > 120f -> "low-accuracy"
             unusableMs > 8_000L -> "position-unconfirmed"
             else -> "position-confirming"
@@ -1124,7 +1155,7 @@ class TrackingService : Service() {
         } else preciseOffRouteSinceAt = 0L
         val outageMs = if (gpsOutageStartedAt > 0L) (now - gpsOutageStartedAt).coerceAtLeast(0L) else 0L
         val next = NativeInterferenceZones.liveReason(output?.active == true,
-            output?.recovering == true, directGpsActive, outageMs, satellitesUsed,
+            output?.recovering == true, directGpsActive, outageMs, satellitesUsed, satellitesVisible,
             accuracy, snap?.distanceM,
             if (preciseOffRouteSinceAt > 0L) (now - preciseOffRouteSinceAt).coerceAtLeast(0L) else 0L)
         if (next == liveInterferenceReason) return
@@ -1135,6 +1166,7 @@ class TrackingService : Service() {
         diagnostics.event("gps_live_interference_changed", diagnosticContext() + mapOf(
             "visible" to (next != null), "reason" to next, "previous_reason" to previous,
             "outage_ms" to outageMs, "satellites" to satellitesUsed,
+            "satellites_visible" to satellitesVisible,
             "average_cn0" to averageCn0, "accuracy_m" to accuracy,
             "distance_to_route_m" to snap?.distanceM,
             "precise_off_route_ms" to if (preciseOffRouteSinceAt > 0L)
@@ -1462,7 +1494,10 @@ class TrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         diagnostics.event("service_command_received", diagnosticContext() + mapOf(
             "action" to intent?.action, "start_id" to startId, "flags" to flags))
-        if (intent?.action == ACTION_CONFIGURE_NATIVE) applyConfig(intent.getStringExtra(EXTRA_NATIVE_CONFIG))
+        when (intent?.action) {
+            ACTION_CONFIGURE_NATIVE -> applyConfig(intent.getStringExtra(EXTRA_NATIVE_CONFIG))
+            ACTION_FOREGROUND_RECOVERY -> kickRecoveryFromForeground()
+        }
         return START_STICKY
     }
 

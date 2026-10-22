@@ -37,12 +37,20 @@ class NativeGpsRecoveryPolicyTest {
         assertTrue(NativeGpsRecoveryPolicy.isRouteSpeedPlausible("Все участки", null))
     }
 
-    @Test fun stalledNativeGpsRequestIsRestartedOnlyOncePerCallbackCycle() {
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 119_999, 120_000))
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 180_000, 119_999))
-        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 120_000, 120_000))
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 600_000, 120_000, 1))
+    @Test fun stalledNativeGpsRequestIsRetriedUntilCallbacksResume() {
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 59_999, 60_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 180_000, 59_999))
+        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 60_000, 60_000))
+        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 600_000, 60_000))
         assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(false, 180_000, 180_000))
+    }
+
+    @Test fun visibleSatellitesProtectAColdAcquisitionFromRestart() {
+        assertTrue(NativeGpsRecoveryPolicy.isGnssActivelyAcquiring(true, 1, 15_000))
+        assertTrue(NativeGpsRecoveryPolicy.isGnssActivelyAcquiring(true, 8, 0))
+        assertFalse(NativeGpsRecoveryPolicy.isGnssActivelyAcquiring(true, 0, 1_000))
+        assertFalse(NativeGpsRecoveryPolicy.isGnssActivelyAcquiring(true, 8, 15_001))
+        assertFalse(NativeGpsRecoveryPolicy.isGnssActivelyAcquiring(false, 8, 1_000))
     }
 
     @Test fun currentLocationProbeOnlyRunsDuringARealRecovery() {

@@ -25,20 +25,24 @@ class NativeInterferenceZonesTest {
     }
 
     @Test fun liveInterferenceNeedsReserveAndSustainedZeroSatelliteOutage() {
-        assertFalse(NativeInterferenceZones.liveReason(true, true, true, 14_999, 0,
+        assertFalse(NativeInterferenceZones.liveReason(true, true, true, 14_999, 0, 0,
             400f, 80.0, 0) != null)
-        assertFalse(NativeInterferenceZones.liveReason(true, true, false, 30_000, 0,
+        assertFalse(NativeInterferenceZones.liveReason(true, true, false, 30_000, 0, 0,
             400f, 80.0, 0) != null)
-        assertTrue(NativeInterferenceZones.liveReason(true, true, true, 15_000, 0,
+        assertTrue(NativeInterferenceZones.liveReason(true, true, true, 15_000, 0, 0,
             400f, 80.0, 0) == NativeInterferenceZones.LIVE_INTERFERENCE)
+        assertTrue(NativeInterferenceZones.liveReason(true, true, true, 15_000, 0, 0,
+            20f, 80.0, 0) == NativeInterferenceZones.LIVE_INTERFERENCE)
+        assertFalse(NativeInterferenceZones.liveReason(true, true, true, 30_000, 0, 6,
+            400f, 80.0, 0) != null)
     }
 
     @Test fun preciseRepeatedOffRouteFixIsReportedAsPossibleSpoofing() {
-        assertFalse(NativeInterferenceZones.liveReason(true, true, true, 30_000, 18,
+        assertFalse(NativeInterferenceZones.liveReason(true, true, true, 30_000, 18, 18,
             12f, 59_000.0, 2_999) != null)
-        assertFalse(NativeInterferenceZones.liveReason(true, true, true, 30_000, 2,
+        assertFalse(NativeInterferenceZones.liveReason(true, true, true, 30_000, 2, 18,
             12f, 59_000.0, 5_000) != null)
-        assertTrue(NativeInterferenceZones.liveReason(true, true, true, 30_000, 18,
+        assertTrue(NativeInterferenceZones.liveReason(true, true, true, 30_000, 18, 18,
             12f, 59_000.0, 3_000) == NativeInterferenceZones.LIVE_SPOOFING)
     }
 }

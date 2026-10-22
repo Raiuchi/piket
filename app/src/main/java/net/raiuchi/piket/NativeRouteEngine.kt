@@ -230,7 +230,7 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
             val labels = track.getJSONArray("labels")
             val segments = track.getJSONArray("segs")
             require(labels.length() == segments.length() && labels.length() == chainage.length())
-            val routes = (0 until labels.length()).map { routeIndex ->
+            val parsed = (0 until labels.length()).map { routeIndex ->
                 val rawPoints = segments.getJSONArray(routeIndex)
                 val rawAxis = chainage.getJSONArray(routeIndex)
                 require(rawPoints.length() == rawAxis.length())
@@ -243,7 +243,31 @@ class NativeRouteEngine private constructor(private val routes: List<Route>) {
                     (0 until rawAxis.length()).map(rawAxis::getDouble)
                 )
             }
-            return NativeRouteEngine(routes)
+            return NativeRouteEngine(withVyborgStationAnchor(parsed))
+        }
+
+        /** The source map starts Vyborg-Kamennogorsk at km 1, while the real and
+         * timetable junction is Vyborg km 0. Without this anchor every transition
+         * inherited a repeatable one-kilometre offset. */
+        private fun withVyborgStationAnchor(routes: List<Route>): List<Route> {
+            val source = routes.firstOrNull { it.label == "СПбФин - Выборг" } ?: return routes
+            val target = routes.firstOrNull { it.label == "Выборг - Каменногорск" } ?: return routes
+            if (target.points.firstOrNull()?.physicalM == 0.0) return routes
+            val before = source.points.lastOrNull { it.physicalM <= 128_900.0 } ?: return routes
+            val after = source.points.firstOrNull { it.physicalM >= 128_900.0 } ?: return routes
+            val span = after.physicalM - before.physicalM
+            val fraction = if (span > 0.0) (128_900.0 - before.physicalM) / span else 0.0
+            val anchor = Point(
+                before.latitude + (after.latitude - before.latitude) * fraction,
+                before.longitude + (after.longitude - before.longitude) * fraction,
+                0.0
+            )
+            return routes.map { route ->
+                if (route.label == target.label)
+                    route.copy(points = listOf(anchor) + route.points,
+                        chainageM = listOf(0.0) + route.chainageM)
+                else route
+            }
         }
     }
 }

@@ -26,12 +26,18 @@ const box = {TRACK: routes.tracks, CHAINAGE: routes.chainage,
 box.journeyTowards=()=>box.state.ctx.towards||'tuda';
 box.dirDown=()=>box.state.ctx.towards==='obratno';
 vm.createContext(box);
-for (const name of ['exactAxisProfile','profileOfficial','baseOfficialTrackM','routeOfficialOffset','manualCalibrationMappingM','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes','nextInChain','boundedTrackMetersForTransition']) {
+for (const name of ['ensureVyborgStationAnchor','exactAxisProfile','profileOfficial','baseOfficialTrackM','routeOfficialOffset','manualCalibrationMappingM','officialToTrackCandidates','officialToTrackM','restrictionAxisPlace','restrictionAxisOptions','scheduleScale','scheduleLiveM','isDachaLeg','normalizeRestrictionRoutes','nextInChain','boundedTrackMetersForTransition']) {
   const start = html.indexOf(`  function ${name}(`);
   assert.ok(start >= 0, name);
   const end = html.indexOf('\n  function ', start + 1);
   vm.runInContext(html.slice(start, end), box);
 }
+box.ensureVyborgStationAnchor();
+const vyborgKamenn = box.TRACK.labels.indexOf('Выборг - Каменногорск');
+assert.equal(box.TRACK.segs[vyborgKamenn][0][2], 0,
+  'Vyborg-Kamennogorsk must begin at the documented Vyborg km 0 junction');
+assert.equal(box.CHAINAGE[vyborgKamenn][0], 0,
+  'Vyborg-Kamennogorsk official axis must begin at km 0');
 assert.equal(box.manualCalibrationMappingM(16000,'СпбГл - Москва'),15725,
   'manual calibration must remove a learned route offset before mapping to physical track');
 box.metersOf=(km,pk=1,m=0)=>km*1000+(pk-1)*100+(m||0);
@@ -86,14 +92,14 @@ for (const [route,a,b] of [['Павлово - Горы II путь',29807,33500]
   }
 }
 assert.ok(html.includes('boundaryM:128900,boundaryToleranceM:1500,cabChange:true') &&
-  html.includes('boundaryM:1000,boundaryToleranceM:1500,cabChange:true'),
+  html.includes('boundaryM:0,boundaryToleranceM:1500,cabChange:true'),
   'Vyborg must switch at the documented stopped junction in both directions');
 box.state.ctx={peregon:'СПбФин - Выборг',towards:'tuda'};
 assert.equal(box.boundedTrackMetersForTransition(130000),128900,
   'forward Vyborg count must wait at 128.9 km for the axis switch');
 box.state.ctx={peregon:'Выборг - Каменногорск',towards:'obratno'};
-assert.equal(box.boundedTrackMetersForTransition(-500),1000,
-  'reverse Vyborg count must never run below its 1 km junction');
+assert.equal(box.boundedTrackMetersForTransition(-500),0,
+  'reverse Vyborg count must wait at its real 0 km junction');
 box.state.ctx={peregon:'Павлово - Горы II путь',towards:'tuda'};
 assert.equal(box.boundedTrackMetersForTransition(40000),33500,
   'every chained forward route must wait at its mapped endpoint');

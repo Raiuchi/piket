@@ -30,17 +30,22 @@ object NativeInterferenceZones {
         recovering: Boolean,
         directGpsActive: Boolean,
         outageMs: Long,
-        satellites: Int,
+        satellitesUsed: Int,
+        satellitesVisible: Int,
         accuracyM: Float?,
         distanceToRouteM: Double?,
         preciseOffRouteMs: Long
     ): String? {
         if (!active || !recovering) return null
         val accuracy = accuracyM ?: Float.POSITIVE_INFINITY
-        if (satellites >= 4 && accuracy <= 50f &&
+        if (satellitesUsed >= 4 && accuracy <= 50f &&
             (distanceToRouteM ?: 0.0) > 1_000.0 && preciseOffRouteMs >= 3_000L
         ) return LIVE_SPOOFING
-        if (directGpsActive && outageMs >= 15_000L && satellites == 0 && accuracy > 120f)
+        // A cached/coarse fused coordinate may still advertise a small historical
+        // accuracy while the live GNSS receiver sees no satellites at all. The real
+        // trip showed this exact state, so zero-satellite recovery is the stronger
+        // signal after a sustained outage.
+        if (directGpsActive && outageMs >= 15_000L && satellitesVisible == 0)
             return LIVE_INTERFERENCE
         return null
     }

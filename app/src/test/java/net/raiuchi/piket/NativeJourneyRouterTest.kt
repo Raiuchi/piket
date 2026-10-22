@@ -166,7 +166,7 @@ class NativeJourneyRouterTest {
         assertEquals(1_000.0, vyborg.maxNextDistanceM, 0.01)
 
         val reverseVyborg = router.nextLeg(null, "Выборг - Каменногорск", "obratno")!!
-        assertEquals(1_000.0, reverseVyborg.boundaryM!!, 0.01)
+        assertEquals(0.0, reverseVyborg.boundaryM!!, 0.01)
         assertTrue(reverseVyborg.requireStop)
         assertEquals(1_500.0, reverseVyborg.maxBoundaryOffsetM, 0.01)
 
@@ -188,7 +188,7 @@ class NativeJourneyRouterTest {
     @Test fun vyborgCabChangeToleratesPlatformStoppingPointOffsetInBothDirections() {
         val cases = listOf(
             Triple("СПбФин - Выборг", "tuda", 129_100.0),
-            Triple("Выборг - Каменногорск", "obratno", 800.0)
+            Triple("Выборг - Каменногорск", "obratno", 200.0)
         )
         cases.forEach { (current, direction, stoppedPhysical) ->
             val fresh = NativeJourneyRouter.fromTimingJson(timingSource, journeySource)
@@ -217,9 +217,9 @@ class NativeJourneyRouterTest {
         // the current-route GPS projection at 512 m. Both are valid platform
         // offsets from the documented 1 km electronic-map boundary.
         assertNull(fresh.consider(null, "Выборг - Каменногорск", "obratno",
-            89.0, 1_000.0, 738.0, 50.0, 512.0, stopped = true))
+            89.0, 0.0, 738.0, 50.0, 512.0, stopped = true))
         val switched = fresh.consider(null, "Выборг - Каменногорск", "obratno",
-            89.0, 1_000.0, 738.0, 50.0, 512.0, stopped = true)
+            89.0, 0.0, 738.0, 50.0, 512.0, stopped = true)
         assertEquals("СПбФин - Выборг", switched?.route)
         assertEquals("obratno", switched?.direction)
     }

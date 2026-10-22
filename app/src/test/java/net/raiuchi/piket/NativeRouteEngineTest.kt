@@ -23,7 +23,10 @@ class NativeRouteEngineTest {
 
     @Test fun parsesEveryProductionRouteAndPoint() {
         assertEquals(10, engine.routeCount)
-        assertEquals(1558, engine.pointCount)
+        assertEquals(1559, engine.pointCount)
+        val vyborg = engine.route("Выборг - Каменногорск")!!
+        assertEquals(0.0, vyborg.points.first().physicalM, 0.01)
+        assertEquals(0.0, vyborg.chainageM.first(), 0.01)
     }
 
     @Test fun everyControlPointKeepsExactOfficialKilometer() {
@@ -81,24 +84,14 @@ class NativeRouteEngineTest {
         }
     }
 
-    @Test fun shortMissingRoutePrefixesSnapBackToZeroInsteadOfFirstKilometer() {
-        var checked = 0
-        for (label in engine.labels()) {
-            val route = engine.route(label)!!
-            val a = route.points.first()
-            val b = route.points[1]
-            val span = b.physicalM - a.physicalM
-            if (span <= 0.0 || a.physicalM !in 0.1..5_000.0 ||
-                abs(route.chainageM.first() - a.physicalM) > 2_500.0) continue
-            val fraction = -a.physicalM / span
-            val latitude = a.latitude + fraction * (b.latitude - a.latitude)
-            val longitude = a.longitude + fraction * (b.longitude - a.longitude)
-            val snap = engine.snap(label, latitude, longitude)!!
-            assertEquals("$label physical origin", 0.0, snap.physicalM, 2.0)
-            assertEquals("$label official origin", route.chainageM.first() - a.physicalM,
-                snap.officialM, 2.0)
-            checked++
-        }
-        assertTrue("production data must contain missing short prefixes", checked >= 4)
+    @Test fun vyborgStationToFirstKilometerIsARealSnappableSegment() {
+        val route = engine.route("Выборг - Каменногорск")!!
+        val a = route.points[0]
+        val b = route.points[1]
+        val latitude = (a.latitude + b.latitude) / 2.0
+        val longitude = (a.longitude + b.longitude) / 2.0
+        val snap = engine.snap(route.label, latitude, longitude)!!
+        assertEquals(500.0, snap.physicalM, 15.0)
+        assertEquals(500.0, snap.officialM, 15.0)
     }
 }

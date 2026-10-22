@@ -452,7 +452,14 @@ class MainActivity : Activity() {
 
     override fun onResume(){
         super.onResume()
-        diagnostics.event("app_lifecycle", mapOf("state" to "foreground", "tracking" to serviceRunning()))
+        val tracking = serviceRunning()
+        diagnostics.event("app_lifecycle", mapOf("state" to "foreground", "tracking" to tracking))
+        if (tracking) {
+            applyScreenMode(screenMode)
+            startService(Intent(this, TrackingService::class.java).apply {
+                action = TrackingService.ACTION_FOREGROUND_RECOVERY
+            })
+        }
         web?.onResume()
         web?.resumeTimers()
         pendingInstallFile?.let { file ->
@@ -517,7 +524,14 @@ class MainActivity : Activity() {
         @JavascriptInterface fun recalibrate()=runOnUiThread{
             logTripUiAction("recalibration_requested", pendingConfig); pendingConfig?.let(::configureRunning)
         }
-        @JavascriptInterface fun setKeepScreen(enabled:Boolean)=runOnUiThread{if(enabled)window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)}
+        @JavascriptInterface fun setKeepScreen(enabled:Boolean)=runOnUiThread{
+            if(enabled || screenMode != "system") window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            diagnostics.event("screen_keep_awake_applied", mapOf("requested" to enabled,
+                "screen_mode" to screenMode,
+                "keep_screen_on" to ((window.attributes.flags and
+                    WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) != 0)))
+        }
         @JavascriptInterface fun setScreenMode(mode:String)=runOnUiThread{applyScreenMode(mode)}
         @JavascriptInterface fun lowerBrightness()=runOnUiThread{
             setWindowBrightness(0.18f,true)
