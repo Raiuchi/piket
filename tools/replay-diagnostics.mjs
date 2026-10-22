@@ -168,6 +168,11 @@ const directFirstFixes = events.filter(e => e.event === 'direct_gps_first_fix');
 const directRequestRestarts = events.filter(e => e.event === 'direct_gps_request_restarted');
 const currentLocationProbes = events.filter(e => e.event === 'current_location_probe_started');
 const currentLocationProbeFixes = events.filter(e => e.event === 'current_location_probe_fix');
+const nativeLocationProbes = events.filter(e => e.event === 'native_location_probe_started');
+const nativeLocationProbeFixes = events.filter(e => e.event === 'native_location_probe_fix');
+const locationSourceChanges = events.filter(e => e.event === 'location_source_changed');
+const countValues = (rows, field) => Object.fromEntries([...new Set(rows.map(e => e[field]).filter(Boolean))]
+  .sort().map(value => [value, rows.filter(e => e[field] === value).length]));
 const directFirstFixWaits = directFirstFixes.map(e => Number(e.wait_ms)).filter(Number.isFinite);
 const directTriggers = Object.fromEntries([...new Set(directStarts.map(e => e.trigger).filter(Boolean))]
   .sort().map(trigger => [trigger, directStarts.filter(e => e.trigger === trigger).length]));
@@ -197,8 +202,15 @@ const report = {
   gpsReserveMaxFirstFixWaitMs: directFirstFixWaits.length ? Math.max(...directFirstFixWaits) : null,
   gpsReserveWaitingEvents: events.filter(e => e.event === 'direct_gps_waiting').length,
   gpsReserveRequestRestarts: directRequestRestarts.length,
+  networkReserveStarts: events.filter(e => e.event === 'network_gps_reserve_started').length,
   currentLocationProbes: currentLocationProbes.length,
   currentLocationProbeFixes: currentLocationProbeFixes.length,
+  nativeLocationProbes: nativeLocationProbes.length,
+  nativeLocationProbeFixes: nativeLocationProbeFixes.length,
+  locationSourceChanges: locationSourceChanges.length,
+  locationRequestChannels: countValues(locationSourceChanges, 'request_channel'),
+  locationProviders: countValues(locationSourceChanges, 'provider'),
+  trustedLocationSourceChanges: locationSourceChanges.filter(e => e.trusted_position === true).length,
   gpsRecoveryWakeLockAcquires: recoveryWakeLocks.filter(e => e.state === 'acquired').length,
   gpsRecoveryWakeLockReleases: recoveryWakeLocks.filter(e => e.state === 'released').length,
   batteryOptimizationExempt: latestBatteryOptimization?.exempt ?? null,

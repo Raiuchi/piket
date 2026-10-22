@@ -156,6 +156,14 @@ class TrackingService : Service() {
     private lateinit var diagnostics: DiagnosticsLogger
     private var lastDiagnosticSampleAt = 0L
     private var lastDiagnosticQuality = ""
+    private var lastLocationRequestChannel: String? = null
+    private var lastLocationProvider: String? = null
+    private var lastLocationAccuracyM: Float? = null
+    private var lastLocationFixWallAt = 0L
+    private var lastLocationFilterAccepted: Boolean? = null
+    private var lastLocationTrusted: Boolean? = null
+    private var lastLocationFilterReason: String? = null
+    private var lastLocationSourceKey = ""
     private var lastRecoveryState: Boolean? = null
     private var lastTransitionProbeAt = 0L
     private var lastTransitionProbeKey = ""
@@ -189,9 +197,27 @@ class TrackingService : Service() {
     private var replayTrace = org.json.JSONArray()
     private var lastReplayTraceFlushAt = 0L
 
-    private fun diagnosticContext() = mapOf(
+    private fun diagnosticContext() = mapOf<String, Any?>(
         "trip_session_id" to tripSessionId, "route" to routeLabel, "journey" to journeyId,
-        "direction" to tripEngine?.save()?.direction, "train" to trainNumber)
+        "direction" to tripEngine?.save()?.direction, "train" to trainNumber,
+        "request_channel" to lastLocationRequestChannel,
+        "provider" to lastLocationProvider,
+        "accuracy_m" to lastLocationAccuracyM,
+        "last_fix_age_ms" to lastLocationFixWallAt.takeIf { it > 0L }?.let {
+            (System.currentTimeMillis() - it).coerceAtLeast(0L)
+        },
+        "filter_accepted" to lastLocationFilterAccepted,
+        "trusted_position" to lastLocationTrusted,
+        "filter_reason" to lastLocationFilterReason,
+        "position_source" to lastEngineOutput?.source,
+        "position_recovering" to lastEngineOutput?.recovering,
+        "satellites_used" to satellitesUsed,
+        "satellites_visible" to satellitesVisible,
+        "average_cn0" to averageCn0,
+        "network_reserve_active" to networkBackupActive,
+        "direct_gps_active" to directGpsActive,
+        "current_location_probe_active" to currentLocationProbeInFlight,
+        "native_location_probe_active" to nativeLocationProbeInFlight)
 
     private fun startTripSession() {
         finishTripSession("reconfigured")
@@ -203,6 +229,9 @@ class TrackingService : Service() {
         directGpsRequestRestartCount = 0; currentLocationProbeCount = 0; nativeLocationProbeCount = 0
         processedLocationCount = 0; locationRequestRestartCount = 0; snapshotPublishCount = 0
         networkReserveStartCount = 0; positionReconciliationCount = 0; maxPositionCorrectionM = 0.0
+        lastLocationRequestChannel = null; lastLocationProvider = null; lastLocationAccuracyM = null
+        lastLocationFixWallAt = 0L; lastLocationFilterAccepted = null; lastLocationTrusted = null
+        lastLocationFilterReason = null; lastLocationSourceKey = ""
         liveInterferenceReason = null; preciseOffRouteSinceAt = 0L
         liveInterferenceDetections = 0; spoofingDetections = 0
         if (directGpsActive) { directGpsStartedAt = tripStartedAt; directGpsStartCount = 1 }
@@ -420,7 +449,7 @@ class TrackingService : Service() {
                 locationCallbackCount++
                 val location = result.lastLocation ?: return
                 if (isFreshRealFix(location)) lastFixReceivedAt = System.currentTimeMillis()
-                processLocation(location, false)
+                processLocation(location, false, "fused-primary")
             }
             override fun onLocationAvailability(value: LocationAvailability) {
                 diagnostics.event("location_availability", diagnosticContext() + mapOf(
@@ -597,7 +626,7 @@ class TrackingService : Service() {
         networkCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 locationCallbackCount++
-                result.lastLocation?.let { processLocation(it, false) }
+                result.lastLocation?.let { processLocation(it, false, "fused-network") }
             }
         }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
@@ -635,7 +664,7 @@ class TrackingService : Service() {
                         "provider_speed_kmh" to if (location.hasSpeed()) location.speed * 3.6f else null,
                         "satellites" to satellitesUsed, "average_cn0" to averageCn0))
                 }
-                processLocation(location, true)
+                processLocation(location, true, "gps-provider")
             }
             override fun onProviderDisabled(provider: String) {
                 diagnostics.event("location_provider_changed", diagnosticContext() + mapOf(
@@ -720,7 +749,7 @@ class TrackingService : Service() {
                         "age_ms" to ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) /
                             1_000_000).coerceAtLeast(0)))
                     locationCallbackCount++
-                    processLocation(location, true)
+                    processLocation(location, true, "fused-current-probe")
                 } else if (directGpsActive) {
                     diagnostics.event("current_location_probe_empty", diagnosticContext())
                 }
@@ -770,7 +799,7 @@ class TrackingService : Service() {
                             "satellites" to satellitesUsed))
                         locationCallbackCount++
                         directGpsLastCallbackAt = System.currentTimeMillis()
-                        processLocation(location, true)
+                        processLocation(location, true, "gps-current-probe")
                     } else if (directGpsActive) {
                         diagnostics.event("native_location_probe_empty", diagnosticContext())
                     }
@@ -850,7 +879,7 @@ class TrackingService : Service() {
         lastFusedRecoveryFixNanos = elapsedRealtimeNanos
     }
 
-    private fun processLocation(location: Location, fromDirectGps: Boolean) {
+    private fun processLocation(location: Location, fromDirectGps: Boolean, requestChannel: String) {
         if (location.elapsedRealtimeNanos <= lastProcessedFixNanos) {
             // Fused and direct GPS often deliver the very same hardware fix. If the
             // direct callback wins the race, the old duplicate guard discarded the
@@ -873,6 +902,12 @@ class TrackingService : Service() {
             location.speedAccuracyMetersPerSecond.takeIf { location.hasSpeedAccuracy() },
             location.isMock, satellitesUsed, averageCn0, gnssTelemetrySeen))
         val wallNow = System.currentTimeMillis()
+        lastLocationRequestChannel = requestChannel
+        lastLocationProvider = location.provider
+        lastLocationAccuracyM = accuracy
+        lastLocationFixWallAt = wallNow
+        lastLocationFilterAccepted = result.accepted
+        lastLocationFilterReason = result.reason
         val state = tripEngine?.save()
         var currentSnap = routeEngine?.snap(routeLabel, location.latitude, location.longitude, state?.direction)
         if (state != null && result.accepted && result.quality in setOf("good", "stationary")) {
@@ -968,7 +1003,23 @@ class TrackingService : Service() {
         // coordinates, oscillating along-track jumps and a recovery that never
         // receives its second confirmation.
         val fullyTrustedFix = positionAccepted && output?.recovering != true
+        lastLocationTrusted = fullyTrustedFix
         lastProcessedFixHealthy = fullyTrustedFix
+        val sourceKey = listOf(requestChannel, location.provider, output?.source,
+            fullyTrustedFix, output?.recovering, networkBackupActive, directGpsActive).joinToString("|")
+        if (sourceKey != lastLocationSourceKey) {
+            lastLocationSourceKey = sourceKey
+            diagnostics.event("location_source_changed", diagnosticContext() + mapOf(
+                "request_channel" to requestChannel,
+                "provider" to location.provider,
+                "accuracy_m" to accuracy,
+                "filter_quality" to result.quality,
+                "filter_reason" to result.reason,
+                "trusted_position" to fullyTrustedFix,
+                "position_source" to output?.source,
+                "position_recovering" to output?.recovering,
+                "distance_to_route_m" to currentSnap?.distanceM))
+        }
         if (fullyTrustedFix) acceptedGpsSamples++ else rejectedGpsSamples++
         if (fullyTrustedFix) {
             recoverGpsOutage(if (fromDirectGps) "direct-gps" else location.provider ?: "fused")
@@ -1006,7 +1057,7 @@ class TrackingService : Service() {
             updateInterferenceMemory(it, result.quality in setOf("weak", "recovering", "rejected"))
         }
         persistSnapshot(output, accuracy)
-        recordDiagnosticSample(location, result, currentSnap, output, fromDirectGps)
+        recordDiagnosticSample(location, result, currentSnap, output, fromDirectGps, requestChannel)
         recordReplayGps(location, result, currentSnap, output, fromDirectGps)
         output?.officialM?.let { official ->
             val text=NativePositionLabel.kmPk(official)
@@ -1054,7 +1105,8 @@ class TrackingService : Service() {
             "requires_stop" to next.requireStop))
     }
     private fun recordDiagnosticSample(location: Location, result: NativeMotionFilter.Result,
-        snap: NativeRouteEngine.Snap?, output: NativeTripEngine.Output?, fromDirectGps: Boolean) {
+        snap: NativeRouteEngine.Snap?, output: NativeTripEngine.Output?, fromDirectGps: Boolean,
+        requestChannel: String) {
         val now = SystemClock.elapsedRealtime()
         val qualityChanged = result.quality != lastDiagnosticQuality
         if (!qualityChanged && now - lastDiagnosticSampleAt < 5_000) return
@@ -1065,6 +1117,7 @@ class TrackingService : Service() {
             "lat" to location.latitude, "lon" to location.longitude,
             "accuracy_m" to location.accuracy,
             "provider" to location.provider,
+            "request_channel" to requestChannel,
             "direct_gps_reserve" to fromDirectGps,
             "fix_elapsed_ms" to location.elapsedRealtimeNanos / 1_000_000,
             "fix_age_ms" to ((SystemClock.elapsedRealtimeNanos() - location.elapsedRealtimeNanos) / 1_000_000).coerceAtLeast(0),

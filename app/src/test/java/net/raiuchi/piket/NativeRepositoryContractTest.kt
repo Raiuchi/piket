@@ -21,6 +21,7 @@ class NativeRepositoryContractTest {
     @Test fun premiumHtmlIsViewAndCriticalEngineRemainsKotlin() {
         val main = projectFile("app/src/main/java/net/raiuchi/piket/MainActivity.kt").readText()
         val service = projectFile("app/src/main/java/net/raiuchi/piket/TrackingService.kt").readText()
+        val diagnostics = projectFile("app/src/main/java/net/raiuchi/piket/DiagnosticsLogger.kt").readText()
         val manifest = projectFile("app/src/main/AndroidManifest.xml").readText()
         val html = projectFile("app/src/main/assets/index.html").readText()
         assertTrue(main.contains("WebView") && main.contains("publishSnapshot"))
@@ -54,6 +55,17 @@ class NativeRepositoryContractTest {
         assertTrue("GPS recovery must keep an Android-provider one-shot path independent of fused location",
             service.contains("native_location_probe_started") &&
                 service.contains("LocationManagerCompat.getCurrentLocation"))
+        assertTrue("diagnostics must identify the exact location request channel automatically",
+            service.contains("location_source_changed") &&
+                service.contains("fused-primary") && service.contains("fused-network") &&
+                service.contains("gps-provider") && service.contains("gps-current-probe"))
+        assertTrue("every native diagnostic event must include the current recovery source state",
+            service.contains("network_reserve_active") &&
+                service.contains("satellites_visible") && service.contains("trusted_position") &&
+                service.contains("position_source"))
+        assertTrue("diagnostics must retain a bounded 100 MB two-generation window",
+            diagnostics.contains("MAX_BYTES = 50_000_000L") &&
+                diagnostics.contains("current.renameTo(previous)"))
         assertTrue("off-route Doppler must not move a manually calibrated train",
             service.contains("isRouteSpeedPlausible") && service.contains("speed_route_plausible"))
         assertTrue("a cold direct-GPS acquisition must not be reset every two minutes",

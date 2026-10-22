@@ -55,10 +55,10 @@ class DiagnosticsLogger(context: Context) {
     }
 
     companion object {
-        // Keep two generations of up to 12 MB each. The compact replay trace makes a
-        // full long-distance round trip larger than the old 6+6 MB window; 12+12 MB
-        // normally retains both directions without allowing unbounded storage growth.
-        private const val MAX_BYTES = 12_000_000L
+        // Keep two generations of up to 50 MB each. A 100 MB bounded window leaves
+        // enough headroom for both directions of a long trip with detailed provider,
+        // recovery and replay telemetry without allowing unbounded storage growth.
+        private const val MAX_BYTES = 50_000_000L
         private val writeLock = Any()
         private val sequence = AtomicLong()
         private val crashHandlerInstalled = AtomicBoolean()
