@@ -8,11 +8,20 @@ const html=fs.readFileSync('app/src/main/assets/index.html','utf8');
 const box={window:{}};vm.createContext(box);vm.runInContext(coreSource,box);vm.runInContext(scheduleSource,box);
 const reliability=box.PIKET_RELIABILITY;
 const trains=box.window.PIKET_SCHEDULES.trains;
+const timingStart=html.indexOf('  var TIMING_STATIONS=');
+const timingEnd=html.indexOf('  var MAXSPD=',timingStart);
+const timingBox={};vm.createContext(timingBox);vm.runInContext(html.slice(timingStart,timingEnd),timingBox);
+const timingStations=JSON.parse(JSON.stringify(timingBox.TIMING_STATIONS));
+const inlineSpeedStart=html.indexOf('  var SPEEDROUTES=');
+const inlineSpeedEnd=html.indexOf('  var SPEED_ROUTE_ORDER=',inlineSpeedStart);
+const inlineSpeedBox={};vm.createContext(inlineSpeedBox);vm.runInContext(html.slice(inlineSpeedStart,inlineSpeedEnd),inlineSpeedBox);
+const inlineSpeedRoutes=JSON.parse(JSON.stringify(inlineSpeedBox.SPEEDROUTES));
 const byId=Object.fromEntries(orders.routes.map(route=>[route.id,route]));
 const max=id=>Math.max(...byId[id].groups.flatMap(group=>group.rows.map(row=>row.glp).filter(Number.isFinite)));
 let passed=0;
 function check(name,ok){if(!ok)throw new Error(`FAIL ${name}`);console.log(`PASS ${name}`);passed++;}
 
+check('встроенный справочник приложения полностью совпадает с файлом приказа',JSON.stringify(inlineSpeedRoutes)===JSON.stringify(orders.routes));
 check('Балтийский — Луга берёт максимум 140 из приказа',max('last-luga')===reliability.browserSpeedCeiling('Броневая - Луга'));
 check('Сапсан берёт максимум 250 из приказов обоих направлений',max('sap-spb-msk')===250&&max('sap-msk-spb')===250&&reliability.browserSpeedCeiling('СпбГл - Москва','751')===250);
 check('Ласточка Москва — Петербург берёт максимум 160',max('last-spb-msk')===160&&max('last-msk-spb')===160&&reliability.browserSpeedCeiling('СпбГл - Москва','723')===160);
@@ -34,19 +43,7 @@ const speedLogicEnd=html.indexOf('\n  function renderSpeedRef(',speedLogicStart)
 function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap-msk-spb',peregon='СпбГл - Москва',physicalDirection=direction) {
   const context={
     SPEEDROUTES:orders.routes,
-    TIMING_STATIONS:{'СпбГл - Москва':[
-      ['Санкт-Петербург-Главный',200],['Крюково',611200],['Сходня',619700],
-      ['Химки',631200],['Ховрино',633900],['Москва-Товарная',646600],
-      ['Москва-Пассажирская',649500]
-    ],'Д. Долг - Павлово':[['Дача Долгорукова',0],['Заневский Пост-2',4800],['Манушкино',19900],['Павлово-на-Неве',29200]],
-      'Павлово - Горы II путь':[['Павлово-на-Неве',29200],['Горы',42000]],
-      'Горы - Павлово I путь':[['Горы',42000],['Павлово-на-Неве',29200]],
-      'Горы - Петрозаводск':[['Горы',42000],['Волховстрой-1',121200],['Волховстрой-2',124400],['Свирь',287300],['Петрозаводск-Пассажирский',402400]],
-      'Броневая - Луга':[['Броневая',3600],['Сиверская',68100],['Луга-1',137800]],
-      'Чудово - Новгород':[['Чудово-Московское',0],['Разъезд 64 км',63900],['Великий Новгород',70000]],
-      'Волховстрой - Чудово':[['Волховстрой-2',0],['Волховстрой-1',2000],['Пороги',7000],['Чудово-Кировское',101000]],
-      'СПбФин - Выборг':[['Санкт-Петербург-Финляндский',0],['Выборг-Пассажирский',128900]],
-      'Выборг - Каменногорск':[['Выборг-Пассажирский',0],['Каменногорск',42000]]},
+    TIMING_STATIONS:JSON.parse(JSON.stringify(timingStations)),
     state:{ctx:{peregon,towards:physicalDirection},settings:{orderPathTuda:mode,orderPathObratno:mode}},
     rt:{},journeyTowards:()=>direction,
     metersOf:(km,pk=1,m=0)=>km*1000+(pk-1)*100+m,
@@ -57,6 +54,7 @@ function speedLogic(direction,mode,routeId=direction==='tuda'?'sap-spb-msk':'sap
   const lookup=position=>{const order=context.activeSpeedOrder(effectiveRouteId,position);return{order,speed:context.orderSpeedValue(order),next:context.nextSpeedOrder(effectiveRouteId,order),routeId:effectiveRouteId};};
   lookup.mode=context.orderPathMode();
   lookup.options=context.orderPathOptions();
+  lookup.rows=()=>context.speedOrderRows(effectiveRouteId);
   lookup.setPeregon=value=>{context.state.ctx.peregon=value;};
   return lookup;
 }
@@ -72,17 +70,14 @@ function checkOrderCoverage(label,direction,routeId,peregon,from,to,step,physica
   const orderAt=speedLogic(direction,'auto',routeId,peregon,physicalDirection);
   const reverse=physicalDirection==='obratno';
   const errors=[];
-  let previousEntry=null;
+  let previousPathIndex=null;
   const visit=pos=>{
     const result=orderAt(pos),order=result.order;
     if(!order){errors.push(`${pos}: карточка не найдена`);return;}
     if(!Number.isFinite(result.speed)||result.speed<=0)errors.push(`${pos}: скорость ${result.speed}`);
     if(indexRange&&(order.index<indexRange[0]||order.index>indexRange[1]))errors.push(`${pos}: индекс ${order.index} вне ${indexRange.join('..')}`);
-    if(Number.isFinite(order.entry)&&Number.isFinite(previousEntry)){
-      if(!reverse&&order.entry+5<previousEntry)errors.push(`${pos}: карточка вернулась ${previousEntry} -> ${order.entry}`);
-      if(reverse&&order.entry-5>previousEntry)errors.push(`${pos}: карточка вернулась ${previousEntry} -> ${order.entry}`);
-    }
-    if(Number.isFinite(order.entry))previousEntry=order.entry;
+    if(Number.isFinite(previousPathIndex)&&order.pathIndex<previousPathIndex)errors.push(`${pos}: индекс карточки вернулся ${previousPathIndex} -> ${order.pathIndex}`);
+    previousPathIndex=order.pathIndex;
   };
   if(reverse){for(let pos=from;pos>=to;pos-=step)visit(pos);}else{for(let pos=from;pos<=to;pos+=step)visit(pos);}
   if(errors.length)console.error(`${label}: ${errors.slice(0,10).join('; ')}`);
@@ -94,6 +89,10 @@ check('после Крюково в Москву автоматически вы
 check('прибытие в Москву переключается на 25 км/ч перронного пути',orderAt(649500).speed===25);
 orderAt=speedLogic('obratno','auto');
 check('Москва — Петербург начинает с 25 км/ч на перронном пути',orderAt(649500).speed===25);
+check('Сапсан после перрона последовательно проходит 60 и 80 км/ч в горловине Москвы',orderAt(649400).speed===60&&orderAt(648500).speed===80);
+const lastochkaFromMoscow=speedLogic('obratno','auto','last-msk-spb','СпбГл - Москва','obratno');
+check('Ласточка после московского перрона проходит 40 км/ч и выходит на 140 км/ч строго по приказу',
+  lastochkaFromMoscow(649500).speed===25&&lastochkaFromMoscow(649400).speed===40&&lastochkaFromMoscow(645400).speed===140);
 check('из Москвы доступны только Авто, Неправильный главный и Боковой путь',
   JSON.stringify(orderAt.options.map(item=>item.value))===JSON.stringify(['auto','wrong','side']));
 check('из Москвы до Крюково автоматически выбран IV путь',orderAt(635400).speed===140);
@@ -119,6 +118,18 @@ checkOrderCoverage('Финляндский — Выборг','tuda','last-spbfin
 checkOrderCoverage('Выборг — Каменногорск','tuda','last-spbfin-kamenn','Выборг - Каменногорск',0,42000,25,'tuda',[32,57]);
 checkOrderCoverage('Каменногорск — Выборг','obratno','last-kamenn-spbfin','Выборг - Каменногорск',42000,0,25,'obratno',[0,18]);
 checkOrderCoverage('Выборг — Финляндский','obratno','last-kamenn-spbfin','СПбФин - Выборг',130000,0,50,'obratno',[19,58]);
+checkOrderCoverage('Сапсан Петербург — Москва','tuda','sap-spb-msk','СпбГл - Москва',200,649500,250,'tuda');
+checkOrderCoverage('Сапсан Москва — Петербург','obratno','sap-msk-spb','СпбГл - Москва',649500,200,250,'obratno');
+checkOrderCoverage('Ласточка Петербург — Москва','tuda','last-spb-msk','СпбГл - Москва',200,649500,250,'tuda');
+checkOrderCoverage('Ласточка Москва — Петербург','obratno','last-msk-spb','СпбГл - Москва',649500,200,250,'obratno');
+checkOrderCoverage('Балтийский — Луга','tuda','last-luga','Броневая - Луга',0,137800,100,'tuda');
+checkOrderCoverage('Луга — Балтийский','obratno','last-luga','Броневая - Луга',137800,0,100,'obratno');
+checkOrderCoverage('Горы — Петрозаводск','tuda','last-dd-ptz','Горы - Петрозаводск',42000,402400,100,'tuda');
+checkOrderCoverage('Петрозаводск — Горы','obratno','last-ptz-dd','Горы - Петрозаводск',402400,42000,100,'obratno');
+checkOrderCoverage('Новгород — Чудово','tuda','last-vnov-volh2','Чудово - Новгород',70000,0,100,'obratno');
+checkOrderCoverage('Чудово — Новгород','obratno','last-vnov-volh2','Чудово - Новгород',0,70000,100,'tuda');
+checkOrderCoverage('Чудово — Волхов','tuda','last-vnov-volh2','Волховстрой - Чудово',101000,0,100,'obratno');
+checkOrderCoverage('Волхов — Чудово','obratno','last-vnov-volh2','Волховстрой - Чудово',0,101000,100,'tuda');
 checkNextSequence('Дача Долгорукова — Павлово','tuda','last-dd-ptz','Д. Долг - Павлово',0,29200,100);
 checkNextSequence('Павлово — Дача Долгорукова','obratno','last-ptz-dd','Д. Долг - Павлово',29200,0,100);
 checkNextSequence('Павлово — Горы','tuda','last-dd-ptz','Павлово - Горы II путь',29200,42000,50);
@@ -163,7 +174,8 @@ check('после Выборга приказ использует только 
 orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','Выборг - Каменногорск');
 check('до Выборга обратный приказ использует только строки Каменногорского участка',orderAt(40000).order.index<=18);
 orderAt=speedLogic('tuda','auto','last-spbfin-kamenn','СПбФин - Выборг');
-check('Финляндский ход начинает с карточки 25 км/ч для перронных путей',orderAt(1000).speed===25&&/перрон/i.test(orderAt(1000).order.rr.name));
+const finDeparture=orderAt(1000);
+check(`Финляндский ход начинает с карточки 25 км/ч для перронных путей (${finDeparture.speed}, ${finDeparture.order&&finDeparture.order.rr.name})`,finDeparture.speed===25&&/перрон/i.test(finDeparture.order.rr.name));
 check('Финляндский — Выборг штатно идёт по I главному',orderAt(80000).order.pathLabel==='I главный');
 const zelenogorskOutbound=orderAt(50878);
 check(`Зеленогорск туда показывает вложенный диапазон приказа 120, а не общий 160 (${zelenogorskOutbound.speed}, ${zelenogorskOutbound.order&&zelenogorskOutbound.order.rr.name})`,
@@ -188,16 +200,18 @@ orderAt.setPeregon('СПбФин - Выборг');
 check('обратный переход в Выборге сбрасывает индекс карточки на Петербургскую ось',orderAt(120000).order.index>=19);
 orderAt=speedLogic('tuda','auto','last-luga','Броневая - Луга');
 const lugaOutboundMain=orderAt(50000),lugaOutboundArrival=orderAt(137900);
-check(`Балтийский ход следует по I главному и заходит в Луге через IIс на IП (${lugaOutboundMain.order.pathLabel}, ${lugaOutboundArrival.order.index}, ${lugaOutboundArrival.speed})`,lugaOutboundMain.order.pathLabel==='I главный'&&lugaOutboundArrival.speed===40);
+check(`Балтийский ход начинает с перронной карточки, следует по I главному и заходит в Луге через IIс на IП (${lugaOutboundMain.order.pathLabel}, ${lugaOutboundArrival.order.index}, ${lugaOutboundArrival.speed})`,orderAt(0).speed===25&&lugaOutboundMain.order.pathLabel==='I главный'&&lugaOutboundArrival.speed===40);
 orderAt=speedLogic('obratno','auto','last-luga','Броневая - Луга');
-check('обратный Балтийский ход выходит из IП через IIс и идёт по II главному',orderAt(136900).speed===25&&orderAt(120000).order.pathLabel==='II главный');
+check('обратный Балтийский ход выходит из IП через IIс, идёт по II главному и заканчивает перронной карточкой',orderAt(136900).speed===25&&orderAt(120000).order.pathLabel==='II главный'&&orderAt(0).speed===25);
 orderAt=speedLogic('tuda','auto','last-dd-ptz','Горы - Петрозаводск');
 const ptzGory=orderAt(42800),ptzVolkhov=orderAt(124400),ptzArrival=orderAt(402400);
 check(`маршрут на Петрозаводск использует IV главный в Горах, 3 путь Волховстроя-2 и 11 путь Петрозаводска (${ptzGory.order.index}/${ptzGory.order.pathLabel}, ${ptzVolkhov.order.index}/${ptzVolkhov.speed}, ${ptzArrival.order.index}/${ptzArrival.speed})`,
   ptzGory.order.pathLabel==='IV главный, Горы'&&ptzVolkhov.speed===40&&ptzArrival.speed===40);
+check('в Мге на Петрозаводск выбран IV путь и съезд IVА → II без карточек альтернативного III пути',orderAt(48800).speed===100&&orderAt(48800).order.pathLabel==='IV путь, Мга'&&orderAt(51500).speed===80&&orderAt(51500).order.pathLabel==='съезд IVА → II, Мга');
 orderAt=speedLogic('obratno','auto','last-ptz-dd','Горы - Петрозаводск');
 check('обратный Петрозаводский ход начинает с 11 пути и не выбирает альтернативный II мостовой путь',
   orderAt(402400).speed===40&&orderAt(124400).speed===40&&speedLogic('obratno','auto','last-ptz-dd','Горы - Петрозаводск')(124400).order.index!==77);
+check('обратно Мга отображается единым штатным III путём без повторяющихся карточек',orderAt(50000).speed===80&&orderAt(50000).order.pathLabel==='III путь, Мга');
 orderAt=speedLogic('tuda','auto','last-dd-ptz','Д. Долг - Павлово');
 check('Дача Долгорукова — Павлово использует только II главный своего участка',orderAt(10000).order.pathLabel==='II главный'&&orderAt(10000).order.index<=16);
 orderAt=speedLogic('obratno','auto','last-ptz-dd','Д. Долг - Павлово');
@@ -210,7 +224,7 @@ const goryPavlovo=orderAt(33000);
 check(`Горы — Павлово отделено как I главный путь (${goryPavlovo.order.index}/${goryPavlovo.order.pathLabel})`,goryPavlovo.order.pathLabel==='I главный');
 orderAt=speedLogic('tuda','auto','last-vnov-volh2','Чудово - Новгород','obratno');
 const novDeparture=orderAt(70000),novChudovo=orderAt(3000);
-check(`ось Новгород — Чудово переведена из карты полётов в координаты приложения (${novDeparture.order.index} → ${novChudovo.order.index})`,novDeparture.order.index<=8&&novChudovo.order.index>=27&&novChudovo.order.index<=29);
+check(`Новгород начинается с перронной карточки, затем последовательно показывает II главный и Предузловую Павловскую (${novDeparture.order.index} → ${novChudovo.order.index})`,novDeparture.speed===25&&orderAt(67500).speed===60&&orderAt(65100).speed===50&&novChudovo.order.index>=27&&novChudovo.order.index<=29);
 orderAt=speedLogic('obratno','auto','last-vnov-volh2','Чудово - Новгород','tuda');
 check('обратная ось Чудово — Новгород идёт последовательно вверх без строк Волховского участка',orderAt(3000).order.index>=27&&orderAt(70000).order.index<=8);
 orderAt=speedLogic('tuda','auto','last-vnov-volh2','Волховстрой - Чудово','obratno');
@@ -228,4 +242,24 @@ check('легенда приказа прямо объясняет жёлтые 
 check('карточки Сапсана и Ласточки получили разные сдержанные премиальные палитры и анимации',html.includes('@keyframes sapsanAurora')&&html.includes('@keyframes sapsanFlight')&&html.includes('@keyframes sapsanRailPulse')&&html.includes('@keyframes lastochkaFlight')&&html.includes('.routeCard.train-sapsan{background:radial-gradient')&&html.includes('#7BAEC9')&&html.includes('.routeCard.train-lastochka{--lc-a:')&&html.includes('#F16476')&&html.includes('#C69B9C')&&!html.includes('.routeCard.train-lastochka:nth-child(3n+2)')&&!html.includes('.routeCard.train-lastochka:nth-child(3n)')&&html.includes('.routeCard.train-lastochka::after')&&html.includes('.routeCard::before,.routeCard::after')&&html.includes('prefers-reduced-motion:reduce'));
 check('заголовки приказов получили контрастный сдержанный градиент и читаемую типографику',html.includes('#srTitle{font-family:var(--display)')&&html.includes('#v-speedref.train-lastochka #srTitle{color:#F3A0AD')&&html.includes('#B84A60')&&html.includes('-webkit-background-clip:text'));
 check('рабочая сводка уплотнена и сохраняет приказ, время и ограничение в двух колонках',html.includes('grid-template-columns:minmax(0,1fr) minmax(0,1fr)')&&html.includes('@media(max-width:340px)')&&html.includes('@keyframes consoleFlow'));
+for(const [label,direction,routeId,peregon,physicalDirection] of [
+  ['Сапсан СПб-Москва','tuda','sap-spb-msk','СпбГл - Москва','tuda'],
+  ['Сапсан Москва-СПб','obratno','sap-msk-spb','СпбГл - Москва','obratno'],
+  ['Ласточка СПб-Москва','tuda','last-spb-msk','СпбГл - Москва','tuda'],
+  ['Ласточка Москва-СПб','obratno','last-msk-spb','СпбГл - Москва','obratno'],
+  ['Балтийский-Луга','tuda','last-luga','Броневая - Луга','tuda'],
+  ['Луга-Балтийский','obratno','last-luga','Броневая - Луга','obratno'],
+  ['Финляндский-Выборг','tuda','last-spbfin-kamenn','СПбФин - Выборг','tuda'],
+  ['Выборг-Финляндский','obratno','last-kamenn-spbfin','СПбФин - Выборг','obratno'],
+  ['Выборг-Каменногорск','tuda','last-spbfin-kamenn','Выборг - Каменногорск','tuda'],
+  ['Каменногорск-Выборг','obratno','last-kamenn-spbfin','Выборг - Каменногорск','obratno'],
+  ['Дача-Петрозаводск','tuda','last-dd-ptz','Горы - Петрозаводск','tuda'],
+  ['Петрозаводск-Дача','obratno','last-ptz-dd','Горы - Петрозаводск','obratno'],
+  ['Новгород-Чудово','tuda','last-vnov-volh2','Чудово - Новгород','obratno'],
+  ['Чудово-Волхов','tuda','last-vnov-volh2','Волховстрой - Чудово','obratno']
+]){
+  const rows=speedLogic(direction,'auto',routeId,peregon,physicalDirection).rows();
+  const unmapped=rows.filter(row=>row.entry==null);
+  check(`${label}: каждая активная строка приказа привязана к позиции (${rows.length}/${rows.length})`,unmapped.length===0);
+}
 console.log(`${passed} speed-order scenarios passed`);

@@ -3352,7 +3352,7 @@ window.addEventListener("unhandledrejection",function(e){
     if(routeId==="last-spbfin-kamenn"||routeId==="last-kamenn-spbfin")return (TIMING_STATIONS["СПбФин - Выборг"]||[]).concat(TIMING_STATIONS["Выборг - Каменногорск"]||[]);
     return[];
   }
-  function speedPlaceKey(value){return String(value||"").toLowerCase().replace(/ё/g,"е").replace(/с\.?\s*пб\.?\s*гл\.?\s*моск/g,"санкт петербург главный").replace(/(?:с\.?\s*)?пб\.?\s*[-–]?\s*финл(?:яндский)?\.?/g,"санкт петербург финляндский").replace(/^выборг(?!\s*[-– ]?пасс)/,"выборг пассажирский").replace(/москва[-– ]?пасс(?:ажирская)?/g,"москва пассажирская").replace(/москва[-– ]?тов(?:арная)?/g,"москва товарная").replace(/петрозаводск[-– ]пассажирский/g,"петрозаводск").replace(/блок[-– ]пост/g,"пост").replace(/[^а-яa-z0-9]+/g," ").trim();}
+  function speedPlaceKey(value){return String(value||"").toLowerCase().replace(/ё/g,"е").replace(/с\.?\s*пб\.?\s*гл\.?\s*моск/g,"санкт петербург главный").replace(/(?:с\.?\s*)?пб\.?\s*[-–]?\s*финл(?:яндский)?\.?/g,"санкт петербург финляндский").replace(/^выборг(?!\s*[-– ]?пасс)/,"выборг пассажирский").replace(/москва[-– ]?пасс(?:ажирская)?/g,"москва пассажирская").replace(/москва[-– ]?тов(?:арная)?/g,"москва товарная").replace(/петрозаводск[-– ]пассажирский/g,"петрозаводск").replace(/верхне\s*[-–]?\s*черкасово/g,"верхнечеркасово").replace(/в\.?\s*волочек/g,"вышний волочек").replace(/в\.?\s*новгород/g,"великий новгород").replace(/чудово\s*[-– ]?\s*моск(?:овское)?\.?/g,"чудово московское").replace(/разъезд\s+64\s+километр/g,"разъезд 64 км").replace(/блок[-– ]пост/g,"пост").replace(/[^а-яa-z0-9]+/g," ").replace(/\s+смена оси.*$/," ").trim();}
   function stationPositionForSpeedRow(routeId,name){
     var row=speedPlaceKey(name),best=null,bestAt=Infinity;
     speedStationRows(routeId).forEach(function(st){
@@ -3402,18 +3402,19 @@ window.addEventListener("unhandledrejection",function(e){
   // на обратном Финляндском ходе штатный маршрут кратко проходит по 4 пути перед
   // возвращением на II главный: для этих строк нужна колонка бокового пути.
   var STANDARD_ROUTE_PATHS={
-    "sap-spb-msk":[{from:0,to:89,label:"I главный"},{from:90,to:106,label:"III главный"},{from:107,to:111,label:"I главный, Крюково"},{from:1000,to:1015,label:"I главный, Крюково — Москва"}],
-    "last-spb-msk":[{from:0,to:71,label:"I главный"},{from:72,to:90,label:"III главный"}],
-    "sap-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:118,label:"II главный"}],
-    "last-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:86,label:"II главный"}],
+    "sap-spb-msk":[{from:0,to:89,label:"I главный"},{from:90,to:106,label:"III главный"},{from:107,to:111,label:"I главный, Крюково"},{from:1000,to:1015,label:"I главный, Крюково — Москва"},{from:1,to:1,label:"альтернативный II главный при отправлении",skip:true},{from:4,to:4,label:"I главный",at:3400},{from:102,to:102,label:"III главный, подход к Москве",at:646700},{from:104,to:104,label:"III главный, горловина Москвы",at:648000},{from:106,to:106,label:"7 приёмо-отправочный путь",skip:true}],
+    "last-spb-msk":[{from:0,to:71,label:"I главный"},{from:72,to:90,label:"III главный"},{from:1,to:1,label:"альтернативный II главный при отправлении",skip:true},{from:3,to:3,label:"дублирующий заголовок I главного",skip:true},{from:85,to:85,label:"IV парк, отдельный вариант",skip:true},{from:86,to:86,label:"III главный, подход к Москве",at:646700},{from:88,to:88,label:"III главный, горловина Москвы",at:648000},{from:90,to:90,label:"7 приёмо-отправочный путь",skip:true}],
+    "sap-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:118,label:"II главный"},{from:2,to:2,label:"выход с перронных путей",at:649400},{from:3,to:3,label:"горловина Москвы",at:648500},{from:114,to:114,label:"II главный",at:5300}],
+    "last-msk-spb":[{from:0,to:17,label:"IV главный"},{from:18,to:86,label:"II главный"},{from:3,to:3,label:"выход с перронных путей",at:649400}],
     "last-spbfin-kamenn":[{from:0,to:30,label:"I главный"},{from:31,to:31,label:"стрелочная улица Выборга",speed:"bokp"},{from:32,to:57,label:"II главный"}],
     "last-kamenn-spbfin":[{from:0,to:18,label:"I главный"},{from:19,to:41,label:"II главный"},{from:42,to:44,label:"4 путь",speed:"bokp"},{from:45,to:58,label:"II главный"}],
     "last-luga":[
-      {from:0,to:1,label:"перронный путь СПб-Балтийского",speed:"bokp",group:"Путь I"},{from:2,to:36,label:"I главный",group:"Путь I"},{from:37,to:39,label:"IIс → IП, Луга",speed:"bokp",group:"Путь I"},
-      {from:41,to:42,label:"IП → IIс → I, Луга",speed:"bokp",group:"Путь II"},{from:43,to:83,label:"II главный",group:"Путь II"}
+      {from:0,to:0,label:"перронный путь СПб-Балтийского",speed:"bokp",group:"Путь I",at:0},{from:1,to:1,label:"дублирующая парковая строка",group:"Путь I",skip:true},{from:2,to:36,label:"I главный",group:"Путь I"},{from:37,to:37,label:"IIс → IП, Луга",speed:"bokp",group:"Путь I",at:137100},{from:38,to:39,label:"дублирующие парковые строки Луги",group:"Путь I",skip:true},
+      {from:40,to:40,label:"заголовок обратного пути",group:"Путь II",skip:true},{from:41,to:42,label:"IП → IIс → I, Луга",speed:"bokp",group:"Путь II"},{from:43,to:82,label:"II главный",group:"Путь II"},{from:83,to:83,label:"перронный путь СПб-Балтийского",group:"Путь II",at:0}
     ],
     "last-dd-ptz":[
-      {from:0,to:17,label:"II главный"},{from:18,to:18,label:"IV главный, Горы",at:42800},{from:19,to:31,label:"II главный"},
+      {from:0,to:17,label:"II главный"},{from:18,to:18,label:"IV главный, Горы",at:42800},{from:19,to:19,label:"II главный"},
+      {from:20,to:20,label:"IV путь, Мга",skip:true},{from:21,to:21,label:"IV путь, Мга",at:48800},{from:22,to:22,label:"съезд IVА → II, Мга",at:51500},{from:23,to:24,label:"альтернативный III путь, Мга",skip:true},{from:25,to:31,label:"II главный"},
       {from:32,to:32,label:"3 путь, Волховстрой-2",speed:"bokp",at:124400},{from:33,to:70,label:"II главный"},
       {from:71,to:72,label:"I главный, Свирь"},{from:73,to:73,label:"съезд I → II"},{from:74,to:109,label:"II главный"},
       {from:110,to:110,label:"11 приёмо-отправочный, Петрозаводск",speed:"bokp",at:402400}
@@ -3421,12 +3422,12 @@ window.addEventListener("unhandledrejection",function(e){
     "last-ptz-dd":[
       {from:0,to:0,label:"11 приёмо-отправочный, Петрозаводск",speed:"bokp",at:402400},{from:1,to:40,label:"I главный"},
       {from:41,to:41,label:"II путь Свири",skip:true},{from:42,to:74,label:"I главный"},{from:75,to:75,label:"3 путь, Волховстрой-2",speed:"bokp",at:124400},
-      {from:76,to:76,label:"I мостовой путь"},{from:77,to:77,label:"II мостовой путь",skip:true},{from:78,to:89,label:"I главный"},
+      {from:76,to:76,label:"I мостовой путь"},{from:77,to:77,label:"II мостовой путь",skip:true},{from:78,to:86,label:"I главный"},{from:87,to:87,label:"III путь, Мга"},{from:88,to:89,label:"дублирующие строки III пути Мги",skip:true},
       {from:90,to:90,label:"III главный, Горы",at:42800},{from:91,to:105,label:"I главный"}
     ],
     "last-vnov-volh2":[
-      {from:0,to:30,label:"Великий Новгород → Чудово"},{from:31,to:32,label:"парковые пути Чудово",skip:true},
-      {from:33,to:34,label:"III/IV главный, Чудово"},{from:35,to:62,label:"I главный"},
+      {from:0,to:0,label:"перронный путь Великого Новгорода",speed:"bokp",at:70000},{from:1,to:4,label:"II главный, Великий Новгород"},{from:5,to:5,label:"альтернативный I главный",skip:true},{from:6,to:6,label:"II главный, до Предузловой Павловской",at:67500},{from:7,to:7,label:"Предузловая Павловская",at:65100},{from:8,to:8,label:"заголовок III главного",skip:true},{from:9,to:29,label:"Великий Новгород → Чудово"},{from:30,to:30,label:"41 путь, Чудово",at:0},{from:31,to:32,label:"парковые пути Чудово",skip:true},
+      {from:33,to:34,label:"III/IV главный, Чудово"},{from:35,to:35,label:"I/IV главный, Чудово",at:101000},{from:36,to:62,label:"I главный"},
       {from:63,to:63,label:"5 путь, Пороги",speed:"bokp",at:7000},{from:64,to:65,label:"I главный"},
       {from:66,to:70,label:"альтернативный путь",skip:true},{from:71,to:71,label:"III путь, Новооктябрьский парк",at:2000},
       {from:72,to:73,label:"альтернативный путь",skip:true},{from:74,to:74,label:"III главный, Волховстрой-2",at:0}
@@ -3541,16 +3542,27 @@ window.addEventListener("unhandledrejection",function(e){
     if(rt.speedRowsCacheKey===cacheKey&&rt.speedRowsCache)return rt.speedRowsCache;
     var route=SPEEDROUTES.find(function(x){return x.id===routeId;}),rows=[],seq=0,reverse=speedTravelReverse(),lastProgress=-Infinity;
     if(!route)return rows;
-    var raw=[];route.groups.forEach(function(group){group.rows.forEach(function(rr){raw.push({rr:rr,index:seq++,groupTitle:group.title||""});});});
+    var lastTravelBoundaryM=null,raw=[];route.groups.forEach(function(group){group.rows.forEach(function(rr){raw.push({rr:rr,index:seq++,groupTitle:group.title||""});});});
     orderRowsForSelectedPath(routeId,raw).forEach(function(item){var rr=item.rr,standardPath=standardRoutePath(routeId,item.index,item.groupTitle);
       if(standardPath&&standardPath.skip)return;
       var positions=standardPath&&standardPath.at!=null?[+standardPath.at,+standardPath.at]:speedPositionsForContext(routeId,item,speedPositionsFromName(rr.name)),stationM=positions.length?null:stationPositionForSpeedRow(routeId,rr.name);
       if(!positions.length&&stationM!=null)positions=[stationM];
       var lo=positions.length?Math.min.apply(null,positions):null,hi=positions.length?Math.max.apply(null,positions):null;
       var entry=positions.length?(reverse?hi:lo):null,progress=entry==null?null:(reverse?-entry:entry);
+      // A named section often follows one or more exact picket ranges in the order.
+      // Its first station can therefore be geographically behind the preceding row
+      // (for example the generic Finlandsky-Lanskaya row follows the 2 km 1-6 pk
+      // ranges). Starting it at the station made the platform card jump straight
+      // from 25 to 100. In that case continue after the previous documented range.
+      if(stationM!=null&&positions.length===1&&progress!=null&&progress<=lastProgress&&lastTravelBoundaryM!=null&&
+          !/перрон|прием|приём|прибыт|отпр/i.test(rr.name||"")){
+        var inferred=lastTravelBoundaryM+(reverse?-100:100);positions=[inferred];stationM=null;
+        lo=hi=entry=inferred;progress=reverse?-entry:entry;
+      }
       // Some station captions and the following "from km" row overlap by 100–200 m.
       // Preserve the document order instead of jumping back to the station caption.
       if(progress!=null){progress=Math.max(progress,lastProgress+.01);lastProgress=progress;}
+      if(positions.length)lastTravelBoundaryM=reverse?lo:hi;
       rows.push({rr:rr,index:item.index,pathIndex:rows.length,positions:positions,stationM:stationM,lo:lo,hi:hi,entry:entry,progress:progress,pathLabel:standardPath&&standardPath.label,standardSpeed:standardPath&&standardPath.speed});
     });
     rows=rows.filter(function(row){return orderSpeedValue(row)!=null;});
