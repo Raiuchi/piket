@@ -365,6 +365,23 @@ class NativeTripEngineTest {
         assertTrue(output.recovering)
     }
 
+    @Test fun vyborgTransitionsKeepTheDocumentedFirstKilometreOnBothAxes() {
+        val toKamennogorsk = routes.snap("Выборг - Каменногорск", 60.71575, 28.75344, "tuda")!!
+        val forward = NativeTripEngine(routes)
+        forward.configure("СПбФин - Выборг", "tuda", 129_878.0, true, emptyList())
+        forward.switchRoute("Выборг - Каменногорск", "tuda", toKamennogorsk)
+        assertEquals(toKamennogorsk.officialM + 987.0,
+            forward.update(NativeTripEngine.Input(1_000, 0f, true, toKamennogorsk, true)).officialM!!, 0.01)
+
+        val toFinland = routes.snap("СПбФин - Выборг", 60.71575, 28.75344, "obratno")!!
+        val reverse = NativeTripEngine(routes)
+        reverse.configure("Выборг - Каменногорск", "obratno", 987.0, true, emptyList())
+        reverse.switchRoute("СПбФин - Выборг", "obratno", toFinland)
+        assertEquals(toFinland.officialM + 978.0,
+            reverse.update(NativeTripEngine.Input(1_000, 0f, true, toFinland, true)).officialM!!, 0.01)
+        assertTrue(reverse.update(NativeTripEngine.Input(2_000, 0f, true, toFinland, true)).officialM!! > 129_700.0)
+    }
+
     @Test fun deadReckoningStaysInsideEveryRouteInBothDirections() {
         routes.labels().forEach { label ->
             val testedRoute = routes.route(label)!!

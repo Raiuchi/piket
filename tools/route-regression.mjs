@@ -40,6 +40,10 @@ assert.equal(box.CHAINAGE[vyborgKamenn][0], 0,
   'Vyborg-Kamennogorsk official axis must begin at km 0');
 assert.equal(box.manualCalibrationMappingM(16000,'СпбГл - Москва'),15725,
   'manual calibration must remove a learned route offset before mapping to physical track');
+assert.equal(box.routeOfficialOffset('СПбФин - Выборг'),978,
+  'Finland-Vyborg must retain the documented first kilometre before field learning');
+assert.equal(box.routeOfficialOffset('Выборг - Каменногорск'),987,
+  'Vyborg-Kamennogorsk must retain the documented first kilometre before field learning');
 box.metersOf=(km,pk=1,m=0)=>km*1000+(pk-1)*100+(m||0);
 for (const name of ['speedPositionsFromName']) {
   const start = html.indexOf(`  function ${name}(`);

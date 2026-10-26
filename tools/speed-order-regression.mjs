@@ -165,6 +165,9 @@ check('до Выборга обратный приказ использует т
 orderAt=speedLogic('tuda','auto','last-spbfin-kamenn','СПбФин - Выборг');
 check('Финляндский ход начинает с карточки 25 км/ч для перронных путей',orderAt(1000).speed===25&&/перрон/i.test(orderAt(1000).order.rr.name));
 check('Финляндский — Выборг штатно идёт по I главному',orderAt(80000).order.pathLabel==='I главный');
+const zelenogorskOutbound=orderAt(50878);
+check(`Зеленогорск туда показывает вложенный диапазон приказа 120, а не общий 160 (${zelenogorskOutbound.speed}, ${zelenogorskOutbound.order&&zelenogorskOutbound.order.rr.name})`,
+  zelenogorskOutbound.speed===120&&/50км 4пк.*51км 1пк/i.test(zelenogorskOutbound.order.rr.name));
 orderAt(120000);
 orderAt.setPeregon('Выборг - Каменногорск');
 check('переход в Выборге сбрасывает индекс карточки на Каменногорскую ось',orderAt(5000).order.index>=32&&orderAt(5000).order.index<=57);
@@ -174,6 +177,9 @@ orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','Выборг - Кам�
 check('Каменногорск — Выборг штатно идёт по I главному',orderAt(20000).order.pathLabel==='I главный');
 orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','СПбФин - Выборг');
 check('Выборг — Финляндский после 4 пути возвращается на II главный',orderAt(100000).order.pathLabel==='II главный');
+const zelenogorskReturn=orderAt(50878);
+check(`Зеленогорск обратно показывает вложенный диапазон приказа 100, а не общий 160 (${zelenogorskReturn.speed}, ${zelenogorskReturn.order&&zelenogorskReturn.order.rr.name})`,
+  zelenogorskReturn.speed===100&&/51км 1пк.*50км 4пк/i.test(zelenogorskReturn.order.rr.name));
 const finArrival=orderAt(1000);
 check(`прибытие на Финляндский заканчивается карточкой перронных путей (${finArrival.speed}, ${finArrival.order&&finArrival.order.rr.name})`,finArrival.speed===25&&/перрон/i.test(finArrival.order.rr.name));
 orderAt=speedLogic('obratno','auto','last-kamenn-spbfin','Выборг - Каменногорск');

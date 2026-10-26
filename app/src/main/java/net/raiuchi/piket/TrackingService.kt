@@ -438,6 +438,8 @@ class TrackingService : Service() {
 
     private fun locationRequest(priority: Int = Priority.PRIORITY_HIGH_ACCURACY, interval: Long = 1_000L) =
         LocationRequest.Builder(interval).setPriority(priority)
+            .setGranularity(if (priority == Priority.PRIORITY_HIGH_ACCURACY)
+                Granularity.GRANULARITY_FINE else Granularity.GRANULARITY_PERMISSION_LEVEL)
             .setMinUpdateIntervalMillis(if (priority == Priority.PRIORITY_HIGH_ACCURACY) 500 else 2_000)
             .setMaxUpdateAgeMillis(0).setMaxUpdateDelayMillis(0).setWaitForAccurateLocation(false).build()
 
@@ -561,7 +563,18 @@ class TrackingService : Service() {
                 val gnssActivelyAcquiring = NativeGpsRecoveryPolicy.isGnssActivelyAcquiring(
                     gnssTelemetrySeen, satellitesVisible,
                     if (lastGnssStatusAtElapsed > 0L) elapsedNow - lastGnssStatusAtElapsed else Long.MAX_VALUE)
-                if (!gnssActivelyAcquiring && NativeGpsRecoveryPolicy.shouldRestartDirectRequest(directGpsActive,
+                val stalledAcquisition = NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
+                    directGpsActive, unusableFor, satellitesUsed, now - directGpsLastRequestAt)
+                if (stalledAcquisition) {
+                    diagnostics.event("gps_recovery_stack_refreshed", diagnosticContext() + mapOf(
+                        "reason" to "satellites-insufficient",
+                        "unusable_ms" to unusableFor,
+                        "satellites" to satellitesUsed,
+                        "satellites_visible" to satellitesVisible,
+                        "since_direct_request_ms" to (now - directGpsLastRequestAt).coerceAtLeast(0)))
+                    restartDirectGpsRequest(now, "satellites-insufficient")
+                    restartFused(now)
+                } else if (!gnssActivelyAcquiring && NativeGpsRecoveryPolicy.shouldRestartDirectRequest(directGpsActive,
                         now - directGpsLastCallbackAt, now - directGpsLastRequestAt)) {
                     restartDirectGpsRequest(now, "callback-stalled")
                 }
@@ -614,7 +627,7 @@ class TrackingService : Service() {
         if (!directGpsActive) {
             startDirectGps(now, (now - lastFixReceivedAt).coerceAtLeast(0), unusableFor,
                 "foreground-resume")
-        } else if (satellitesVisible == 0) {
+        } else if (satellitesUsed < 4) {
             restartDirectGpsRequest(now, "foreground-resume")
         }
         if (!currentLocationProbeInFlight) probeCurrentLocation(now)
@@ -942,12 +955,16 @@ class TrackingService : Service() {
             }
             if (transition != null && nextSnap != null) {
                 routeTransitionCount++
+                tripEngine?.switchRoute(transition.route, transition.direction, nextSnap)
+                val switchedOffset = tripEngine?.save()?.offsetM ?: 0.0
                 diagnostics.event("route_transition", diagnosticContext() + mapOf("from" to routeLabel,
                     "to" to transition.route, "direction" to transition.direction,
-                    "physical_m" to nextSnap.physicalM, "official_m" to nextSnap.officialM))
+                    "physical_m" to nextSnap.physicalM,
+                    "raw_official_m" to nextSnap.officialM,
+                    "official_offset_m" to switchedOffset,
+                    "official_m" to nextSnap.officialM + switchedOffset))
                 routeLabel = transition.route
                 updateSpeedCeiling()
-                tripEngine?.switchRoute(transition.route, transition.direction, nextSnap)
                 currentSnap = nextSnap
             }
         }
@@ -955,10 +972,16 @@ class TrackingService : Service() {
         // filtered speed also discarded an accurate on-track position, leaving
         // both speed and kilometre frozen until Stop/Start. NativeTripEngine has
         // its own two-fix recovery confirmation, so a good position remains safe.
-        val basePositionAccepted = result.accepted && result.quality in setOf("good", "stationary")
+        // NativeMotionFilter.accepted already guarantees a fresh, non-mock fix with
+        // <=50 m accuracy. Its quality/reason also describes Doppler and satellite
+        // confidence, which must not discard an otherwise valid coordinate. The route
+        // gate below plus NativeTripEngine's two-fix confirmation still quarantine
+        // off-route and jumping positions while questionable speed remains filtered.
+        val basePositionAccepted = result.accepted
         val routePositionPlausible = NativeGpsRecoveryPolicy.isRoutePositionPlausible(
             routeLabel, currentSnap?.distanceM)
-        val positionAccepted = basePositionAccepted && routePositionPlausible
+        val positionAccepted = NativeGpsRecoveryPolicy.shouldUsePosition(
+            basePositionAccepted, routeLabel, currentSnap?.distanceM)
         // Never move a manual calibration using Doppler from a fresh but physically
         // impossible coordinate. Keep dead reckoning for coarse fixes near the same
         // railway corridor, but quarantine spoofed/off-route fixes such as the 59 km

@@ -5,6 +5,15 @@ import kotlin.math.pow
 
 /** Нативное счисление позиции. Не содержит Android API и проверяется unit-тестами. */
 class NativeTripEngine(private val routes: NativeRouteEngine) {
+    private fun defaultOfficialOffsetM(label: String): Double = when (label) {
+        // Both field calibrations in the 25/26 October Vyborg run independently
+        // measured the same missing first kilometre: 1354 -> physical 376 on the
+        // Finland line and 38400 -> physical 37413 on the Kamennogorsk line.
+        // Route switching used to reset this offset to zero at Vyborg.
+        "СПбФин - Выборг" -> 978.0
+        "Выборг - Каменногорск" -> 987.0
+        else -> 0.0
+    }
     data class Restriction(val id: String, val route: String, val direction: String,
                            val startOfficialM: Double, val endOfficialM: Double, val leadM: Double,
                            val startTrackHintM: Double? = null, val endTrackHintM: Double? = null)
@@ -86,7 +95,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         } else if (routeChanged || calibrationChanged || forceCalibration) {
             previousAlertPhysicalM = null
             physicalM = null
-            officialOffsetM = 0.0
+            officialOffsetM = defaultOfficialOffsetM(route)
             recoveryCandidateM = null
             recoveryConfirmations = 0
             calibrationWaitStartedElapsedMs = 0L
@@ -142,7 +151,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
             val delayedFirstFix = input.acceptedFix && !input.provisionalCalibrationFix &&
                 input.elapsedMs - calibrationWaitStartedElapsedMs >= 30_000L &&
                 abs(manualOfficialM - base) > 250.0
-            officialOffsetM = if (delayedFirstFix) 0.0
+            officialOffsetM = if (delayedFirstFix) defaultOfficialOffsetM(route)
                 else (manualOfficialM - base).coerceIn(-1_500.0, 1_500.0)
             calibrationWaitStartedElapsedMs = 0L
             recovering = !input.acceptedFix
@@ -221,7 +230,7 @@ class NativeTripEngine(private val routes: NativeRouteEngine) {
         route = nextRoute
         direction = nextDirection
         physicalM = snap.physicalM
-        officialOffsetM = 0.0
+        officialOffsetM = defaultOfficialOffsetM(nextRoute)
         recoveryCandidateM = null
         recoveryConfirmations = 0
         recovering = false

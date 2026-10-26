@@ -1216,7 +1216,13 @@ window.addEventListener("unhandledrejection",function(e){
   }
   function routeOfficialOffset(label){
     var offsets=load("sap_routeOffsets",{}), value=+(offsets[label]);
-    return isFinite(value) && Math.abs(value)<=1500 ? value : 0;
+    if(isFinite(value) && Math.abs(value)<=1500)return value;
+    // The source geometry omits the first official kilometre on both sides of
+    // Vyborg. Use the two independent field calibrations as safe defaults; a later
+    // manual calibration can still learn a more precise residual for this device.
+    if(label==="СПбФин - Выборг")return 978;
+    if(label==="Выборг - Каменногорск")return 987;
+    return 0;
   }
   function manualCalibrationMappingM(enteredOfficialM,label){
     return enteredOfficialM-routeOfficialOffset(label);

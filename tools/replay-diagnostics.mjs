@@ -171,6 +171,7 @@ const currentLocationProbeFixes = events.filter(e => e.event === 'current_locati
 const nativeLocationProbes = events.filter(e => e.event === 'native_location_probe_started');
 const nativeLocationProbeFixes = events.filter(e => e.event === 'native_location_probe_fix');
 const locationSourceChanges = events.filter(e => e.event === 'location_source_changed');
+const gpsRecoveryStackRefreshes = events.filter(e => e.event === 'gps_recovery_stack_refreshed');
 const countValues = (rows, field) => Object.fromEntries([...new Set(rows.map(e => e[field]).filter(Boolean))]
   .sort().map(value => [value, rows.filter(e => e[field] === value).length]));
 const directFirstFixWaits = directFirstFixes.map(e => Number(e.wait_ms)).filter(Number.isFinite);
@@ -208,6 +209,7 @@ const report = {
   nativeLocationProbes: nativeLocationProbes.length,
   nativeLocationProbeFixes: nativeLocationProbeFixes.length,
   locationSourceChanges: locationSourceChanges.length,
+  gpsRecoveryStackRefreshes: gpsRecoveryStackRefreshes.length,
   locationRequestChannels: countValues(locationSourceChanges, 'request_channel'),
   locationProviders: countValues(locationSourceChanges, 'provider'),
   trustedLocationSourceChanges: locationSourceChanges.filter(e => e.trusted_position === true).length,
