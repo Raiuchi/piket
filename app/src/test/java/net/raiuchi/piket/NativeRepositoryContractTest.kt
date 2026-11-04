@@ -189,10 +189,12 @@ class NativeRepositoryContractTest {
     }
 
     @Test fun allSchedulesRemainCompleteUniqueAndMonotonic() {
-        val trains = json("schedules.json").getJSONArray("trains")
-        assertEquals(66, trains.length())
+        val schedule = json("schedules.json")
+        assertEquals("ЛБ_2026_10_23_Выписка_о_кооректировке_в_графике_движения_поездов.pdf", schedule.getString("source"))
+        val trains = schedule.getJSONArray("trains")
+        assertEquals(65, trains.length())
         val numbers = mutableSetOf<String>(); var passages = 0
-        val expected = mapOf("751" to 49, "754" to 49, "768" to 49, "804" to 34, "819" to 61, "820" to 61, "841" to 40, "842" to 39)
+        val expected = mapOf("751" to 49, "754" to 49, "768" to 49, "802" to 32, "804" to 34, "819" to 61, "820" to 61, "823" to 30, "841" to 40, "842" to 40)
         repeat(trains.length()) { index ->
             val train = trains.getJSONObject(index); val number = train.getString("number")
             assertTrue("duplicate train $number", numbers.add(number))
@@ -211,9 +213,8 @@ class NativeRepositoryContractTest {
             }
             assertTrue("$number has multiple midnight transitions", wraps <= 1)
         }
-        // Nine adjacent alias duplicates were removed from the source timetable;
-        // every operational stop remains covered without rendering a zero-length card.
-        assertEquals(2_703, passages)
+        assertFalse("train 766 has no times in the timetable effective 25.10.2026", numbers.contains("766"))
+        assertEquals(2_659, passages)
     }
 
     @Test fun everyTimetableRendersFromItsFirstStopAndProgressesOnlyForward() {

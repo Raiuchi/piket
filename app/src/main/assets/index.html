@@ -1587,7 +1587,10 @@ window.addEventListener("unhandledrejection",function(e){
     var nonFinite=!isFinite(req),impossible=nonFinite||req>currentBrowserSpeedCeiling();out.style.display="block";out.className="timing-result"+(impossible?" bad":"");
     out.innerHTML=(nonFinite?'<b>График недостижим: времени недостаточно</b><br><strong>Следовать с максимально реализуемой скоростью согласно приказам по скоростям</strong><br>':(impossible?'<b>График недостижим: требуется '+Math.round(req)+' км/ч</b><br><strong>Следовать с максимально реализуемой скоростью согласно приказам по скоростям</strong><br>':'Средняя по графику: <strong>'+Math.round(req)+' км/ч</strong><br>'))+'Расстояние '+fmtM(remaining)+' · '+Math.round((arrival-departure)/60000)+' мин.<br><small>Учитывай график, сигналы, ограничения и фактические условия. Это справочный расчёт.</small>';
   }
+  var scheduleSourceId=(window.PIKET_SCHEDULES&&window.PIKET_SCHEDULES.source)||"";
   var scheduleOverrides=load("sap_schedule_overrides",{}),scheduleTrainSelections=load("sap_schedule_trains",{});
+  if(scheduleOverrides.__source!==scheduleSourceId){scheduleOverrides={__source:scheduleSourceId};save("sap_schedule_overrides",scheduleOverrides);}
+  if(scheduleTrainSelections.__source!==scheduleSourceId){scheduleTrainSelections={__source:scheduleSourceId};save("sap_schedule_trains",scheduleTrainSelections);}
   function scheduleTrainKey(){return scheduleSourceRoute()+"|"+journeyTowards()+"|"+(activeThrough()||"direct");}
   function selectedScheduleTrain(){var field=document.getElementById("scheduleTrain"),current=field&&field.value;return current||(scheduleTrainSelections&&scheduleTrainSelections[scheduleTrainKey()])||"";}
   function scheduleNorm(s){return String(s||"").toLowerCase().replace(/ё/g,"е").replace(/[–—-]/g,"").replace(/[^a-zа-я0-9]/g,"").replace(/станция|московское|московский/g,"");}

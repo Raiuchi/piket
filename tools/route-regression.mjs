@@ -148,7 +148,49 @@ assert.ok(html.includes('state.settings.screenMode="auto";delete state.settings.
   html.includes('Автозатемнение включено, яркость снижена'),
   'accepting the heat warning must persist Auto dimming in settings');
 
-const schedules=JSON.parse(fs.readFileSync('app/src/main/assets/data/schedules.json','utf8')).trains;
+const scheduleData=JSON.parse(fs.readFileSync('app/src/main/assets/data/schedules.json','utf8'));
+const scheduleScript=fs.readFileSync('app/src/main/assets/assets/piket-schedules.js','utf8').trim();
+assert.ok(scheduleScript.startsWith('window.PIKET_SCHEDULES=')&&scheduleScript.endsWith(';'),
+  'browser timetable bundle must remain directly executable');
+assert.deepEqual(JSON.parse(scheduleScript.slice('window.PIKET_SCHEDULES='.length,-1)),scheduleData,
+  'JSON timetable and browser bundle must stay byte-for-byte equivalent as data');
+const schedules=scheduleData.trains;
+assert.equal(scheduleData.source,'ЛБ_2026_10_23_Выписка_о_кооректировке_в_графике_движения_поездов.pdf',
+  'schedule source must be the timetable effective 25.10.2026');
+assert.equal(schedules.length,65,'new timetable must contain all 65 trains that have published times');
+assert.ok(!schedules.some(train=>train.number==='766'),'train 766 has no published times in the new timetable');
+assert.equal(schedules.reduce((sum,train)=>sum+train.stops.length,0),2659,
+  'new timetable passage count must remain complete');
+assert.equal(new Set(schedules.map(train=>train.number)).size,schedules.length,'train numbers must remain unique');
+const scheduleClock=value=>{
+  assert.match(value,/^(?:[01]\d|2[0-3]):[0-5]\d(?::(?:00|30))?$/,'schedule time must be HH:MM or HH:MM:30');
+  const parts=value.split(':').map(Number);
+  return parts[0]*3600+parts[1]*60+(parts[2]||0);
+};
+for(const train of schedules){
+  let previous=null,day=0;
+  for(const stop of train.stops) for(const kind of ['arr','dep']) if(stop[kind]){
+    const clock=scheduleClock(stop[kind]);
+    if(previous!==null&&clock<previous%86400) day++;
+    const current=clock+day*86400;
+    assert.ok(previous===null||current>=previous,`train ${train.number} must progress monotonically near ${stop.station}`);
+    previous=current;
+  }
+  assert.ok(day<=1,`train ${train.number} must cross midnight at most once`);
+}
+const scheduleByNumber=number=>schedules.find(train=>train.number===number);
+const assertScheduleEdge=(number,departure,arrival)=>{
+  const train=scheduleByNumber(number),first=train.stops[0],last=train.stops.at(-1);
+  assert.equal(first.dep,departure,`train ${number} departure must match the new timetable`);
+  assert.equal(last.arr,arrival,`train ${number} arrival must match the new timetable`);
+};
+[
+  ['751','05:30','09:23'],['723','05:35','11:13'],['724','15:45','21:05'],
+  ['841','07:25','14:01'],['842','15:05','22:10'],['804','06:32','11:57'],
+  ['803','06:36','12:00'],['820','13:12','00:28'],['819','10:32','21:57'],
+  ['821','06:15','10:45'],['824','18:11','22:39'],['825','08:30','12:25'],
+  ['826','20:10','00:09']
+].forEach(row=>assertScheduleEdge(...row));
 const scheduleStationKey=value=>{
   const normalized=String(value||'').toLowerCase().replace(/ё/g,'е').replace(/[–—-]/g,'').replace(/[^a-zа-я0-9]/g,'').replace(/станция|московское|московский/g,'');
   return ({бологоемоск:'бологоемосковское',чудовомоск:'чудовомосковское'})[normalized]||normalized;
@@ -164,5 +206,8 @@ assert.deepEqual(vyborgForward,['821','823','825'],'Finland Station forward must
 assert.deepEqual(vyborgReverse,['822','824','826'],'Finland Station reverse must keep only even trains');
 assert.ok(html.includes('function scheduleTrainKey(){return scheduleSourceRoute()+"|"+journeyTowards()+"|"+(activeThrough()||"direct");}'),
   'saved train choices must remain isolated by route, direction and through journey');
+assert.ok(html.includes('if(scheduleOverrides.__source!==scheduleSourceId)')&&
+  html.includes('if(scheduleTrainSelections.__source!==scheduleSourceId)'),
+  'a new official timetable must invalidate stale manual times and train choices');
 
 console.log('Browser route regression: axes, trains, Moscow 205/210 transition, thermal UI and all documented through-route junctions passed');
