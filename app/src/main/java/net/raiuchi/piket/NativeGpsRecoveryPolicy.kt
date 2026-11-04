@@ -12,19 +12,18 @@ object NativeGpsRecoveryPolicy {
     const val INTERFERENCE_PREWARM_MIN_MS = 120_000L
     const val PRIMARY_STABLE_BEFORE_DIRECT_STOP_MS = 30_000L
     const val PRIMARY_STABLE_FIX_MAX_GAP_MS = 5_000L
-    // Re-registering GPS every 20 seconds repeatedly reset Samsung's weak-signal
+    // Re-registering GPS too often repeatedly resets Samsung's weak-signal
     // acquisition. Leave the continuous request alive long enough for a cold fix.
-    // If Android silently stalls GPS_PROVIDER with no satellites in use, repeat
-    // the internal navigator kick automatically. A normal cold start is left alone,
-    // but a receiver that still cannot use four satellites after 30 seconds is stale.
-    const val DIRECT_REQUEST_RESTART_AFTER_MS = 30_000L
-    const val DIRECT_REQUEST_RESTART_COOLDOWN_MS = 30_000L
-    // Field logs from the Finland corridor showed a Samsung receiver reporting
-    // 2-5 visible satellites but using fewer than four of them for more than an hour.
-    // Merely seeing satellites is not proof that acquisition is progressing. Refresh the
-    // whole recovery stack after 30 seconds without a minimally stable fix; this is the
-    // automatic equivalent of the foreground resume that recovered fixes in 5-6 s.
-    const val STALLED_ACQUISITION_REFRESH_AFTER_MS = 30_000L
+    const val DIRECT_REQUEST_RESTART_AFTER_MS = 60_000L
+    const val DIRECT_REQUEST_RESTART_COOLDOWN_MS = 60_000L
+    // Field diagnostics from 30 October and 3 November showed that re-registering
+    // GPS_PROVIDER every 30 seconds prevented Samsung's receiver from finishing a
+    // weak-signal acquisition: 182 restarts produced only two native fixes. Keep a
+    // visible-satellite acquisition alive for three minutes, while a receiver that
+    // sees no satellites at all may be restarted after one minute. Fused and one-shot
+    // probes continue independently during both windows.
+    const val NO_SATELLITE_REFRESH_AFTER_MS = 60_000L
+    const val VISIBLE_SATELLITE_REFRESH_AFTER_MS = 180_000L
     const val CURRENT_LOCATION_PROBE_AFTER_MS = 6_000L
     const val CURRENT_LOCATION_PROBE_COOLDOWN_MS = 12_000L
     const val NATIVE_LOCATION_PROBE_AFTER_MS = 12_000L
@@ -35,6 +34,9 @@ object NativeGpsRecoveryPolicy {
     // before this check, so 250 m accepts a precise railway fix without accepting
     // the 300-550 m coarse fused fixes seen in real diagnostics.
     const val MAX_TRUSTED_ROUTE_DISTANCE_M = 250.0
+    const val KAMENNOGORSK_MAX_TRUSTED_ROUTE_DISTANCE_M = 400.0
+    const val RECOVERY_POSITION_MAX_ACCURACY_M = 100f
+    const val RECOVERY_POSITION_MAX_ROUTE_DISTANCE_M = 120.0
     // Speed may remain useful while the position accuracy is temporarily too poor
     // for an exact snap. It must still belong to the selected railway corridor.
     // Real diagnostics contained fresh 130 km/h fixes almost 60 km away from the
@@ -42,10 +44,12 @@ object NativeGpsRecoveryPolicy {
     // freshly calibrated train while it was actually standing at the platform.
     const val MAX_SPEED_ROUTE_DISTANCE_M = 1_000.0
 
-    fun isRoutePositionPlausible(routeLabel: String, distanceToRouteM: Double?): Boolean =
-        routeLabel == "Все участки" ||
-            (distanceToRouteM != null && distanceToRouteM.isFinite() &&
-                distanceToRouteM <= MAX_TRUSTED_ROUTE_DISTANCE_M)
+    fun isRoutePositionPlausible(routeLabel: String, distanceToRouteM: Double?): Boolean {
+        if (routeLabel == "Все участки") return true
+        val limit = if (routeLabel == "Выборг - Каменногорск")
+            KAMENNOGORSK_MAX_TRUSTED_ROUTE_DISTANCE_M else MAX_TRUSTED_ROUTE_DISTANCE_M
+        return distanceToRouteM != null && distanceToRouteM.isFinite() && distanceToRouteM <= limit
+    }
 
     fun isRouteSpeedPlausible(routeLabel: String, distanceToRouteM: Double?): Boolean =
         routeLabel == "Все участки" ||
@@ -55,6 +59,17 @@ object NativeGpsRecoveryPolicy {
     fun shouldUsePosition(filterAccepted: Boolean, routeLabel: String,
                           distanceToRouteM: Double?): Boolean =
         filterAccepted && isRoutePositionPlausible(routeLabel, distanceToRouteM)
+
+    fun shouldUseRecoveryPosition(
+        recoveryActive: Boolean,
+        filterReason: String,
+        freshRealFix: Boolean,
+        accuracyM: Float,
+        distanceToRouteM: Double?
+    ): Boolean = recoveryActive && filterReason == "accuracy" && freshRealFix &&
+        accuracyM.isFinite() && accuracyM in 1f..RECOVERY_POSITION_MAX_ACCURACY_M &&
+        distanceToRouteM != null && distanceToRouteM.isFinite() &&
+        distanceToRouteM <= RECOVERY_POSITION_MAX_ROUTE_DISTANCE_M
 
     fun shouldStartDirect(
         tripActive: Boolean,
@@ -93,10 +108,14 @@ object NativeGpsRecoveryPolicy {
         directActive: Boolean,
         sinceLastUsableFixMs: Long,
         satellitesUsed: Int,
+        satellitesVisible: Int,
         sinceLastDirectRequestMs: Long
-    ): Boolean = directActive && satellitesUsed < 4 &&
-        sinceLastUsableFixMs >= STALLED_ACQUISITION_REFRESH_AFTER_MS &&
-        sinceLastDirectRequestMs >= STALLED_ACQUISITION_REFRESH_AFTER_MS
+    ): Boolean {
+        val threshold = if (satellitesVisible > 0) VISIBLE_SATELLITE_REFRESH_AFTER_MS
+            else NO_SATELLITE_REFRESH_AFTER_MS
+        return directActive && satellitesUsed < 4 && sinceLastUsableFixMs >= threshold &&
+            sinceLastDirectRequestMs >= threshold
+    }
 
     fun isGnssActivelyAcquiring(
         telemetrySeen: Boolean,

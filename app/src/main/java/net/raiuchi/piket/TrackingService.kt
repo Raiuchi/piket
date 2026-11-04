@@ -564,7 +564,8 @@ class TrackingService : Service() {
                     gnssTelemetrySeen, satellitesVisible,
                     if (lastGnssStatusAtElapsed > 0L) elapsedNow - lastGnssStatusAtElapsed else Long.MAX_VALUE)
                 val stalledAcquisition = NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
-                    directGpsActive, unusableFor, satellitesUsed, now - directGpsLastRequestAt)
+                    directGpsActive, unusableFor, satellitesUsed, satellitesVisible,
+                    now - directGpsLastRequestAt)
                 if (stalledAcquisition) {
                     diagnostics.event("gps_recovery_stack_refreshed", diagnosticContext() + mapOf(
                         "reason" to "satellites-insufficient",
@@ -980,8 +981,11 @@ class TrackingService : Service() {
         val basePositionAccepted = result.accepted
         val routePositionPlausible = NativeGpsRecoveryPolicy.isRoutePositionPlausible(
             routeLabel, currentSnap?.distanceM)
+        val recoveryPositionCandidate = NativeGpsRecoveryPolicy.shouldUseRecoveryPosition(
+            directGpsActive || lastEngineOutput?.recovering == true || wallNow - lastUsableFixAt > 8_000L,
+            result.reason, isFreshRealFix(location), accuracy, currentSnap?.distanceM)
         val positionAccepted = NativeGpsRecoveryPolicy.shouldUsePosition(
-            basePositionAccepted, routeLabel, currentSnap?.distanceM)
+            basePositionAccepted, routeLabel, currentSnap?.distanceM) || recoveryPositionCandidate
         // Never move a manual calibration using Doppler from a fresh but physically
         // impossible coordinate. Keep dead reckoning for coarse fixes near the same
         // railway corridor, but quarantine spoofed/off-route fixes such as the 59 km
@@ -1038,6 +1042,7 @@ class TrackingService : Service() {
                 "accuracy_m" to accuracy,
                 "filter_quality" to result.quality,
                 "filter_reason" to result.reason,
+                "recovery_position_candidate" to recoveryPositionCandidate,
                 "trusted_position" to fullyTrustedFix,
                 "position_source" to output?.source,
                 "position_recovering" to output?.recovering,

@@ -30,11 +30,26 @@ class NativeGpsRecoveryPolicyTest {
         assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("Горы - Петрозаводск", 177.3))
         assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", 249.9))
         assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", 250.1))
+        assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("Выборг - Каменногорск", 316.1))
+        assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("Выборг - Каменногорск", 400.1))
         assertFalse(NativeGpsRecoveryPolicy.isRoutePositionPlausible("СПбГл - Москва", null))
         assertTrue(NativeGpsRecoveryPolicy.isRoutePositionPlausible("Все участки", null))
         assertTrue(NativeGpsRecoveryPolicy.isRouteSpeedPlausible("СПбФин - Выборг", 999.9))
         assertFalse(NativeGpsRecoveryPolicy.isRouteSpeedPlausible("СПбФин - Выборг", 1_000.1))
         assertTrue(NativeGpsRecoveryPolicy.isRouteSpeedPlausible("Все участки", null))
+    }
+
+    @Test fun moderatelyCoarseOnRouteFixCanRecoverButNeverStartNormalTracking() {
+        assertTrue(NativeGpsRecoveryPolicy.shouldUseRecoveryPosition(
+            true, "accuracy", true, 85f, 42.0))
+        assertFalse(NativeGpsRecoveryPolicy.shouldUseRecoveryPosition(
+            false, "accuracy", true, 85f, 42.0))
+        assertFalse(NativeGpsRecoveryPolicy.shouldUseRecoveryPosition(
+            true, "accuracy", true, 101f, 42.0))
+        assertFalse(NativeGpsRecoveryPolicy.shouldUseRecoveryPosition(
+            true, "accuracy", true, 85f, 121.0))
+        assertFalse(NativeGpsRecoveryPolicy.shouldUseRecoveryPosition(
+            true, "stale", true, 85f, 42.0))
     }
 
     @Test fun acceptedCoordinateIsIndependentFromTheSeparateDopplerDecision() {
@@ -44,10 +59,10 @@ class NativeGpsRecoveryPolicyTest {
     }
 
     @Test fun stalledNativeGpsRequestIsRetriedUntilCallbacksResume() {
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 29_999, 30_000))
-        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 180_000, 29_999))
-        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 30_000, 30_000))
-        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 600_000, 30_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 59_999, 60_000))
+        assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 180_000, 59_999))
+        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 60_000, 60_000))
+        assertTrue(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(true, 600_000, 60_000))
         assertFalse(NativeGpsRecoveryPolicy.shouldRestartDirectRequest(false, 180_000, 180_000))
     }
 
@@ -60,19 +75,20 @@ class NativeGpsRecoveryPolicyTest {
     }
 
     @Test fun visibleButNeverUsedSatellitesEventuallyRefreshTheWholeStack() {
-        val threshold = NativeGpsRecoveryPolicy.STALLED_ACQUISITION_REFRESH_AFTER_MS
+        val visibleThreshold = NativeGpsRecoveryPolicy.VISIBLE_SATELLITE_REFRESH_AFTER_MS
+        val absentThreshold = NativeGpsRecoveryPolicy.NO_SATELLITE_REFRESH_AFTER_MS
         assertFalse(NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
-            true, threshold - 1, 0, threshold))
+            true, visibleThreshold - 1, 0, 12, visibleThreshold))
         assertTrue(NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
-            true, threshold, 3, threshold))
+            true, visibleThreshold, 3, 12, visibleThreshold))
         assertFalse(NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
-            true, threshold, 4, threshold))
+            true, visibleThreshold, 4, 12, visibleThreshold))
         assertFalse(NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
-            true, threshold, 0, threshold - 1))
+            true, visibleThreshold, 0, 12, visibleThreshold - 1))
         assertTrue(NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
-            true, threshold, 0, threshold))
+            true, absentThreshold, 0, 0, absentThreshold))
         assertFalse(NativeGpsRecoveryPolicy.shouldRefreshStalledAcquisition(
-            false, threshold * 2, 0, threshold * 2))
+            false, visibleThreshold * 2, 0, 12, visibleThreshold * 2))
     }
 
     @Test fun currentLocationProbeOnlyRunsDuringARealRecovery() {
